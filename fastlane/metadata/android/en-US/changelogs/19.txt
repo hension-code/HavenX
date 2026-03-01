@@ -1,0 +1,4 @@
+- Swipe-to-scroll in mouse mode (Zellij, vim, etc.)
+- Fix terminal not resizing when keyboard opens/closes
+- Sort Zellij sessions alphabetically
+- LoRa discovery with active path requests and periodic refresh

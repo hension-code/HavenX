@@ -7,7 +7,9 @@ Connect to your servers with a full terminal emulator, browse and transfer files
 ## Features
 
 - **SSH terminal** with multiple tabs per server — open several shells on the same host
+- **Reticulum support** — connect over rnsh via Sideband or direct TCP gateway, with announce-based discovery
 - **Session manager integration** — attach to tmux, zellij, screen, or byobu sessions
+- **Mouse mode / swipe-to-scroll** — vertical swipes send scroll events to TUI apps like Zellij and vim
 - **Auto-reconnect** with exponential backoff when connections drop
 - **SFTP file browser** for uploading and downloading files
 - **SSH key management** — generate and store Ed25519, RSA, and ECDSA keys
