@@ -70,6 +70,7 @@ fun TerminalScreen(
     val activeTabIndex by viewModel.activeTabIndex.collectAsState()
     val ctrlActive by viewModel.ctrlActive.collectAsState()
     val altActive by viewModel.altActive.collectAsState()
+    val colorScheme by viewModel.terminalColorScheme.collectAsState()
     val navigateToConnections by viewModel.navigateToConnections.collectAsState()
     val newTabSessionPicker by viewModel.newTabSessionPicker.collectAsState()
     val newTabLoading by viewModel.newTabLoading.collectAsState()
@@ -124,7 +125,11 @@ fun TerminalScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (tabs.isEmpty()) {
-            EmptyTerminalState(fontSize = fontSize)
+            EmptyTerminalState(
+                fontSize = fontSize,
+                backgroundColor = Color(colorScheme.background),
+                foregroundColor = Color(colorScheme.foreground),
+            )
         } else {
             // Tab row — always show when tabs exist so "+" button is accessible
             PrimaryScrollableTabRow(
@@ -217,8 +222,8 @@ fun TerminalScreen(
                             modifier = Modifier.fillMaxSize(),
                             initialFontSize = fontSize.sp,
                             keyboardEnabled = true,
-                            backgroundColor = Color(0xFF1A1A2E),
-                            foregroundColor = Color(0xFF00E676),
+                            backgroundColor = Color(colorScheme.background),
+                            foregroundColor = Color(colorScheme.foreground),
                             focusRequester = focusRequester,
                             onSelectionControllerAvailable = { selectionController = it },
                         )
@@ -248,11 +253,15 @@ fun TerminalScreen(
 }
 
 @Composable
-private fun EmptyTerminalState(fontSize: Int) {
+private fun EmptyTerminalState(
+    fontSize: Int,
+    backgroundColor: Color,
+    foregroundColor: Color,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E))
+            .background(backgroundColor)
             .padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -260,7 +269,7 @@ private fun EmptyTerminalState(fontSize: Int) {
             text = "Connect to a server to start a session.",
             fontFamily = FontFamily.Monospace,
             fontSize = fontSize.sp,
-            color = Color(0xFF00E676),
+            color = foregroundColor,
         )
     }
 }

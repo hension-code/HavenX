@@ -48,6 +48,14 @@ class SettingsViewModel @Inject constructor(
                 UserPreferencesRepository.SessionManager.NONE,
             )
 
+    val terminalColorScheme: StateFlow<UserPreferencesRepository.TerminalColorScheme> =
+        preferencesRepository.terminalColorScheme
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserPreferencesRepository.TerminalColorScheme.HAVEN,
+            )
+
     fun setBiometricEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setBiometricEnabled(enabled)
@@ -69,6 +77,12 @@ class SettingsViewModel @Inject constructor(
     fun setSessionManager(manager: UserPreferencesRepository.SessionManager) {
         viewModelScope.launch {
             preferencesRepository.setSessionManager(manager)
+        }
+    }
+
+    fun setTerminalColorScheme(scheme: UserPreferencesRepository.TerminalColorScheme) {
+        viewModelScope.launch {
+            preferencesRepository.setTerminalColorScheme(scheme)
         }
     }
 }

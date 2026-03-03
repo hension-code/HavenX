@@ -3,17 +3,25 @@ package sh.haven.feature.settings
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
@@ -36,7 +44,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -56,9 +66,11 @@ fun SettingsScreen(
     val fontSize by viewModel.terminalFontSize.collectAsState()
     val theme by viewModel.theme.collectAsState()
     val sessionManager by viewModel.sessionManager.collectAsState()
+    val colorScheme by viewModel.terminalColorScheme.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showSessionManagerDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showColorSchemeDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -94,6 +106,12 @@ fun SettingsScreen(
             title = "Terminal font size",
             subtitle = "${fontSize}sp",
             onClick = { showFontSizeDialog = true },
+        )
+        SettingsItem(
+            icon = Icons.Filled.Palette,
+            title = "Terminal color scheme",
+            subtitle = colorScheme.label,
+            onClick = { showColorSchemeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.ColorLens,
@@ -137,6 +155,17 @@ fun SettingsScreen(
             onSelect = { selected ->
                 viewModel.setTheme(selected)
                 showThemeDialog = false
+            },
+        )
+    }
+
+    if (showColorSchemeDialog) {
+        ColorSchemeDialog(
+            currentScheme = colorScheme,
+            onDismiss = { showColorSchemeDialog = false },
+            onSelect = { selected ->
+                viewModel.setTerminalColorScheme(selected)
+                showColorSchemeDialog = false
             },
         )
     }
@@ -234,6 +263,64 @@ private fun ThemeDialog(
                         },
                         modifier = Modifier.clickable(role = Role.RadioButton) {
                             onSelect(mode)
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColorSchemeDialog(
+    currentScheme: UserPreferencesRepository.TerminalColorScheme,
+    onDismiss: () -> Unit,
+    onSelect: (UserPreferencesRepository.TerminalColorScheme) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Terminal color scheme") },
+        text = {
+            Column {
+                UserPreferencesRepository.TerminalColorScheme.entries.forEach { scheme ->
+                    ListItem(
+                        headlineContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(scheme.background))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline,
+                                            RoundedCornerShape(4.dp),
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = "A",
+                                        color = Color(scheme.foreground),
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(scheme.label)
+                            }
+                        },
+                        leadingContent = {
+                            RadioButton(
+                                selected = scheme == currentScheme,
+                                onClick = null,
+                            )
+                        },
+                        modifier = Modifier.clickable(role = Role.RadioButton) {
+                            onSelect(scheme)
                         },
                     )
                 }

@@ -7,8 +7,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.connectbot.terminal.TerminalEmulator
@@ -21,6 +23,7 @@ import sh.haven.core.ssh.SshClient
 import sh.haven.core.ssh.SshSessionManager
 import sh.haven.core.ssh.SshSessionManager.SessionState
 import sh.haven.core.reticulum.ReticulumSessionManager
+import sh.haven.core.data.preferences.UserPreferencesRepository
 import javax.inject.Inject
 
 private const val TAG = "TerminalViewModel"
@@ -100,7 +103,16 @@ class TerminalViewModel @Inject constructor(
     private val sessionManager: SshSessionManager,
     private val reticulumSessionManager: ReticulumSessionManager,
     private val hostKeyVerifier: HostKeyVerifier,
+    private val preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    val terminalColorScheme: StateFlow<UserPreferencesRepository.TerminalColorScheme> =
+        preferencesRepository.terminalColorScheme
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserPreferencesRepository.TerminalColorScheme.HAVEN,
+            )
 
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
     val tabs: StateFlow<List<TerminalTab>> = _tabs.asStateFlow()
@@ -221,11 +233,12 @@ class TerminalViewModel @Inject constructor(
             ) ?: continue
 
             val coalescer = InputCoalescer { data -> termSession.sendToSsh(data) }
+            val scheme = terminalColorScheme.value
             emulator = TerminalEmulatorFactory.create(
                 initialRows = 24,
                 initialCols = 80,
-                defaultForeground = Color.White,
-                defaultBackground = Color(0xFF1A1A2E),
+                defaultForeground = Color(scheme.foreground),
+                defaultBackground = Color(scheme.background),
                 onKeyboardInput = { data -> coalescer.send(applyModifiers(data)) },
                 onResize = { dims ->
                     Log.d(TAG, "SSH onResize: ${dims.columns}x${dims.rows}")
@@ -270,11 +283,12 @@ class TerminalViewModel @Inject constructor(
             ) ?: continue
 
             val rnsCoalescer = InputCoalescer { data -> rnsSession.sendInput(data) }
+            val rnsScheme = terminalColorScheme.value
             emulator = TerminalEmulatorFactory.create(
                 initialRows = 24,
                 initialCols = 80,
-                defaultForeground = Color.White,
-                defaultBackground = Color(0xFF1A1A2E),
+                defaultForeground = Color(rnsScheme.foreground),
+                defaultBackground = Color(rnsScheme.background),
                 onKeyboardInput = { data -> rnsCoalescer.send(applyModifiers(data)) },
                 onResize = { dims ->
                     Log.d(TAG, "RNS onResize: ${dims.columns}x${dims.rows}")

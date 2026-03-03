@@ -22,6 +22,7 @@ class UserPreferencesRepository @Inject constructor(
     private val reticulumRpcKeyKey = stringPreferencesKey("reticulum_rpc_key")
     private val reticulumHostKey = stringPreferencesKey("reticulum_host")
     private val reticulumPortKey = intPreferencesKey("reticulum_port")
+    private val terminalColorSchemeKey = stringPreferencesKey("terminal_color_scheme")
 
     val biometricEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[biometricEnabledKey] ?: false
@@ -90,6 +91,34 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun clearReticulumConfig() {
         dataStore.edit { prefs ->
             prefs.remove(reticulumRpcKeyKey)
+        }
+    }
+
+    val terminalColorScheme: Flow<TerminalColorScheme> = dataStore.data.map { prefs ->
+        TerminalColorScheme.fromString(prefs[terminalColorSchemeKey])
+    }
+
+    suspend fun setTerminalColorScheme(scheme: TerminalColorScheme) {
+        dataStore.edit { prefs ->
+            prefs[terminalColorSchemeKey] = scheme.name
+        }
+    }
+
+    enum class TerminalColorScheme(
+        val label: String,
+        val background: Long,
+        val foreground: Long,
+    ) {
+        HAVEN("Haven", 0xFF1A1A2E, 0xFF00E676),
+        CLASSIC_GREEN("Classic Green", 0xFF000000, 0xFF00FF00),
+        LIGHT("Light", 0xFFFFFFFF, 0xFF1A1A1A),
+        SOLARIZED_DARK("Solarized Dark", 0xFF002B36, 0xFF839496),
+        DRACULA("Dracula", 0xFF282A36, 0xFFF8F8F2),
+        MONOKAI("Monokai", 0xFF272822, 0xFFF8F8F2);
+
+        companion object {
+            fun fromString(value: String?): TerminalColorScheme =
+                entries.find { it.name == value } ?: HAVEN
         }
     }
 
