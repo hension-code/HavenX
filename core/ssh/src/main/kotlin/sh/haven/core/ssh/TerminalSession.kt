@@ -94,9 +94,10 @@ class TerminalSession(
                 try { Thread.sleep(50) } catch (_: InterruptedException) { break }
             }
             val exitStatus = channel.exitStatus
-            // Clean exit: got EOF or channel closed with a real exit status (>= 0)
-            // Unexpected drop: exception thrown, or no exit status available (-1)
-            val cleanExit = (gotEof || exitStatus >= 0) && !gotException
+            // Clean exit: remote sent a real exit status (>= 0), e.g. shell
+            // exited normally.  A network drop produces EOF with exitStatus -1
+            // (no status received) — that must trigger reconnection.
+            val cleanExit = exitStatus >= 0 && !gotException
             Log.d(TAG, "readLoop ended for $sessionId — eof=$gotEof exception=$gotException exitStatus=$exitStatus cleanExit=$cleanExit")
             onDisconnected?.invoke(cleanExit)
         }

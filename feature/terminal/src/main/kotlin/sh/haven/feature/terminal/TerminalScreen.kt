@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -200,18 +201,14 @@ fun TerminalScreen(
                         modifier = Modifier
                             .weight(1f)
                             .onSizeChanged { surfaceSize = it }
-                            .then(
-                                if (isMouseMode) {
-                                    Modifier.pointerInput(activeTab.sessionId) {
-                                        scrollGestureDetector(
-                                            activeTab = activeTab,
-                                            surfaceSize = { surfaceSize },
-                                        )
-                                    }
-                                } else {
-                                    Modifier
-                                }
-                            )
+                            .pointerInput(activeTab.sessionId, isMouseMode, selectionActive) {
+                                terminalGestureInterceptor(
+                                    activeTab = activeTab,
+                                    mouseMode = isMouseMode,
+                                    selectionActive = selectionActive,
+                                    surfaceSize = { surfaceSize },
+                                )
+                            }
                             .then(terminalModifier),
                     ) {
                         Terminal(
@@ -354,6 +351,9 @@ private fun NewTabSessionPickerDialog(
 /** Pixels of vertical drag accumulated before emitting one scroll event. */
 private const val SCROLL_THRESHOLD_PX = 40f
 
+/** Millis after a drag gesture before long-press selection is allowed again. */
+private const val DRAG_SELECTION_COOLDOWN_MS = 300L
+
 /**
  * Build an SGR-encoded mouse wheel escape sequence.
  * Scroll up: button 64, scroll down: button 65.
@@ -366,48 +366,90 @@ private fun sgrMouseWheel(scrollUp: Boolean, col: Int, row: Int): ByteArray {
 }
 
 /**
- * Detect vertical drag gestures and emit SGR mouse wheel sequences.
- * Called inside a `Modifier.pointerInput` block when mouse mode is active.
+ * Unified gesture interceptor for the terminal surface.
+ *
+ * Runs on PointerEventPass.Initial so it sees events before the Terminal
+ * composable's internal gesture handler. Behavior:
+ *
+ * - Long press (hold still): passes through to Terminal for selection
+ * - Horizontal drag: consumed (blocks Terminal's drag-to-select)
+ * - Vertical drag + mouse mode: consumed, emits SGR mouse wheel sequences
+ * - Vertical drag + no mouse mode: passes through for Terminal scrollback
+ * - Selection already active: passes through for handle drag
  */
-private suspend fun PointerInputScope.scrollGestureDetector(
+private suspend fun PointerInputScope.terminalGestureInterceptor(
     activeTab: TerminalTab,
+    mouseMode: Boolean,
+    selectionActive: Boolean,
     surfaceSize: () -> IntSize,
 ) {
+    // When selection is active, let the Terminal handle handle-drag etc.
+    if (selectionActive) return
+
+    val touchSlop = viewConfiguration.touchSlop
+    var lastDragEndTime = 0L
+
     awaitPointerEventScope {
         while (true) {
-            // Wait for first touch down
-            val down = awaitPointerEvent()
+            val down = awaitPointerEvent(PointerEventPass.Initial)
             val firstChange = down.changes.firstOrNull() ?: continue
-
             if (!firstChange.pressed) continue
 
+            // If a drag just ended, consume the next touch-down so
+            // Terminal doesn't start a long-press selection immediately.
+            val inCooldown = System.currentTimeMillis() - lastDragEndTime < DRAG_SELECTION_COOLDOWN_MS
+
+            val startX = firstChange.position.x
+            val startY = firstChange.position.y
+            var classified = false
+            var isHorizontal = false
+            var isVertical = false
             var accumulatedY = 0f
-            var isDragging = false
+            var wasDrag = false
 
-            // Track subsequent moves until release
             while (true) {
-                val event = awaitPointerEvent()
+                val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull() ?: break
-
                 if (!change.pressed) break
 
-                val dy = change.position.y - (change.previousPosition.y)
-                accumulatedY += dy
-
-                // Only start consuming once we've moved enough vertically
-                // to distinguish from a tap
-                if (!isDragging && abs(accumulatedY) > SCROLL_THRESHOLD_PX) {
-                    isDragging = true
+                if (inCooldown) {
+                    change.consume()
+                    continue
                 }
 
-                if (isDragging) {
-                    change.consume()
+                if (!classified) {
+                    val dx = change.position.x - startX
+                    val dy = change.position.y - startY
+                    val absDx = abs(dx)
+                    val absDy = abs(dy)
 
-                    // Emit scroll events for each threshold crossed
+                    if (absDx > touchSlop || absDy > touchSlop) {
+                        classified = true
+                        isHorizontal = absDx > absDy
+                        isVertical = !isHorizontal
+                        wasDrag = true
+                        if (isVertical && mouseMode) {
+                            accumulatedY = dy
+                        }
+                    }
+                }
+
+                if (!classified) continue
+
+                if (isHorizontal) {
+                    // Consume horizontal drags — blocks Terminal selection
+                    change.consume()
+                    continue
+                }
+
+                if (isVertical && mouseMode) {
+                    // Consume vertical drags in mouse mode and emit wheel events
+                    change.consume()
+                    accumulatedY += change.position.y - change.previousPosition.y
+
                     while (abs(accumulatedY) >= SCROLL_THRESHOLD_PX) {
                         val draggedUp = accumulatedY < 0
                         accumulatedY += if (draggedUp) SCROLL_THRESHOLD_PX else -SCROLL_THRESHOLD_PX
-                        // Natural scrolling: drag down = scroll up
                         val scrollUp = !draggedUp
 
                         val size = surfaceSize()
@@ -420,7 +462,16 @@ private suspend fun PointerInputScope.scrollGestureDetector(
                             activeTab.sendInput(sgrMouseWheel(scrollUp, col, row))
                         }
                     }
+                    continue
                 }
+
+                // Vertical drag in non-mouse mode: don't consume,
+                // Terminal handles scrollback internally.
+                break
+            }
+
+            if (wasDrag) {
+                lastDragEndTime = System.currentTimeMillis()
             }
         }
     }
