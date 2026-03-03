@@ -17,7 +17,7 @@ class SshSessionManagerTest {
 
     @Before
     fun setUp() {
-        manager = SshSessionManager()
+        manager = SshSessionManager(mockk(relaxed = true))
     }
 
     @Test
