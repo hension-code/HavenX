@@ -1,6 +1,9 @@
 package sh.haven.feature.terminal
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import android.util.Patterns
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -169,6 +173,18 @@ fun SelectionToolbar(
                 controller.clearSelection()
             }
 
+            // Open URL
+            SelectionIconButton(Icons.AutoMirrored.Filled.OpenInNew, "Open") {
+                val text = controller.copySelection()?.trim()
+                val url = detectUrl(text)
+                if (url != null) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    controller.clearSelection()
+                } else {
+                    Toast.makeText(context, "No URL detected", Toast.LENGTH_SHORT).show()
+                }
+            }
+
             // Anchor target toggle: Start / End
             if (anchorMover.available) {
                 SelectionToggleButton(
@@ -242,4 +258,16 @@ private fun SelectionIconButton(icon: ImageVector, description: String, onClick:
     ) {
         Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
     }
+}
+
+/**
+ * Detect a URL in the selected text. Returns null if no URL found.
+ * Auto-adds "https://" if the matched text has no scheme.
+ */
+private fun detectUrl(text: String?): String? {
+    if (text.isNullOrBlank()) return null
+    val matcher = Patterns.WEB_URL.matcher(text)
+    if (!matcher.find()) return null
+    val url = matcher.group()
+    return if (url.contains("://")) url else "https://$url"
 }

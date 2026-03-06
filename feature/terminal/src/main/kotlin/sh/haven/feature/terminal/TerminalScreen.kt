@@ -189,12 +189,15 @@ fun TerminalScreen(
                 // key() forces Terminal recreation when switching tabs, ensuring
                 // the emulator and keyboard input are bound to the correct session.
                 key(activeTab.sessionId) {
-                    // Wire OSC 52 clipboard handler to Android ClipboardManager
+                    // Wire OSC handler callbacks
                     val clipboard = remember {
                         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     }
-                    activeTab.osc52Handler.onClipboardSet = { text ->
+                    activeTab.oscHandler.onClipboardSet = { text ->
                         clipboard.setPrimaryClip(ClipData.newPlainText("terminal", text))
+                    }
+                    activeTab.oscHandler.onNotification = { title, body ->
+                        showTerminalNotification(context, title, body, activeTab.label)
                     }
 
                     val focusRequester = remember { FocusRequester() }

@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.runtime)
+    implementation(libs.lifecycle.process)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

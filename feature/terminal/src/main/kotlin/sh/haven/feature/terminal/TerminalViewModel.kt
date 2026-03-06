@@ -93,7 +93,8 @@ data class TerminalTab(
     val transportType: String,
     val emulator: TerminalEmulator,
     val mouseMode: StateFlow<Boolean>,
-    val osc52Handler: Osc52Handler,
+    val oscHandler: OscHandler,
+    val cwd: StateFlow<String?>,
     val sendInput: (ByteArray) -> Unit,
     val resize: (Int, Int) -> Unit,
     val close: () -> Unit,
@@ -225,13 +226,15 @@ class TerminalViewModel @Inject constructor(
 
             lateinit var emulator: TerminalEmulator
             val mouseTracker = MouseModeTracker()
-            val osc52Handler = Osc52Handler()
+            val oscHandler = OscHandler()
+            val cwdFlow = MutableStateFlow<String?>(null)
+            oscHandler.onCwdChanged = { cwdFlow.value = it }
             val termSession = sessionManager.createTerminalSession(
                 sessionId = sessionId,
                 onDataReceived = { data, offset, length ->
-                    osc52Handler.process(data, offset, length)
-                    mouseTracker.process(osc52Handler.outputBuf, 0, osc52Handler.outputLen)
-                    emulator.writeInput(osc52Handler.outputBuf, 0, osc52Handler.outputLen)
+                    oscHandler.process(data, offset, length)
+                    mouseTracker.process(oscHandler.outputBuf, 0, oscHandler.outputLen)
+                    emulator.writeInput(oscHandler.outputBuf, 0, oscHandler.outputLen)
                 },
             ) ?: continue
 
@@ -259,7 +262,8 @@ class TerminalViewModel @Inject constructor(
                     transportType = "SSH",
                     emulator = emulator,
                     mouseMode = mouseTracker.mouseMode,
-                    osc52Handler = osc52Handler,
+                    oscHandler = oscHandler,
+                    cwd = cwdFlow,
                     sendInput = { data -> termSession.sendToSsh(data) },
                     resize = { cols, rows -> termSession.resize(cols, rows) },
                     close = { termSession.close() },
@@ -278,13 +282,15 @@ class TerminalViewModel @Inject constructor(
 
             lateinit var emulator: TerminalEmulator
             val rnsMouseTracker = MouseModeTracker()
-            val rnsOsc52Handler = Osc52Handler()
+            val rnsOscHandler = OscHandler()
+            val rnsCwdFlow = MutableStateFlow<String?>(null)
+            rnsOscHandler.onCwdChanged = { rnsCwdFlow.value = it }
             val rnsSession = reticulumSessionManager.createTerminalSession(
                 sessionId = sessionId,
                 onDataReceived = { data, offset, length ->
-                    rnsOsc52Handler.process(data, offset, length)
-                    rnsMouseTracker.process(rnsOsc52Handler.outputBuf, 0, rnsOsc52Handler.outputLen)
-                    emulator.writeInput(rnsOsc52Handler.outputBuf, 0, rnsOsc52Handler.outputLen)
+                    rnsOscHandler.process(data, offset, length)
+                    rnsMouseTracker.process(rnsOscHandler.outputBuf, 0, rnsOscHandler.outputLen)
+                    emulator.writeInput(rnsOscHandler.outputBuf, 0, rnsOscHandler.outputLen)
                 },
             ) ?: continue
 
@@ -312,7 +318,8 @@ class TerminalViewModel @Inject constructor(
                     transportType = "RETICULUM",
                     emulator = emulator,
                     mouseMode = rnsMouseTracker.mouseMode,
-                    osc52Handler = rnsOsc52Handler,
+                    oscHandler = rnsOscHandler,
+                    cwd = rnsCwdFlow,
                     sendInput = { data -> rnsSession.sendInput(data) },
                     resize = { cols, rows -> rnsSession.resize(cols, rows) },
                     close = { rnsSession.close() },
