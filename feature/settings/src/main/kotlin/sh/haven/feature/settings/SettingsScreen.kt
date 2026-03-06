@@ -364,6 +364,9 @@ private fun SessionManagerDialog(
                                 Text(manager.label)
                             }
                         },
+                        supportingContent = if (!manager.supportsScrollback) {
+                            { Text("No touch scrollback") }
+                        } else null,
                         leadingContent = {
                             RadioButton(
                                 selected = manager == current,

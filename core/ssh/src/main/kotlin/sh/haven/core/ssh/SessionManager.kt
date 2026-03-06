@@ -17,7 +17,7 @@ enum class SessionManager(
 ) {
     NONE("None", null, null),
     TMUX("tmux",
-        { name -> "tmux set -gq allow-passthrough on 2>/dev/null; tmux new-session -A -s $name" },
+        { name -> "tmux new-session -A -s $name \\; set -gq allow-passthrough on \\; set -gq mouse on" },
         "tmux ls -F '#{session_name}' 2>/dev/null",
         { name -> "tmux kill-session -t $name" },
         { old, new -> "tmux rename-session -t $old $new" },
@@ -35,7 +35,7 @@ enum class SessionManager(
         { old, new -> "screen -S $old -X sessionname $new" },
     ),
     BYOBU("byobu",
-        { name -> "byobu new-session -A -s $name" },
+        { name -> "byobu new-session -A -s $name \\; set -gq mouse on" },
         "byobu ls -F '#{session_name}' 2>/dev/null",
         { name -> "byobu kill-session -t $name" },
         { old, new -> "byobu rename-session -t $old $new" },

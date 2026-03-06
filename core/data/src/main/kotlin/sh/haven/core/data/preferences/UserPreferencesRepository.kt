@@ -137,12 +137,13 @@ class UserPreferencesRepository @Inject constructor(
         val label: String,
         val url: String?,
         val command: ((String) -> String)?,
+        val supportsScrollback: Boolean = true,
     ) {
-        NONE("None", null, null),
-        TMUX("tmux", "https://github.com/tmux/tmux/wiki", { name -> "tmux set -gq allow-passthrough on 2>/dev/null; tmux new-session -A -s $name" }),
+        NONE("None", null, null, supportsScrollback = false),
+        TMUX("tmux", "https://github.com/tmux/tmux/wiki", { name -> "tmux new-session -A -s $name \\; set -gq allow-passthrough on \\; set -gq mouse on" }),
         ZELLIJ("zellij", "https://zellij.dev", { name -> "zellij attach $name --create" }),
-        SCREEN("screen", "https://www.gnu.org/software/screen/", { name -> "screen -dRR $name" }),
-        BYOBU("byobu", "https://www.byobu.org", { name -> "byobu new-session -A -s $name" });
+        SCREEN("screen", "https://www.gnu.org/software/screen/", { name -> "screen -dRR $name" }, supportsScrollback = false),
+        BYOBU("byobu", "https://www.byobu.org", { name -> "byobu new-session -A -s $name \\; set -gq mouse on" });
 
         companion object {
             fun fromString(value: String?): SessionManager =

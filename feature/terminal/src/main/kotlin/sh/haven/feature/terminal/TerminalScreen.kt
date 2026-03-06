@@ -416,7 +416,7 @@ private fun sgrMouseWheel(scrollUp: Boolean, col: Int, row: Int): ByteArray {
  * - Long press (hold still): passes through to Terminal for selection
  * - Horizontal drag: passes through for page swiping / tab navigation
  * - Vertical drag + mouse mode: consumed, emits SGR mouse wheel sequences
- * - Vertical drag + no mouse mode: passes through for Terminal scrollback
+ * - Vertical drag + no mouse mode: ignored (no touch scrollback)
  * - Selection already active: passes through for handle drag
  */
 private suspend fun PointerInputScope.terminalGestureInterceptor(
@@ -484,7 +484,7 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
                 }
 
                 if (isVertical && mouseMode) {
-                    // Consume vertical drags in mouse mode and emit wheel events
+                    // Consume vertical drags and emit SGR wheel events.
                     change.consume()
                     accumulatedY += change.position.y - change.previousPosition.y
 
@@ -505,10 +505,6 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
                     }
                     continue
                 }
-
-                // Vertical drag in non-mouse mode: don't consume,
-                // Terminal handles scrollback internally.
-                break
             }
 
             if (wasDrag) {

@@ -1,0 +1,3 @@
+Enable touch scrollback for tmux, byobu, and zellij sessions
+Session managers that support mouse mode now auto-enable it at startup
+Show "No touch scrollback" label for None and screen in session picker
