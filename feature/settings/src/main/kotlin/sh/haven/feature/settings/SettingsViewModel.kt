@@ -1,14 +1,18 @@
 package sh.haven.feature.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import sh.haven.core.data.backup.BackupService
 import sh.haven.core.data.preferences.ToolbarLayout
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.security.BiometricAuthenticator
@@ -16,13 +20,60 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val appContext: Context,
     private val preferencesRepository: UserPreferencesRepository,
     private val authenticator: BiometricAuthenticator,
+    private val backupService: BackupService,
 ) : ViewModel() {
 
     val biometricAvailable: Boolean =
-        authenticator.checkAvailability(context) == BiometricAuthenticator.Availability.AVAILABLE
+        authenticator.checkAvailability(appContext) == BiometricAuthenticator.Availability.AVAILABLE
+
+    private val _backupStatus = MutableStateFlow<BackupStatus>(BackupStatus.Idle)
+    val backupStatus: StateFlow<BackupStatus> = _backupStatus.asStateFlow()
+
+    sealed interface BackupStatus {
+        data object Idle : BackupStatus
+        data object InProgress : BackupStatus
+        data class Success(val message: String) : BackupStatus
+        data class Error(val message: String) : BackupStatus
+    }
+
+    fun exportBackup(uri: Uri, password: String) {
+        viewModelScope.launch {
+            _backupStatus.value = BackupStatus.InProgress
+            try {
+                val data = backupService.export(password)
+                appContext.contentResolver.openOutputStream(uri)?.use { it.write(data) }
+                    ?: throw IllegalStateException("Could not open output stream")
+                _backupStatus.value = BackupStatus.Success("Backup exported")
+            } catch (e: Exception) {
+                _backupStatus.value = BackupStatus.Error(e.message ?: "Export failed")
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri, password: String) {
+        viewModelScope.launch {
+            _backupStatus.value = BackupStatus.InProgress
+            try {
+                val data = appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Could not open input stream")
+                val result = backupService.import(data, password)
+                val msg = "Restored ${result.count} items" +
+                    if (result.errors.isNotEmpty()) " (${result.errors.size} errors)" else ""
+                _backupStatus.value = BackupStatus.Success(msg)
+            } catch (e: javax.crypto.AEADBadTagException) {
+                _backupStatus.value = BackupStatus.Error("Wrong password")
+            } catch (e: Exception) {
+                _backupStatus.value = BackupStatus.Error(e.message ?: "Import failed")
+            }
+        }
+    }
+
+    fun clearBackupStatus() {
+        _backupStatus.value = BackupStatus.Idle
+    }
 
     val biometricEnabled: StateFlow<Boolean> = preferencesRepository.biometricEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)

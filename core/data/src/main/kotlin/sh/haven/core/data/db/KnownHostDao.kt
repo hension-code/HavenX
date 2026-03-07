@@ -14,6 +14,9 @@ interface KnownHostDao {
     @Query("SELECT * FROM known_hosts ORDER BY hostname ASC")
     fun observeAll(): Flow<List<KnownHost>>
 
+    @Query("SELECT * FROM known_hosts ORDER BY hostname ASC")
+    suspend fun getAll(): List<KnownHost>
+
     @Query("SELECT * FROM known_hosts WHERE hostname = :hostname AND port = :port LIMIT 1")
     suspend fun findByHostPort(hostname: String, port: Int): KnownHost?
 

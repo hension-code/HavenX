@@ -3,6 +3,9 @@ package sh.haven.feature.settings
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fingerprint
@@ -29,6 +34,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,6 +64,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,14 +86,46 @@ fun SettingsScreen(
     val colorScheme by viewModel.terminalColorScheme.collectAsState()
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
     val toolbarLayoutJson by viewModel.toolbarLayoutJson.collectAsState()
+    val backupStatus by viewModel.backupStatus.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showSessionManagerDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showColorSchemeDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showToolbarConfigDialog by remember { mutableStateOf(false) }
+    var showBackupPasswordDialog by remember { mutableStateOf<BackupAction?>(null) }
 
     val context = LocalContext.current
+
+    // SAF launchers for backup/restore
+    var pendingPassword by remember { mutableStateOf("") }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri != null) viewModel.exportBackup(uri, pendingPassword)
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            showBackupPasswordDialog = BackupAction.Restore(uri)
+        }
+    }
+
+    // Show toast on backup status changes
+    LaunchedEffect(backupStatus) {
+        when (val status = backupStatus) {
+            is SettingsViewModel.BackupStatus.Success -> {
+                Toast.makeText(context, status.message, Toast.LENGTH_SHORT).show()
+                viewModel.clearBackupStatus()
+            }
+            is SettingsViewModel.BackupStatus.Error -> {
+                Toast.makeText(context, status.message, Toast.LENGTH_LONG).show()
+                viewModel.clearBackupStatus()
+            }
+            else -> {}
+        }
+    }
 
     val packageInfo = remember {
         context.packageManager.getPackageInfo(context.packageName, 0)
@@ -137,6 +177,35 @@ fun SettingsScreen(
             subtitle = theme.label,
             onClick = { showThemeDialog = true },
         )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        SettingsItem(
+            icon = Icons.Filled.CloudUpload,
+            title = "Export backup",
+            subtitle = "Keys, connections, and settings",
+            onClick = {
+                showBackupPasswordDialog = BackupAction.Export
+            },
+        )
+        SettingsItem(
+            icon = Icons.Filled.CloudDownload,
+            title = "Restore backup",
+            subtitle = "Import from a backup file",
+            onClick = {
+                importLauncher.launch(arrayOf("*/*"))
+            },
+        )
+
+        if (backupStatus is SettingsViewModel.BackupStatus.InProgress) {
+            ListItem(
+                headlineContent = { Text("Working...") },
+                leadingContent = {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                },
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -235,6 +304,100 @@ fun SettingsScreen(
             },
         )
     }
+
+    showBackupPasswordDialog?.let { action ->
+        BackupPasswordDialog(
+            isExport = action is BackupAction.Export,
+            onDismiss = { showBackupPasswordDialog = null },
+            onConfirm = { password ->
+                showBackupPasswordDialog = null
+                when (action) {
+                    is BackupAction.Export -> {
+                        pendingPassword = password
+                        exportLauncher.launch("haven-backup.enc")
+                    }
+                    is BackupAction.Restore -> {
+                        viewModel.importBackup(action.uri, password)
+                    }
+                }
+            },
+        )
+    }
+}
+
+private sealed interface BackupAction {
+    data object Export : BackupAction
+    data class Restore(val uri: Uri) : BackupAction
+}
+
+@Composable
+private fun BackupPasswordDialog(
+    isExport: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    val title = if (isExport) "Export Backup" else "Restore Backup"
+    val passwordError = if (isExport && password.length in 1..5) "At least 6 characters" else null
+    val confirmError = if (isExport && confirmPassword.isNotEmpty() && confirmPassword != password) {
+        "Passwords don't match"
+    } else null
+    val canConfirm = if (isExport) {
+        password.length >= 6 && password == confirmPassword
+    } else {
+        password.isNotEmpty()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(
+                    text = if (isExport) {
+                        "Encrypt your backup with a password. This protects your SSH keys and connection data."
+                    } else {
+                        "Enter the password used when the backup was created."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    isError = passwordError != null,
+                    supportingText = passwordError?.let { { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (isExport) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        label = { Text("Confirm password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        isError = confirmError != null,
+                        supportingText = confirmError?.let { { Text(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(password) }, enabled = canConfirm) {
+                Text(if (isExport) "Export" else "Restore")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 private const val GITHUB_URL = "https://github.com/GlassOnTin/Haven"
