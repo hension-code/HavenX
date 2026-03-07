@@ -4,7 +4,9 @@ Open-source SSH and SFTP client for Android.
 
 Connect to your servers with a full terminal emulator, browse and transfer files over SFTP, and manage your SSH keys — all from your phone.
 
-Haven is free to build yourself or install from [F-Droid](https://f-droid.org) and [GitHub Releases](https://github.com/GlassOnTin/Haven/releases). Also available on [Google Play](https://play.google.com/store/apps/details?id=sh.haven.app) for a nominal fee.
+Haven is free to build yourself or install from [F-Droid](https://f-droid.org), [GitHub Releases](https://github.com/GlassOnTin/Haven/releases), and [Google Play](https://play.google.com/store/apps/details?id=sh.haven.app).
+
+If you find Haven useful, please consider [supporting development on Ko-fi](https://ko-fi.com/glassontin).
 
 ## Screenshots
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -128,6 +129,14 @@ fun SettingsScreen(
             subtitle = "v${packageInfo.versionName}",
             onClick = { showAboutDialog = true },
         )
+        SettingsItem(
+            icon = Icons.Filled.Favorite,
+            title = "Support Haven",
+            subtitle = "Buy the developer a coffee",
+            onClick = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
+            },
+        )
 
     }
 
@@ -142,8 +151,10 @@ fun SettingsScreen(
             },
             onDismiss = { showAboutDialog = false },
             onOpenGitHub = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL))
-                context.startActivity(intent)
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
+            },
+            onOpenKofi = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
             },
         )
     }
@@ -194,6 +205,7 @@ fun SettingsScreen(
 }
 
 private const val GITHUB_URL = "https://github.com/GlassOnTin/Haven"
+private const val KOFI_URL = "https://ko-fi.com/glassontin"
 
 @Composable
 private fun AboutDialog(
@@ -201,6 +213,7 @@ private fun AboutDialog(
     versionCode: Long,
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
+    onOpenKofi: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -234,8 +247,13 @@ private fun AboutDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onOpenGitHub) {
-                Text("GitHub")
+            Row {
+                TextButton(onClick = onOpenKofi) {
+                    Text("Support")
+                }
+                TextButton(onClick = onOpenGitHub) {
+                    Text("GitHub")
+                }
             }
         },
     )
