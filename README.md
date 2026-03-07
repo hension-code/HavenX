@@ -43,7 +43,7 @@
 
 **Connections** — Saved profiles with host key TOFU verification, fingerprint change detection, auto-reconnect with backoff, and password fallback.
 
-**Reticulum** — Connect over [rnsh](https://github.com/acehoss/rnsh) with announce-based destination discovery and hop count.
+**Reticulum** — Connect over [Reticulum](https://reticulum.network) mesh networks via [rnsh](https://github.com/acehoss/rnsh) or [Sideband](https://github.com/markqvist/Sideband) with announce-based destination discovery and hop count.
 
 **Security** — Biometric app lock, no telemetry or analytics, local storage only. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
 
