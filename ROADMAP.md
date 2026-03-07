@@ -12,11 +12,12 @@
 - [x] **Keyboard toolbar customization** — Configurable keyboard toolbar with JSON layout support: smaller keys, more keys per row, user-editable layout.
 - [x] **Network discovery** — Automatic LAN discovery of SSH hosts via mDNS/broadcast, shown in the connection creation dialog.
 - [x] **Port forwarding** — Local (`-L`) and remote (`-R`) SSH port forwarding with visual flow diagrams showing tunnel direction. Rules persist across sessions, auto-activate on connect, restore on reconnect. Live add/edit/remove on active sessions with port validation.
+- [x] **ProxyJump / multi-hop tunneling** — `ssh -J` style jump hosts via JSch direct-tcpip channels. Jump host selector in connection editor, tree view of dependencies, cascade disconnect, and terminal access on the jump host with tmux/screen session flow.
+- [x] **Backup & restore** — Encrypted export/import of SSH keys, connections, port forward rules, known hosts, and settings. AES-256-GCM with PBKDF2 key derivation, accessible from Settings.
 
 ## Near-term
 
 - [ ] **SFTP integration with CWD** — Use OSC 7 working directory to open SFTP browser at the current remote path.
-- [ ] **ProxyJump / multi-hop tunneling** — `ssh -J` style jump hosts: connect through an intermediate SSH server to reach a final destination. Visual chain indicator in the connection editor.
 
 ## Medium-term
 
