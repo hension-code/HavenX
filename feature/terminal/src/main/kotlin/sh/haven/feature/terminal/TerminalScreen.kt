@@ -108,12 +108,6 @@ fun TerminalScreen(
         }
     }
 
-    // Sync tabs with session manager on each composition
-    LaunchedEffect(Unit) {
-        // Re-sync periodically via snapshotFlow
-    }
-    viewModel.syncSessions()
-
     // Navigate to specific tab if requested
     LaunchedEffect(navigateToProfileId) {
         if (navigateToProfileId != null) {

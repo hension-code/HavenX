@@ -123,6 +123,17 @@ class TerminalViewModel @Inject constructor(
         trackedSessionIds.clear()
     }
 
+    init {
+        // React to session state changes (e.g., "Disconnect All" from notification)
+        // even when the TerminalScreen isn't actively composing.
+        viewModelScope.launch {
+            sessionManager.sessions.collect { syncSessions() }
+        }
+        viewModelScope.launch {
+            reticulumSessionManager.sessions.collect { syncSessions() }
+        }
+    }
+
     val terminalColorScheme: StateFlow<UserPreferencesRepository.TerminalColorScheme> =
         preferencesRepository.terminalColorScheme
             .stateIn(
