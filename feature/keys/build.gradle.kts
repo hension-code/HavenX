@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":core:ssh"))
     implementation(project(":core:data"))
 
+    implementation(libs.activity.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)

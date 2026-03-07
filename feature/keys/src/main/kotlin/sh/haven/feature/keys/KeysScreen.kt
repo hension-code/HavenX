@@ -3,12 +3,14 @@ package sh.haven.feature.keys
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import sh.haven.core.data.db.entities.SshKey
@@ -60,12 +64,28 @@ fun KeysScreen(
     val keys by viewModel.keys.collectAsState()
     val generating by viewModel.generating.collectAsState()
     val error by viewModel.error.collectAsState()
+    val needsPassphrase by viewModel.needsPassphrase.collectAsState()
+    val importResult by viewModel.importResult.collectAsState()
 
+    var showAddKeyDialog by remember { mutableStateOf(false) }
     var showGenerateDialog by remember { mutableStateOf(false) }
     var contextMenuKeyId by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let {
+            val bytes = context.contentResolver.openInputStream(it)?.use { stream ->
+                stream.readBytes()
+            }
+            if (bytes != null) {
+                viewModel.startImport(bytes)
+            }
+        }
+    }
 
     LaunchedEffect(error) {
         error?.let {
@@ -77,7 +97,7 @@ fun KeysScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showGenerateDialog = true }) {
+            FloatingActionButton(onClick = { showAddKeyDialog = true }) {
                 if (generating) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
@@ -85,7 +105,7 @@ fun KeysScreen(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(Icons.Filled.Add, contentDescription = "Generate key")
+                    Icon(Icons.Filled.Add, contentDescription = "Add key")
                 }
             }
         },
@@ -111,7 +131,7 @@ fun KeysScreen(
                     modifier = Modifier.padding(top = 16.dp),
                 )
                 Text(
-                    "Tap + to generate a key",
+                    "Tap + to generate or import a key",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
@@ -201,6 +221,20 @@ fun KeysScreen(
         }
     }
 
+    if (showAddKeyDialog) {
+        AddKeyChooser(
+            onGenerate = {
+                showAddKeyDialog = false
+                showGenerateDialog = true
+            },
+            onImport = {
+                showAddKeyDialog = false
+                filePickerLauncher.launch(arrayOf("*/*"))
+            },
+            onDismiss = { showAddKeyDialog = false },
+        )
+    }
+
     if (showGenerateDialog) {
         GenerateKeyDialog(
             onDismiss = { showGenerateDialog = false },
@@ -210,8 +244,63 @@ fun KeysScreen(
             },
         )
     }
+
+    if (needsPassphrase) {
+        PassphraseDialog(
+            onConfirm = { viewModel.retryImportWithPassphrase(it) },
+            onDismiss = { viewModel.cancelImport() },
+        )
+    }
+
+    importResult?.let { result ->
+        ImportLabelDialog(
+            keyType = result.keyType,
+            fingerprint = result.fingerprintSha256,
+            onConfirm = { label -> viewModel.saveImportedKey(label) },
+            onDismiss = { viewModel.cancelImport() },
+        )
+    }
 }
 
+@Composable
+private fun AddKeyChooser(
+    onGenerate: () -> Unit,
+    onImport: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add SSH Key") },
+        text = {
+            Column {
+                ListItem(
+                    modifier = Modifier.clickable { onGenerate() },
+                    headlineContent = { Text("Generate new key") },
+                    supportingContent = { Text("Ed25519, RSA, or ECDSA") },
+                    leadingContent = {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    },
+                )
+                ListItem(
+                    modifier = Modifier.clickable { onImport() },
+                    headlineContent = { Text("Import from file") },
+                    supportingContent = { Text("PEM or OpenSSH format") },
+                    leadingContent = {
+                        Icon(Icons.Filled.FileUpload, contentDescription = null)
+                    },
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GenerateKeyDialog(
     onDismiss: () -> Unit,
@@ -272,6 +361,100 @@ private fun GenerateKeyDialog(
                 onClick = { onGenerate(label.ifBlank { selectedType.displayName }, selectedType) },
             ) {
                 Text("Generate")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun PassphraseDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var passphrase by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Encrypted Key") },
+        text = {
+            Column {
+                Text(
+                    "This key is protected with a passphrase.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text("Passphrase") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(passphrase) },
+                enabled = passphrase.isNotEmpty(),
+            ) {
+                Text("Unlock")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun ImportLabelDialog(
+    keyType: String,
+    fingerprint: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var label by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Import SSH Key") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Label") },
+                    placeholder = { Text("e.g. my-server") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    keyType,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Text(
+                    fingerprint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(label.ifBlank { keyType }) },
+            ) {
+                Text("Import")
             }
         },
         dismissButton = {

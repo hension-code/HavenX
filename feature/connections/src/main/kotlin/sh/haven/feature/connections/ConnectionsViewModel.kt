@@ -569,6 +569,12 @@ class ConnectionsViewModel @Inject constructor(
      * RSA/ECDSA keys from JCA are already PKCS#8 DER encoded.
      */
     private fun rawKeyToPem(rawBytes: ByteArray, keyType: String): ByteArray {
+        // Imported keys are stored as PEM or OpenSSH format — pass through to JSch
+        if (rawBytes.size > 5 && rawBytes[0] == '-'.code.toByte()) {
+            return rawBytes
+        }
+
+        // Generated keys: raw bytes → PKCS#8 PEM
         val pkcs8Der = if (keyType.contains("Ed25519", ignoreCase = true)) {
             // PKCS#8 DER prefix for Ed25519: SEQUENCE { INTEGER 0, SEQUENCE { OID 1.3.101.112 }, OCTET STRING { OCTET STRING { <32 bytes> } } }
             val prefix = byteArrayOf(
