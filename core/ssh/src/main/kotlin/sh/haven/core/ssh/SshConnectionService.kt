@@ -25,6 +25,13 @@ class SshConnectionService : Service() {
         const val CHANNEL_ID = "haven_connection"
         const val NOTIFICATION_ID = 1
         const val ACTION_DISCONNECT_ALL = "sh.haven.action.DISCONNECT_ALL"
+
+        /** Set when "Disconnect All" is tapped; cleared after the activity finishes. */
+        @Volatile
+        var disconnectedAll = false
+            private set
+
+        fun clearDisconnectedAll() { disconnectedAll = false }
     }
 
     override fun onCreate() {
@@ -34,10 +41,16 @@ class SshConnectionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_DISCONNECT_ALL) {
+            disconnectedAll = true
             sessionManager.disconnectAll()
             reticulumSessionManager.disconnectAll()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+            // Bring the activity to the foreground so it can finish itself
+            packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                startActivity(launchIntent)
+            }
             return START_NOT_STICKY
         }
 

@@ -1,6 +1,8 @@
 package sh.haven.app
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +20,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import sh.haven.app.navigation.HavenNavHost
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.security.BiometricAuthenticator
+import sh.haven.core.ssh.SshConnectionService
 import sh.haven.core.ui.theme.HavenTheme
 import javax.inject.Inject
 
@@ -26,6 +29,24 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var biometricAuthenticator: BiometricAuthenticator
+
+    private fun exitIfDisconnected() {
+        if (SshConnectionService.disconnectedAll) {
+            Log.d("MainActivity", "Disconnect All detected — exiting")
+            SshConnectionService.clearDisconnectedAll()
+            finishAndRemoveTask()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        exitIfDisconnected()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        exitIfDisconnected()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
