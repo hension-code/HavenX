@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -52,6 +48,10 @@ private val KEY_UP = "$ESC[A".toByteArray()
 private val KEY_DOWN = "$ESC[B".toByteArray()
 private val KEY_RIGHT = "$ESC[C".toByteArray()
 private val KEY_LEFT = "$ESC[D".toByteArray()
+private val KEY_HOME = "$ESC[H".toByteArray()
+private val KEY_END = "$ESC[F".toByteArray()
+private val KEY_PGUP = "$ESC[5~".toByteArray()
+private val KEY_PGDN = "$ESC[6~".toByteArray()
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -196,10 +196,14 @@ private fun BuiltInKey(
         ToolbarKey.SHIFT -> ToolbarToggleButton("Shift", shiftActive, onClick = onToggleShift)
         ToolbarKey.CTRL -> ToolbarToggleButton("Ctrl", ctrlActive, onClick = onToggleCtrl)
         ToolbarKey.ALT -> ToolbarToggleButton("Alt", altActive, onClick = onToggleAlt)
-        ToolbarKey.ARROW_LEFT -> ToolbarIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left") { onSendBytes(KEY_LEFT) }
-        ToolbarKey.ARROW_UP -> ToolbarIconButton(Icons.Filled.KeyboardArrowUp, "Up") { onSendBytes(KEY_UP) }
-        ToolbarKey.ARROW_DOWN -> ToolbarIconButton(Icons.Filled.KeyboardArrowDown, "Down") { onSendBytes(KEY_DOWN) }
-        ToolbarKey.ARROW_RIGHT -> ToolbarIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right") { onSendBytes(KEY_RIGHT) }
+        ToolbarKey.ARROW_LEFT -> ToolbarArrowButton("\u2190") { onSendBytes(KEY_LEFT) }
+        ToolbarKey.ARROW_UP -> ToolbarArrowButton("\u2191") { onSendBytes(KEY_UP) }
+        ToolbarKey.ARROW_DOWN -> ToolbarArrowButton("\u2193") { onSendBytes(KEY_DOWN) }
+        ToolbarKey.ARROW_RIGHT -> ToolbarArrowButton("\u2192") { onSendBytes(KEY_RIGHT) }
+        ToolbarKey.HOME -> ToolbarTextButton("Home") { onSendBytes(KEY_HOME) }
+        ToolbarKey.END -> ToolbarTextButton("End") { onSendBytes(KEY_END) }
+        ToolbarKey.PGUP -> ToolbarTextButton("PgUp") { onSendBytes(KEY_PGUP) }
+        ToolbarKey.PGDN -> ToolbarTextButton("PgDn") { onSendBytes(KEY_PGDN) }
         else -> {
             val ch = key.char ?: return
             SymbolButton(key.label) {
@@ -231,6 +235,24 @@ private fun sendChar(
 }
 
 @Composable
+private fun ToolbarArrowButton(label: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier
+            .padding(horizontal = 1.dp)
+            .height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 16.sp,
+            lineHeight = 16.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
 private fun ToolbarTextButton(label: String, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
@@ -239,7 +261,7 @@ private fun ToolbarTextButton(label: String, onClick: () -> Unit) {
             .height(32.dp),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
     ) {
-        Text(label, fontSize = 11.sp)
+        Text(label, fontSize = 11.sp, lineHeight = 11.sp)
     }
 }
 
@@ -260,7 +282,7 @@ private fun ToolbarToggleButton(label: String, active: Boolean, onClick: () -> U
             ButtonDefaults.filledTonalButtonColors()
         },
     ) {
-        Text(label, fontSize = 11.sp)
+        Text(label, fontSize = 11.sp, lineHeight = 11.sp)
     }
 }
 
@@ -273,7 +295,7 @@ private fun SymbolButton(label: String, onClick: () -> Unit) {
             .height(30.dp),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
     ) {
-        Text(label, fontSize = 12.sp)
+        Text(label, fontSize = 12.sp, lineHeight = 12.sp)
     }
 }
 

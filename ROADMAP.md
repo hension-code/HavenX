@@ -28,3 +28,4 @@
 ## Longer-term
 
 - [ ] **Mosh support** — UDP-based mobile shell for unreliable network connections.
+- [ ] **Remote desktop** — Desktop sharing via X11 forwarding, VNC tunneling, or RDP. NoMachine/NX protocol would be ideal for mobile (adaptive compression, low bandwidth) but licensing needs investigation.

@@ -16,6 +16,10 @@ enum class ToolbarKey(val id: String, val label: String, val isModifier: Boolean
     ARROW_UP("arrow_up", "Up", isAction = true),
     ARROW_DOWN("arrow_down", "Down", isAction = true),
     ARROW_RIGHT("arrow_right", "Right", isAction = true),
+    HOME("home", "Home", isAction = true),
+    END("end", "End", isAction = true),
+    PGUP("pgup", "PgUp", isAction = true),
+    PGDN("pgdn", "PgDn", isAction = true),
     SYM_PIPE("sym_pipe", "|"),
     SYM_TILDE("sym_tilde", "~"),
     SYM_SLASH("sym_slash", "/"),
@@ -70,9 +74,10 @@ enum class ToolbarKey(val id: String, val label: String, val isModifier: Boolean
             KEYBOARD, ESC_KEY, TAB_KEY, SHIFT, CTRL, ALT,
         )
 
-        /** Default row 2: arrows + commonly needed symbols. */
+        /** Default row 2: arrows, nav keys, + commonly needed symbols. */
         val DEFAULT_ROW2 = listOf(
             ARROW_LEFT, ARROW_UP, ARROW_DOWN, ARROW_RIGHT,
+            HOME, END, PGUP, PGDN,
             SYM_PIPE, SYM_TILDE, SYM_SLASH, SYM_BACKSLASH, SYM_BACKTICK,
         )
 
