@@ -5,7 +5,7 @@
 <h1 align="center">Haven</h1>
 
 <p align="center">
-  Free SSH &amp; SFTP client for Android
+  Free SSH, VNC &amp; SFTP client for Android
 </p>
 
 <p align="center">
@@ -24,13 +24,15 @@
 ---
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_connections.png" width="220" />
-  &nbsp;&nbsp;
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_terminal.png" width="220" />
-  &nbsp;&nbsp;
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_keys.png" width="220" />
-  &nbsp;&nbsp;
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_settings.png" width="220" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_connections.png" width="180" />
+  &nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_terminal.png" width="180" />
+  &nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_desktop.png" width="180" />
+  &nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_desktop_fullscreen.png" width="180" />
+  &nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_settings.png" width="180" />
 </p>
 
 ---
@@ -44,6 +46,8 @@ Haven is a **transparent terminal**. It never silently injects commands or modif
 ## Features
 
 **Terminal** — VT100/xterm emulator with multi-tab sessions, tmux/zellij/screen auto-attach, mouse mode for TUI apps, keyboard toolbar (Esc, Tab, Ctrl, Alt, arrows), text selection with copy and Open URL, configurable font size, and six color schemes.
+
+**Desktop (VNC)** — Remote desktop viewer with RFB 3.8 protocol support. Pinch-to-zoom, two-finger pan and scroll, single-finger drag for window management, soft keyboard with X11 KeySym mapping. Fullscreen mode with NoMachine-style corner hotspot for session controls. Connect directly or tunnel through SSH. Quick-connect from the terminal toolbar with per-profile VNC settings. Supports Raw, CopyRect, RRE, Hextile, and ZLib encodings.
 
 **SFTP** — Browse remote directories, upload and download files, delete, copy path, toggle hidden files, sort by name/size/date, and multi-server tabs.
 

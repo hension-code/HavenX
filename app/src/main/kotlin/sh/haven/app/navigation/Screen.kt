@@ -14,7 +14,7 @@ enum class Screen(
     val label: String,
     val icon: ImageVector,
 ) {
-    Connections("connections", "Connections", Icons.Filled.Cable),
+    Connections("connections", "Connect", Icons.Filled.Cable),
     Terminal("terminal", "Terminal", Icons.Filled.Terminal),
     Vnc("vnc", "Desktop", Icons.Filled.DesktopWindows),
     Sftp("sftp", "Files", Icons.Filled.Folder),
