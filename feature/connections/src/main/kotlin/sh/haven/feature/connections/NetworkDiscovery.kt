@@ -29,6 +29,7 @@ data class DiscoveredHost(
 )
 
 data class LocalVmStatus(
+    val terminalAppInstalled: Boolean = false,
     val sshPort: Int? = null,
     val vncPort: Int? = null,
 )
@@ -69,17 +70,36 @@ class NetworkDiscovery(private val context: Context) {
      */
     suspend fun scanLocalVm() {
         withContext(Dispatchers.IO) {
+            val terminalInstalled = isTerminalAppInstalled()
             val sshPorts = listOf(8022, 2222, 22)
             val vncPorts = listOf(5900, 5901, 5902)
             val sshPort = sshPorts.firstOrNull { probePort("127.0.0.1", it, 200) }
             val vncPort = vncPorts.firstOrNull { probePort("127.0.0.1", it, 200) }
-            _localVm.value = LocalVmStatus(sshPort = sshPort, vncPort = vncPort)
+            _localVm.value = LocalVmStatus(
+                terminalAppInstalled = terminalInstalled,
+                sshPort = sshPort,
+                vncPort = vncPort,
+            )
+            if (terminalInstalled) {
+                Log.d(TAG, "Android Terminal app detected")
+            }
             if (sshPort != null) {
                 Log.d(TAG, "Local VM SSH detected on port $sshPort")
             }
             if (vncPort != null) {
                 Log.d(TAG, "Local VM VNC detected on port $vncPort")
             }
+        }
+    }
+
+    private fun isTerminalAppInstalled(): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(
+                "com.android.virtualization.terminal", 0,
+            )
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 

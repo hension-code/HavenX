@@ -2,21 +2,30 @@
 # Haven Linux VM Setup
 # Run this in the Android Terminal app
 #
+# Prerequisites:
+#   1. Open Terminal app settings and add port 8022 to listening ports
+#
 # Usage:
 #   Download and run:  curl -sLO https://raw.githubusercontent.com/GlassOnTin/Haven/main/scripts/haven-vm-setup.sh && bash haven-vm-setup.sh
-#   Or pipe (skips VNC password prompt):  curl -sL ... | bash
+#   Or pipe (skips password prompts):  curl -sL ... | bash
 
 set -e
+
+echo "=== Setting droid user password ==="
+if [ -t 0 ]; then
+    sudo su -c "passwd droid"
+else
+    echo "droid:haven" | sudo chpasswd
+    echo "Password set to 'haven' — change with: passwd"
+fi
 
 echo "=== Updating packages ==="
 sudo apt update && sudo apt upgrade -y
 
 echo "=== Installing SSH server ==="
 sudo apt install -y openssh-server
-sudo sed -i 's/^#\?Port .*/Port 8022/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sudo systemctl enable --now ssh
-echo "SSH ready on port 8022"
+echo "SSH ready on port 22 (forwarded via Terminal app port 8022)"
 
 echo "=== Installing VNC server and desktop ==="
 sudo apt install -y tigervnc-standalone-server tigervnc-common \
@@ -49,7 +58,8 @@ vncserver :1 -localhost no -geometry 1920x1080 -depth 24
 
 echo ""
 echo "=== Done ==="
-echo "SSH:  localhost:8022"
+echo "SSH:  droid@localhost:8022"
 echo "VNC:  localhost:5901"
 echo ""
+echo "Make sure port 8022 is in Terminal app settings → listening ports."
 echo "In Haven, tap the Linux VM card on the Connect tab."

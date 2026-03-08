@@ -834,6 +834,10 @@ class ConnectionsViewModel @Inject constructor(
         _error.value = null
     }
 
+    fun showError(message: String) {
+        _error.value = message
+    }
+
     private val _deploySuccess = MutableStateFlow(false)
     val deploySuccess: StateFlow<Boolean> = _deploySuccess.asStateFlow()
 

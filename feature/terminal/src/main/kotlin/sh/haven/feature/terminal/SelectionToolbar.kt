@@ -6,7 +6,9 @@ import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -206,87 +208,107 @@ fun SelectionToolbar(
     onPaste: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    Surface(
+        tonalElevation = 2.dp,
+        modifier = modifier,
+    ) {
+        SelectionToolbarContent(
+            controller = controller,
+            hyperlinkUri = hyperlinkUri,
+            bracketPasteMode = bracketPasteMode,
+            onPaste = onPaste,
+        )
+    }
+}
+
+/**
+ * Selection toolbar row content without a Surface wrapper.
+ * Used by [KeyboardToolbar] to embed selection controls in place of a keyboard
+ * row, keeping total toolbar height constant.
+ */
+@Composable
+fun SelectionToolbarContent(
+    controller: SelectionController,
+    hyperlinkUri: String? = null,
+    bracketPasteMode: Boolean = false,
+    onPaste: (String) -> Unit = {},
+) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val anchorMover = remember(controller) { AnchorMover(controller) }
     var anchorTarget by remember { mutableStateOf(AnchorTarget.END) }
 
-    Surface(
-        tonalElevation = 2.dp,
-        modifier = modifier,
+    Row(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            // Copy
-            SelectionIconButton(Icons.Filled.ContentCopy, "Copy") {
-                val text = controller.copySelection()
-                if (!text.isNullOrEmpty()) {
-                    clipboardManager.setText(AnnotatedString(text))
-                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                }
+        // Copy
+        SelectionIconButton(Icons.Filled.ContentCopy, "Copy") {
+            val text = controller.copySelection()
+            if (!text.isNullOrEmpty()) {
+                clipboardManager.setText(AnnotatedString(text))
+                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+            }
+            controller.clearSelection()
+        }
+
+        // Paste (wrapped in bracket paste sequences when mode 2004 is active)
+        SelectionIconButton(Icons.Filled.ContentPaste, "Paste") {
+            val text = clipboardManager.getText()?.text
+            if (!text.isNullOrEmpty()) {
                 controller.clearSelection()
-            }
-
-            // Paste (wrapped in bracket paste sequences when mode 2004 is active)
-            SelectionIconButton(Icons.Filled.ContentPaste, "Paste") {
-                val text = clipboardManager.getText()?.text
-                if (!text.isNullOrEmpty()) {
-                    controller.clearSelection()
-                    if (bracketPasteMode) {
-                        onPaste("\u001b[200~$text\u001b[201~")
-                    } else {
-                        onPaste(text)
-                    }
-                }
-            }
-
-            // Open URL (detected in selection text, or from OSC 8 hyperlink)
-            SelectionIconButton(Icons.AutoMirrored.Filled.OpenInNew, "Open") {
-                val text = controller.copySelection()?.trim()
-                val url = detectUrl(text) ?: hyperlinkUri
-                if (url != null) {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
-                        if (url.contains("://")) url else "https://$url"
-                    )))
-                    controller.clearSelection()
+                if (bracketPasteMode) {
+                    onPaste("\u001b[200~$text\u001b[201~")
                 } else {
-                    Toast.makeText(context, "No URL detected", Toast.LENGTH_SHORT).show()
+                    onPaste(text)
                 }
             }
+        }
 
-            // Anchor target toggle: Start / End
-            if (anchorMover.available) {
-                SelectionToggleButton(
-                    label = if (anchorTarget == AnchorTarget.START) "Start" else "End",
-                    active = anchorTarget == AnchorTarget.START,
-                    onClick = {
-                        anchorTarget = if (anchorTarget == AnchorTarget.END)
-                            AnchorTarget.START else AnchorTarget.END
-                    },
-                )
-            }
-
-            // D-pad arrows
-            SelectionIconButton(Icons.Filled.KeyboardArrowUp, "Up") {
-                moveAnchor(anchorMover, anchorTarget, 0, -1)
-            }
-            SelectionIconButton(Icons.Filled.KeyboardArrowDown, "Down") {
-                moveAnchor(anchorMover, anchorTarget, 0, 1)
-            }
-            SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left") {
-                moveAnchor(anchorMover, anchorTarget, -1, 0)
-            }
-            SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right") {
-                moveAnchor(anchorMover, anchorTarget, 1, 0)
-            }
-
-            // Dismiss selection
-            SelectionIconButton(Icons.Filled.Close, "Cancel") {
+        // Open URL (detected in selection text, or from OSC 8 hyperlink)
+        SelectionIconButton(Icons.AutoMirrored.Filled.OpenInNew, "Open") {
+            val text = controller.copySelection()?.trim()
+            val url = detectUrl(text) ?: hyperlinkUri
+            if (url != null) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                    if (url.contains("://")) url else "https://$url"
+                )))
                 controller.clearSelection()
+            } else {
+                Toast.makeText(context, "No URL detected", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        // Anchor target toggle: Start / End
+        if (anchorMover.available) {
+            SelectionToggleButton(
+                label = if (anchorTarget == AnchorTarget.START) "Start" else "End",
+                active = anchorTarget == AnchorTarget.START,
+                onClick = {
+                    anchorTarget = if (anchorTarget == AnchorTarget.END)
+                        AnchorTarget.START else AnchorTarget.END
+                },
+            )
+        }
+
+        // D-pad arrows
+        SelectionIconButton(Icons.Filled.KeyboardArrowUp, "Up") {
+            moveAnchor(anchorMover, anchorTarget, 0, -1)
+        }
+        SelectionIconButton(Icons.Filled.KeyboardArrowDown, "Down") {
+            moveAnchor(anchorMover, anchorTarget, 0, 1)
+        }
+        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left") {
+            moveAnchor(anchorMover, anchorTarget, -1, 0)
+        }
+        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right") {
+            moveAnchor(anchorMover, anchorTarget, 1, 0)
+        }
+
+        // Dismiss selection
+        SelectionIconButton(Icons.Filled.Close, "Cancel") {
+            controller.clearSelection()
         }
     }
 }
@@ -308,7 +330,10 @@ private fun moveAnchor(
 private fun SelectionToggleButton(label: String, active: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = 2.dp),
+        modifier = Modifier
+            .padding(horizontal = 1.dp)
+            .height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
         colors = if (active) {
             ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -318,7 +343,7 @@ private fun SelectionToggleButton(label: String, active: Boolean, onClick: () ->
             ButtonDefaults.filledTonalButtonColors()
         },
     ) {
-        Text(label, fontSize = 12.sp)
+        Text(label, fontSize = 11.sp, lineHeight = 11.sp)
     }
 }
 
@@ -326,9 +351,9 @@ private fun SelectionToggleButton(label: String, active: Boolean, onClick: () ->
 private fun SelectionIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(36.dp),
+        modifier = Modifier.size(32.dp),
     ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = description, modifier = Modifier.size(18.dp))
     }
 }
 

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -37,11 +42,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private const val QUICK_SETUP = """curl -sLO https://raw.githubusercontent.com/GlassOnTin/Haven/main/scripts/haven-vm-setup.sh && bash haven-vm-setup.sh"""
+private const val SCRIPT_URL = "https://github.com/GlassOnTin/Haven/blob/main/scripts/haven-vm-setup.sh"
+private const val QUICK_SETUP = """curl -sL https://raw.githubusercontent.com/GlassOnTin/Haven/main/scripts/haven-vm-setup.sh | bash"""
 
-private const val SSH_SETUP = """sudo apt update && sudo apt install -y openssh-server
-sudo sed -i 's/#Port 22/Port 8022/' /etc/ssh/sshd_config
-sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+private const val SSH_SETUP = """sudo su -c "passwd droid"
+sudo apt update && sudo apt install -y openssh-server
 sudo systemctl enable --now ssh"""
 
 private const val VNC_SETUP = """sudo apt install -y tigervnc-standalone-server dbus-x11
@@ -92,63 +97,103 @@ fun LinuxVmSetupDialog(
                 Text("Quick setup", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Paste this in the Terminal app to install SSH, VNC, and Xfce4:",
+                    "Installs SSH, VNC, and Xfce4 desktop:",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(4.dp))
-                CodeBlock(code = QUICK_SETUP, context = context)
-
-                Spacer(Modifier.height(16.dp))
-
-                // Launch Terminal app
-                Text("1. Start the Linux VM", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Open the Android Terminal app to boot the VM.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { launchTerminalApp(context) }) {
+                TextButton(onClick = {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("setup", QUICK_SETUP))
+                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Copy install command")
+                }
+                TextButton(onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SCRIPT_URL)))
+                }) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Open Terminal app")
+                    Text("View script")
                 }
 
-                Spacer(Modifier.height(12.dp))
+                // Collapsible step-by-step instructions
+                var showSteps by remember { mutableStateOf(false) }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = { showSteps = !showSteps }) {
+                    Text(if (showSteps) "Hide setup steps" else "Show setup steps")
+                }
 
-                // SSH setup
-                Text("2. Install SSH server", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Run in the Terminal app. Uses port 8022 to avoid conflicts.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                CodeBlock(code = SSH_SETUP, context = context)
+                if (showSteps) {
+                    Spacer(Modifier.height(8.dp))
 
-                Spacer(Modifier.height(12.dp))
+                    // Launch Terminal app
+                    Text("1. Start the Linux VM", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Open the Android Terminal app to boot the VM.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { launchTerminalApp(context) }) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Open Terminal app")
+                    }
 
-                // VNC setup
-                Text("3. Install VNC server (optional)", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "For remote desktop access via Haven's Desktop tab.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                CodeBlock(code = VNC_SETUP, context = context)
+                    Spacer(Modifier.height(12.dp))
 
-                Spacer(Modifier.height(12.dp))
+                    // Port forwarding
+                    Text("2. Open port 8022", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "In the Terminal app settings, add port 8022 to the listening ports list.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
 
-                // Desktop environment
-                Text("4. Install a desktop (optional)", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Xfce4 is lightweight and works well over VNC.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                CodeBlock(code = DESKTOP_SETUP, context = context)
+                    Spacer(Modifier.height(12.dp))
+
+                    // SSH setup
+                    Text("3. Set password & install SSH", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Run in the Terminal app. You'll be prompted to set a password for the droid user.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    CodeBlock(code = SSH_SETUP, context = context)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Then connect with: droid@localhost:8022",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // VNC setup
+                    Text("4. Install VNC server (optional)", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "For remote desktop access via Haven's Desktop tab.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    CodeBlock(code = VNC_SETUP, context = context)
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Desktop environment
+                    Text("5. Install a desktop (optional)", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Xfce4 is lightweight and works well over VNC.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    CodeBlock(code = DESKTOP_SETUP, context = context)
+                }
             }
         },
         confirmButton = {

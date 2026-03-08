@@ -174,26 +174,33 @@ fun ConnectionsScreen(
             vmStatus = localVmStatus,
             onConnectSsh = { port ->
                 showVmSetup = false
-                val profile = ConnectionProfile(
+                val existing = connections.find {
+                    it.host in listOf("localhost", "127.0.0.1") && it.port == port && it.username == "droid"
+                }
+                val profile = existing ?: ConnectionProfile(
                     label = "Linux VM",
-                    host = "127.0.0.1",
+                    host = "localhost",
                     port = port,
-                    username = "user",
+                    username = "droid",
                 )
-                viewModel.saveConnection(profile)
+                if (existing == null) viewModel.saveConnection(profile)
                 connectingProfile = profile
             },
             onConnectVnc = { port ->
                 showVmSetup = false
-                // VNC connect would navigate to Desktop tab — for now create SSH profile
-                val profile = ConnectionProfile(
-                    label = "Linux VM",
-                    host = "127.0.0.1",
-                    port = localVmStatus.sshPort ?: 8022,
-                    username = "user",
-                    vncPort = port,
-                    vncSshForward = false,
-                )
+                val sshPort = localVmStatus.sshPort ?: 8022
+                val existing = connections.find {
+                    it.host in listOf("localhost", "127.0.0.1") && it.port == sshPort && it.username == "droid"
+                }
+                val profile = (existing?.copy(vncPort = port, vncSshForward = false))
+                    ?: ConnectionProfile(
+                        label = "Linux VM",
+                        host = "localhost",
+                        port = sshPort,
+                        username = "droid",
+                        vncPort = port,
+                        vncSshForward = false,
+                    )
                 viewModel.saveConnection(profile)
                 connectingProfile = profile
             },
@@ -324,17 +331,17 @@ fun ConnectionsScreen(
             OutlinedTextField(
                 value = quickConnectText,
                 onValueChange = { quickConnectText = it },
-                placeholder = { Text("Quick connect: user@host:port") },
+                placeholder = { Text("user@host or host:port") },
                 singleLine = true,
                 trailingIcon = {
                     IconButton(
                         onClick = {
-                            val profile = viewModel.parseQuickConnect(quickConnectText)
-                            if (profile != null) {
-                                viewModel.saveConnection(profile)
-                                connectingProfile = profile
-                                quickConnectText = ""
-                            }
+                            quickConnectAction(
+                                quickConnectText, viewModel, sshKeys,
+                                onNavigateToTerminal,
+                                { connectingProfile = it },
+                                { quickConnectText = "" },
+                            )
                         },
                         enabled = quickConnectText.isNotBlank(),
                     ) {
@@ -344,12 +351,12 @@ fun ConnectionsScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(
                     onGo = {
-                        val profile = viewModel.parseQuickConnect(quickConnectText)
-                        if (profile != null) {
-                            viewModel.saveConnection(profile)
-                            connectingProfile = profile
-                            quickConnectText = ""
-                        }
+                        quickConnectAction(
+                            quickConnectText, viewModel, sshKeys,
+                            onNavigateToTerminal,
+                            { connectingProfile = it },
+                            { quickConnectText = "" },
+                        )
                     },
                 ),
                 modifier = Modifier
@@ -357,8 +364,8 @@ fun ConnectionsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
-            // Linux VM card — shown when VM services detected on localhost
-            if (localVmStatus.sshPort != null || localVmStatus.vncPort != null) {
+            // Linux VM card — shown when Terminal app is installed
+            if (localVmStatus.terminalAppInstalled) {
                 LinuxVmCard(
                     vmStatus = localVmStatus,
                     onClick = { showVmSetup = true },
@@ -427,6 +434,28 @@ fun ConnectionsScreen(
                 }
             }
         }
+    }
+}
+
+private fun quickConnectAction(
+    input: String,
+    viewModel: ConnectionsViewModel,
+    sshKeys: List<sh.haven.core.data.db.entities.SshKey>,
+    onNavigateToTerminal: (String) -> Unit,
+    showPasswordDialog: (ConnectionProfile) -> Unit,
+    clearInput: () -> Unit,
+) {
+    val profile = viewModel.parseQuickConnect(input)
+    if (profile == null) {
+        viewModel.showError("Use format: user@host or user@host:port")
+        return
+    }
+    viewModel.saveConnection(profile)
+    clearInput()
+    if (sshKeys.isNotEmpty()) {
+        viewModel.connectWithKey(profile)
+    } else {
+        showPasswordDialog(profile)
     }
 }
 
@@ -764,6 +793,7 @@ private fun LinuxVmCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val hasServices = vmStatus.sshPort != null || vmStatus.vncPort != null
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -782,22 +812,32 @@ private fun LinuxVmCard(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Linux VM", style = MaterialTheme.typography.titleSmall)
-                val services = buildList {
-                    vmStatus.sshPort?.let { add("SSH :$it") }
-                    vmStatus.vncPort?.let { add("VNC :$it") }
+                if (hasServices) {
+                    val services = buildList {
+                        vmStatus.sshPort?.let { add("SSH :$it") }
+                        vmStatus.vncPort?.let { add("VNC :$it") }
+                    }
+                    Text(
+                        services.joinToString(" · ") + " on localhost",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "Tap to set up",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Text(
-                    services.joinToString(" · ") + " on localhost",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+            if (hasServices) {
+                Icon(
+                    Icons.Filled.Circle,
+                    contentDescription = "Active",
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(10.dp),
                 )
             }
-            Icon(
-                Icons.Filled.Circle,
-                contentDescription = "Active",
-                tint = Color(0xFF4CAF50),
-                modifier = Modifier.size(10.dp),
-            )
         }
     }
 }

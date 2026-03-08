@@ -59,9 +59,11 @@ data class ConnectionConfig(
             if (trimmed.isBlank()) return null
 
             val match = QUICK_CONNECT_REGEX.matchEntire(trimmed) ?: return null
-            val username = match.groupValues[1].ifEmpty { return null }
+            val username = match.groupValues[1] // may be empty
             val host = match.groupValues[2]
             val port = match.groupValues[3].ifEmpty { "22" }.toIntOrNull() ?: return null
+
+            if (host.isBlank()) return null
 
             return try {
                 ConnectionConfig(host = host, port = port, username = username)

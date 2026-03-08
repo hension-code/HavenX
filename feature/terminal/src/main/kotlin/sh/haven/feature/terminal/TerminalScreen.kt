@@ -292,40 +292,31 @@ fun TerminalScreen(
 
                     }
 
-                    // Selection toolbar replaces keyboard toolbar during selection
-                    if (selectionActive && selectionController != null) {
-                        SelectionToolbar(
-                            controller = selectionController!!,
-                            hyperlinkUri = currentHyperlinkUri,
-                            bracketPasteMode = isBracketPaste,
-                            onPaste = { text ->
-                                activeTab.sendInput(text.toByteArray())
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    } else {
-                        KeyboardToolbar(
-                            onSendBytes = { bytes -> activeTab.sendInput(bytes) },
-                            focusRequester = focusRequester,
-                            ctrlActive = ctrlActive,
-                            altActive = altActive,
-                            bracketPasteMode = isBracketPaste,
-                            layout = toolbarLayout,
-                            onToggleCtrl = viewModel::toggleCtrl,
-                            onToggleAlt = viewModel::toggleAlt,
-                            onVncTap = if (activeTab.transportType == "SSH") {{
-                                coroutineScope.launch {
-                                    val info = viewModel.getActiveVncInfo() ?: return@launch
-                                    if (info.stored) {
-                                        onNavigateToVnc(info.host, info.port, info.password, info.sshForward, info.sessionId)
-                                    } else {
-                                        vncDialogInfo = info
-                                    }
+                    KeyboardToolbar(
+                        onSendBytes = { bytes -> activeTab.sendInput(bytes) },
+                        focusRequester = focusRequester,
+                        ctrlActive = ctrlActive,
+                        altActive = altActive,
+                        bracketPasteMode = isBracketPaste,
+                        layout = toolbarLayout,
+                        onToggleCtrl = viewModel::toggleCtrl,
+                        onToggleAlt = viewModel::toggleAlt,
+                        onVncTap = if (activeTab.transportType == "SSH") {{
+                            coroutineScope.launch {
+                                val info = viewModel.getActiveVncInfo() ?: return@launch
+                                if (info.stored) {
+                                    onNavigateToVnc(info.host, info.port, info.password, info.sshForward, info.sessionId)
+                                } else {
+                                    vncDialogInfo = info
                                 }
-                            }} else null,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                            }
+                        }} else null,
+                        selectionController = selectionController,
+                        selectionActive = selectionActive,
+                        hyperlinkUri = currentHyperlinkUri,
+                        onPaste = { text -> activeTab.sendInput(text.toByteArray()) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }

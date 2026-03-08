@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.isImeVisible
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import org.connectbot.terminal.SelectionController
 import sh.haven.core.data.preferences.ToolbarItem
 import sh.haven.core.data.preferences.ToolbarKey
 import sh.haven.core.data.preferences.ToolbarLayout
@@ -66,6 +68,10 @@ fun KeyboardToolbar(
     onToggleCtrl: () -> Unit = {},
     onToggleAlt: () -> Unit = {},
     onVncTap: (() -> Unit)? = null,
+    selectionController: SelectionController? = null,
+    selectionActive: Boolean = false,
+    hyperlinkUri: String? = null,
+    onPaste: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var shiftActive by remember { mutableStateOf(false) }
@@ -77,8 +83,20 @@ fun KeyboardToolbar(
         modifier = modifier,
     ) {
         Column {
+            val rowCount = layout.rows.size
             layout.rows.forEachIndexed { index, row ->
-                if (row.isNotEmpty()) {
+                // When selection is active and there are 2+ rows, replace the
+                // last row with selection controls to keep total height constant.
+                if (selectionActive && selectionController != null &&
+                    index == rowCount - 1 && rowCount > 1
+                ) {
+                    SelectionToolbarContent(
+                        controller = selectionController,
+                        hyperlinkUri = hyperlinkUri,
+                        bracketPasteMode = bracketPasteMode,
+                        onPaste = onPaste,
+                    )
+                } else if (row.isNotEmpty()) {
                     ToolbarRow(
                         items = row,
                         onSendBytes = onSendBytes,
@@ -95,6 +113,15 @@ fun KeyboardToolbar(
                         onVncTap = if (index == 0) onVncTap else null,
                     )
                 }
+            }
+            // Single-row layout: show selection as the only row (replaces keyboard)
+            if (selectionActive && selectionController != null && rowCount <= 1) {
+                SelectionToolbarContent(
+                    controller = selectionController,
+                    hyperlinkUri = hyperlinkUri,
+                    bracketPasteMode = bracketPasteMode,
+                    onPaste = onPaste,
+                )
             }
         }
     }

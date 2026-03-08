@@ -119,40 +119,11 @@ fun ConnectionEditDialog(
                             }
                             .take(8)
                     }
-                    if (filteredHosts.isNotEmpty() && filteredHosts.size <= 3) {
-                        Text(
-                            text = "Discovered (${filteredHosts.size})",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            filteredHosts.forEach { disc ->
-                                val chipLabel = disc.hostname ?: disc.address
-                                SuggestionChip(
-                                    onClick = {
-                                        host = disc.address
-                                        if (disc.port != 22) port = disc.port.toString()
-                                        if (label.isBlank() && disc.hostname != null) {
-                                            label = disc.hostname
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            text = chipLabel,
-                                            style = MaterialTheme.typography.labelSmall,
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                    }
 
-                    // Host field with discovered hosts dropdown when > 3
+                    // Use dropdown when there are many discovered hosts (decision
+                    // based on unfiltered count to avoid switching widgets mid-typing)
                     var hostExpanded by remember { mutableStateOf(false) }
-                    if (filteredHosts.size > 3) {
+                    if (discoveredHosts.size > 3) {
                         ExposedDropdownMenuBox(
                             expanded = hostExpanded,
                             onExpandedChange = { hostExpanded = it },
@@ -169,44 +140,77 @@ fun ConnectionEditDialog(
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostExpanded)
                                 },
-                                supportingText = {
+                                supportingText = if (filteredHosts.isNotEmpty()) {{
                                     Text("${filteredHosts.size} hosts discovered")
-                                },
+                                }} else null,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .menuAnchor(MenuAnchorType.PrimaryEditable),
                             )
-                            ExposedDropdownMenu(
-                                expanded = hostExpanded,
-                                onDismissRequest = { hostExpanded = false },
+                            if (filteredHosts.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = hostExpanded,
+                                    onDismissRequest = { hostExpanded = false },
+                                ) {
+                                    filteredHosts.forEach { disc ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Column {
+                                                    Text(disc.hostname ?: disc.address)
+                                                    if (disc.hostname != null) {
+                                                        Text(
+                                                            disc.address + if (disc.port != 22) ":${disc.port}" else "",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            onClick = {
+                                                host = disc.address
+                                                if (disc.port != 22) port = disc.port.toString()
+                                                if (label.isBlank() && disc.hostname != null) {
+                                                    label = disc.hostname
+                                                }
+                                                hostExpanded = false
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Few or no discovered hosts — show chips + plain text field
+                        if (filteredHosts.isNotEmpty()) {
+                            Text(
+                                text = "Discovered (${filteredHosts.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 filteredHosts.forEach { disc ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Column {
-                                                Text(disc.hostname ?: disc.address)
-                                                if (disc.hostname != null) {
-                                                    Text(
-                                                        disc.address + if (disc.port != 22) ":${disc.port}" else "",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    )
-                                                }
-                                            }
-                                        },
+                                    val chipLabel = disc.hostname ?: disc.address
+                                    SuggestionChip(
                                         onClick = {
                                             host = disc.address
                                             if (disc.port != 22) port = disc.port.toString()
                                             if (label.isBlank() && disc.hostname != null) {
                                                 label = disc.hostname
                                             }
-                                            hostExpanded = false
+                                        },
+                                        label = {
+                                            Text(
+                                                text = chipLabel,
+                                                style = MaterialTheme.typography.labelSmall,
+                                            )
                                         },
                                     )
                                 }
                             }
+                            Spacer(Modifier.height(4.dp))
                         }
-                    } else {
                         OutlinedTextField(
                             value = host,
                             onValueChange = { host = it },
