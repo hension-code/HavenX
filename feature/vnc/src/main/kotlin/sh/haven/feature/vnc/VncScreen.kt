@@ -15,6 +15,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,11 +39,13 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -81,11 +86,15 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
+import sh.haven.core.data.preferences.ToolbarKey
+import sh.haven.core.data.preferences.ToolbarLayout
 import kotlin.math.abs
 
 @Composable
@@ -96,6 +105,7 @@ fun VncScreen(
     pendingPassword: String? = null,
     pendingSshForward: Boolean = false,
     pendingSshSessionId: String? = null,
+    toolbarLayout: ToolbarLayout = ToolbarLayout.DEFAULT,
     onPendingConsumed: () -> Unit = {},
     onFullscreenChanged: (Boolean) -> Unit = {},
     viewModel: VncViewModel = hiltViewModel(),
@@ -161,6 +171,7 @@ fun VncScreen(
         VncViewer(
             frame = frame!!,
             fullscreen = fullscreen,
+            toolbarLayout = toolbarLayout,
             onTap = { x, y -> viewModel.sendClick(x, y) },
             onDragStart = { x, y ->
                 viewModel.sendPointer(x, y)
@@ -378,6 +389,7 @@ only needs to listen on localhost in that case."""
 private fun VncViewer(
     frame: Bitmap,
     fullscreen: Boolean,
+    toolbarLayout: ToolbarLayout = ToolbarLayout.DEFAULT,
     onTap: (Int, Int) -> Unit,
     onDragStart: (Int, Int) -> Unit,
     onDrag: (Int, Int) -> Unit,
@@ -402,6 +414,11 @@ private fun VncViewer(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     var keyboardVisible by remember { mutableStateOf(false) }
+
+    // Modifier state for VNC key toolbar
+    var ctrlActive by remember { mutableStateOf(false) }
+    var altActive by remember { mutableStateOf(false) }
+    var shiftActive by remember { mutableStateOf(false) }
 
     // Fullscreen overlay toolbar
     var overlayVisible by remember { mutableStateOf(false) }
@@ -585,6 +602,45 @@ private fun VncViewer(
                     }
                 },
         )
+
+        // VNC key extension rows (hidden in fullscreen)
+        if (!fullscreen) {
+            VncKeyToolbar(
+                layout = toolbarLayout,
+                ctrlActive = ctrlActive,
+                altActive = altActive,
+                shiftActive = shiftActive,
+                onToggleCtrl = {
+                    ctrlActive = !ctrlActive
+                    if (!ctrlActive) onKeyUp(XK_CONTROL_L) else onKeyDown(XK_CONTROL_L)
+                },
+                onToggleAlt = {
+                    altActive = !altActive
+                    if (!altActive) onKeyUp(XK_ALT_L) else onKeyDown(XK_ALT_L)
+                },
+                onToggleShift = {
+                    shiftActive = !shiftActive
+                    if (!shiftActive) onKeyUp(XK_SHIFT_L) else onKeyDown(XK_SHIFT_L)
+                },
+                onVncKey = { keySym ->
+                    onKeyDown(keySym)
+                    onKeyUp(keySym)
+                    // Auto-release modifiers after key press
+                    if (ctrlActive) { onKeyUp(XK_CONTROL_L); ctrlActive = false }
+                    if (altActive) { onKeyUp(XK_ALT_L); altActive = false }
+                    if (shiftActive) { onKeyUp(XK_SHIFT_L); shiftActive = false }
+                },
+                onToggleKeyboard = {
+                    keyboardVisible = !keyboardVisible
+                    if (keyboardVisible) {
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    } else {
+                        keyboardController?.hide()
+                    }
+                },
+            )
+        }
 
         // Bottom toolbar (hidden in fullscreen)
         if (!fullscreen) {
@@ -792,6 +848,293 @@ private fun screenToVnc(
     val vncX = ((localX - offsetX) / fitScale).toInt().coerceIn(0, fbWidth - 1)
     val vncY = ((localY - offsetY) / fitScale).toInt().coerceIn(0, fbHeight - 1)
     return vncX to vncY
+}
+
+/** Keys that form the aligned navigation block. */
+private val VNC_NAV_KEYS = setOf(
+    ToolbarKey.ARROW_UP, ToolbarKey.ARROW_DOWN,
+    ToolbarKey.ARROW_LEFT, ToolbarKey.ARROW_RIGHT,
+    ToolbarKey.HOME, ToolbarKey.END,
+    ToolbarKey.PGUP, ToolbarKey.PGDN,
+)
+
+private val VNC_NAV_GRID_TOP = arrayOf(
+    ToolbarKey.HOME, ToolbarKey.ARROW_UP, ToolbarKey.END, ToolbarKey.PGUP,
+)
+private val VNC_NAV_GRID_BOTTOM = arrayOf(
+    ToolbarKey.ARROW_LEFT, ToolbarKey.ARROW_DOWN,
+    ToolbarKey.ARROW_RIGHT, ToolbarKey.PGDN,
+)
+
+private val VNC_NAV_CELL_WIDTH = 44.dp
+
+/** Map a ToolbarKey to its X11 KeySym for VNC. */
+private fun toolbarKeyToKeySym(key: ToolbarKey): Int? = when (key) {
+    ToolbarKey.ESC_KEY -> XK_ESCAPE
+    ToolbarKey.TAB_KEY -> XK_TAB
+    ToolbarKey.ARROW_LEFT -> XK_LEFT
+    ToolbarKey.ARROW_UP -> XK_UP
+    ToolbarKey.ARROW_DOWN -> XK_DOWN
+    ToolbarKey.ARROW_RIGHT -> XK_RIGHT
+    ToolbarKey.HOME -> XK_HOME
+    ToolbarKey.END -> XK_END
+    ToolbarKey.PGUP -> XK_PAGE_UP
+    ToolbarKey.PGDN -> XK_PAGE_DOWN
+    else -> key.char?.code
+}
+
+/** Split a row's items into (before nav keys, after nav keys). */
+private fun vncSplitAroundNav(row: List<sh.haven.core.data.preferences.ToolbarItem>): Pair<List<sh.haven.core.data.preferences.ToolbarItem>, List<sh.haven.core.data.preferences.ToolbarItem>> {
+    val firstNavIdx = row.indexOfFirst { it is sh.haven.core.data.preferences.ToolbarItem.BuiltIn && it.key in VNC_NAV_KEYS }
+    val lastNavIdx = row.indexOfLast { it is sh.haven.core.data.preferences.ToolbarItem.BuiltIn && it.key in VNC_NAV_KEYS }
+    if (firstNavIdx == -1) return row to emptyList()
+    val left = row.subList(0, firstNavIdx)
+    val right = if (lastNavIdx + 1 < row.size) row.subList(lastNavIdx + 1, row.size) else emptyList()
+    return left to right
+}
+
+@Composable
+private fun VncKeyToolbar(
+    layout: ToolbarLayout,
+    ctrlActive: Boolean,
+    altActive: Boolean,
+    shiftActive: Boolean,
+    onToggleCtrl: () -> Unit,
+    onToggleAlt: () -> Unit,
+    onToggleShift: () -> Unit,
+    onVncKey: (keySym: Int) -> Unit,
+    onToggleKeyboard: () -> Unit,
+) {
+    val presentNavKeys = layout.rows.flatten()
+        .filterIsInstance<sh.haven.core.data.preferences.ToolbarItem.BuiltIn>()
+        .filter { it.key in VNC_NAV_KEYS }
+        .map { it.key }
+        .toSet()
+
+    Surface(tonalElevation = 2.dp) {
+        if (layout.rows.size >= 2 && presentNavKeys.isNotEmpty()) {
+            val (row1Left, row1Right) = vncSplitAroundNav(layout.row1)
+            val (row2Left, row2Right) = vncSplitAroundNav(layout.row2)
+
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 4.dp),
+            ) {
+                // Left keys column
+                Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        for (item in row1Left) {
+                            VncRenderItem(item, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        for (item in row2Left) {
+                            VncRenderItem(item, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+                        }
+                    }
+                }
+
+                // Nav block grid
+                Column {
+                    Row(Modifier.padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        for (key in VNC_NAV_GRID_TOP) {
+                            if (key != null && key in presentNavKeys) {
+                                val keySym = toolbarKeyToKeySym(key)
+                                VncNavButton(key, keySym) { if (keySym != null) onVncKey(keySym) }
+                            } else {
+                                Spacer(Modifier.width(VNC_NAV_CELL_WIDTH).height(32.dp))
+                            }
+                        }
+                    }
+                    Row(Modifier.padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        for (key in VNC_NAV_GRID_BOTTOM) {
+                            if (key != null && key in presentNavKeys) {
+                                val keySym = toolbarKeyToKeySym(key)
+                                VncNavButton(key, keySym) { if (keySym != null) onVncKey(keySym) }
+                            } else {
+                                Spacer(Modifier.width(VNC_NAV_CELL_WIDTH).height(32.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Right keys (symbols)
+                if (row1Right.isNotEmpty() || row2Right.isNotEmpty()) {
+                    Column {
+                        if (row1Right.isNotEmpty()) {
+                            Row(Modifier.padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                                for (item in row1Right) {
+                                    VncRenderItem(item, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+                                }
+                            }
+                        } else {
+                            Spacer(Modifier.height(34.dp))
+                        }
+                        Row(Modifier.padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                            for (item in row2Right) {
+                                VncRenderItem(item, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Fallback: flat rows
+            Column {
+                for (row in layout.rows) {
+                    if (row.isEmpty()) continue
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        for (item in row) {
+                            VncRenderItem(item, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VncRenderItem(
+    item: sh.haven.core.data.preferences.ToolbarItem,
+    ctrlActive: Boolean,
+    altActive: Boolean,
+    shiftActive: Boolean,
+    onToggleCtrl: () -> Unit,
+    onToggleAlt: () -> Unit,
+    onToggleShift: () -> Unit,
+    onVncKey: (keySym: Int) -> Unit,
+    onToggleKeyboard: () -> Unit,
+) {
+    when (item) {
+        is sh.haven.core.data.preferences.ToolbarItem.BuiltIn -> {
+            VncBuiltInKey(item.key, ctrlActive, altActive, shiftActive, onToggleCtrl, onToggleAlt, onToggleShift, onVncKey, onToggleKeyboard)
+        }
+        is sh.haven.core.data.preferences.ToolbarItem.Custom -> {
+            VncSymbolButton(item.label) {
+                for (ch in item.send) { onVncKey(ch.code) }
+            }
+        }
+    }
+}
+
+/** Nav block button with fixed cell width for VNC toolbar. */
+@Composable
+private fun VncNavButton(key: ToolbarKey, keySym: Int?, onClick: () -> Unit) {
+    val isArrow = key in setOf(ToolbarKey.ARROW_UP, ToolbarKey.ARROW_DOWN, ToolbarKey.ARROW_LEFT, ToolbarKey.ARROW_RIGHT)
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 1.dp).width(VNC_NAV_CELL_WIDTH).height(32.dp),
+        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+    ) {
+        if (isArrow) {
+            val label = when (key) {
+                ToolbarKey.ARROW_UP -> "\u2191"
+                ToolbarKey.ARROW_DOWN -> "\u2193"
+                ToolbarKey.ARROW_LEFT -> "\u2190"
+                ToolbarKey.ARROW_RIGHT -> "\u2192"
+                else -> ""
+            }
+            Text(label, fontSize = 16.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+        } else {
+            Text(key.label, fontSize = 11.sp, lineHeight = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun VncBuiltInKey(
+    key: ToolbarKey,
+    ctrlActive: Boolean,
+    altActive: Boolean,
+    shiftActive: Boolean,
+    onToggleCtrl: () -> Unit,
+    onToggleAlt: () -> Unit,
+    onToggleShift: () -> Unit,
+    onVncKey: (keySym: Int) -> Unit,
+    onToggleKeyboard: () -> Unit,
+) {
+    when (key) {
+        ToolbarKey.KEYBOARD -> {
+            IconButton(
+                onClick = onToggleKeyboard,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(Icons.Default.Keyboard, contentDescription = "Toggle keyboard", modifier = Modifier.size(18.dp))
+            }
+        }
+        ToolbarKey.CTRL -> VncToggleButton("Ctrl", ctrlActive, onToggleCtrl)
+        ToolbarKey.ALT -> VncToggleButton("Alt", altActive, onToggleAlt)
+        ToolbarKey.SHIFT -> VncToggleButton("Shift", shiftActive, onToggleShift)
+        ToolbarKey.ARROW_LEFT -> VncArrowButton("\u2190") { onVncKey(XK_LEFT) }
+        ToolbarKey.ARROW_UP -> VncArrowButton("\u2191") { onVncKey(XK_UP) }
+        ToolbarKey.ARROW_DOWN -> VncArrowButton("\u2193") { onVncKey(XK_DOWN) }
+        ToolbarKey.ARROW_RIGHT -> VncArrowButton("\u2192") { onVncKey(XK_RIGHT) }
+        else -> {
+            val keySym = toolbarKeyToKeySym(key)
+            if (keySym != null) {
+                VncTextButton(key.label) { onVncKey(keySym) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VncTextButton(label: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 1.dp).height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) {
+        Text(label, fontSize = 11.sp, lineHeight = 11.sp)
+    }
+}
+
+@Composable
+private fun VncArrowButton(label: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 1.dp).height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) {
+        Text(label, fontSize = 16.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun VncToggleButton(label: String, active: Boolean, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 1.dp).height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        colors = if (active) {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            )
+        } else {
+            ButtonDefaults.filledTonalButtonColors()
+        },
+    ) {
+        Text(label, fontSize = 11.sp, lineHeight = 11.sp)
+    }
+}
+
+@Composable
+private fun VncSymbolButton(label: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 1.dp).height(30.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+    ) {
+        Text(label, fontSize = 12.sp, lineHeight = 12.sp)
+    }
 }
 
 // X11 KeySym constants for special keys

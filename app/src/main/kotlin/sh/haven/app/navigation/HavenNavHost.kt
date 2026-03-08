@@ -152,6 +152,7 @@ fun HavenNavHost(
                     pendingPassword = pendingVncPassword,
                     pendingSshForward = pendingVncSshForward,
                     pendingSshSessionId = pendingVncSshSessionId,
+                    toolbarLayout = toolbarLayout,
                     onPendingConsumed = {
                         pendingVncHost = null
                         pendingVncPort = null

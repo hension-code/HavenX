@@ -69,15 +69,14 @@ enum class ToolbarKey(val id: String, val label: String, val isModifier: Boolean
     companion object {
         fun fromId(id: String): ToolbarKey? = entries.find { it.id == id }
 
-        /** Default row 1: functional keys. */
+        /** Default row 1: keyboard toggle, function keys, nav block top. */
         val DEFAULT_ROW1 = listOf(
-            KEYBOARD, ESC_KEY, TAB_KEY, SHIFT, CTRL, ALT,
+            KEYBOARD, ESC_KEY, TAB_KEY, HOME, ARROW_UP, END, PGUP,
         )
 
-        /** Default row 2: arrows, nav keys, + commonly needed symbols. */
+        /** Default row 2: modifiers, nav block bottom, symbols. */
         val DEFAULT_ROW2 = listOf(
-            ARROW_LEFT, ARROW_UP, ARROW_DOWN, ARROW_RIGHT,
-            HOME, END, PGUP, PGDN,
+            SHIFT, CTRL, ALT, ARROW_LEFT, ARROW_DOWN, ARROW_RIGHT, PGDN,
             SYM_PIPE, SYM_TILDE, SYM_SLASH, SYM_BACKSLASH, SYM_BACKTICK,
         )
 
