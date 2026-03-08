@@ -1,5 +1,6 @@
 package sh.haven.feature.connections
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
@@ -96,6 +97,7 @@ class NetworkDiscovery(private val context: Context) {
         }
     }
 
+    @SuppressLint("MissingPermission") // ACCESS_NETWORK_STATE declared in app manifest
     private fun getLocalSubnetBase(): String? {
         try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
