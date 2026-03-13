@@ -25,6 +25,15 @@ android {
         }
     }
 
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
+    }
+
     signingConfigs {
         create("release") {
             val ksFile = rootProject.file("haven-release.jks")
@@ -49,11 +58,17 @@ android {
         }
     }
 
+    val abiCodes = mapOf("arm64-v8a" to 1, "x86_64" to 2)
+
     applicationVariants.all {
         val variant = this
         outputs.all {
-            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "haven-${variant.versionName}-${variant.buildType.name}.apk"
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val abi = output.getFilter(com.android.build.OutputFile.ABI)
+            if (abi != null) {
+                output.versionCodeOverride = (defaultConfig.versionCode ?: 0) * 10 + (abiCodes[abi] ?: 0)
+            }
+            output.outputFileName = "haven-${variant.versionName}-${abi ?: "universal"}-${variant.buildType.name}.apk"
         }
     }
 
