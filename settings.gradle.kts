@@ -23,6 +23,13 @@ includeBuild("termlib") {
     }
 }
 
+// Pure Kotlin mosh transport library (submodule).
+includeBuild("mosh-kotlin") {
+    dependencySubstitution {
+        substitute(module("sh.haven:mosh-transport")).using(project(":"))
+    }
+}
+
 rootProject.name = "Haven"
 
 include(":app")

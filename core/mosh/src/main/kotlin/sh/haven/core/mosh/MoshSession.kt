@@ -4,10 +4,19 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import sh.haven.core.mosh.transport.MoshTransport
+import sh.haven.mosh.MoshLogger
+import sh.haven.mosh.transport.MoshTransport
 import java.io.Closeable
 
 private const val TAG = "MoshSession"
+
+/** Bridges MoshLogger to android.util.Log. */
+private object AndroidMoshLogger : MoshLogger {
+    override fun d(tag: String, msg: String) { Log.d(tag, msg) }
+    override fun e(tag: String, msg: String, throwable: Throwable?) {
+        if (throwable != null) Log.e(tag, msg, throwable) else Log.e(tag, msg)
+    }
+}
 
 /**
  * Bridges a mosh transport session to the terminal emulator.
@@ -56,6 +65,7 @@ class MoshSession(
                     onDisconnected?.invoke(cleanExit)
                 }
             },
+            logger = AndroidMoshLogger,
         )
         transport = t
         t.start(scope)
