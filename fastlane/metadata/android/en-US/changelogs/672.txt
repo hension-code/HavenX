@@ -1,0 +1,4 @@
+- Add Eternal Terminal (ET) support with pure Kotlin protocol implementation
+- Unified transport dropdown: SSH, Mosh, Eternal Terminal, Reticulum
+- ET uses XSalsa20-Poly1305 encryption, SSH bootstrap via etterminal
+- SFTP and VNC tunneling work over ET and Mosh SSH connections

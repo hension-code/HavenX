@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import sh.haven.core.et.EtSessionManager
+import sh.haven.core.mosh.MoshSessionManager
+import sh.haven.core.ssh.SshClient
 import sh.haven.core.ssh.SshSessionManager
 import sh.haven.core.vnc.ColorDepth
 import sh.haven.core.vnc.VncClient
@@ -35,6 +38,8 @@ data class SshTunnelOption(
 @HiltViewModel
 class VncViewModel @Inject constructor(
     private val sshSessionManager: SshSessionManager,
+    private val moshSessionManager: MoshSessionManager,
+    private val etSessionManager: EtSessionManager,
 ) : ViewModel() {
 
     private val _frame = MutableStateFlow<Bitmap?>(null)
@@ -57,15 +62,34 @@ class VncViewModel @Inject constructor(
         client?.paused = !active
     }
 
-    /** List active SSH sessions available for tunneling. */
+    /** List active sessions with SSH clients available for tunneling. */
     fun getActiveSshSessions(): List<SshTunnelOption> {
-        return sshSessionManager.activeSessions.map { session ->
+        val ssh = sshSessionManager.activeSessions.map { session ->
             SshTunnelOption(
                 sessionId = session.sessionId,
                 label = session.label,
                 profileId = session.profileId,
             )
         }
+        val mosh = moshSessionManager.activeSessions
+            .filter { it.sshClient != null }
+            .map { session ->
+                SshTunnelOption(
+                    sessionId = session.sessionId,
+                    label = "${session.label} (Mosh)",
+                    profileId = session.profileId,
+                )
+            }
+        val et = etSessionManager.activeSessions
+            .filter { it.sshClient != null }
+            .map { session ->
+                SshTunnelOption(
+                    sessionId = session.sessionId,
+                    label = "${session.label} (ET)",
+                    profileId = session.profileId,
+                )
+            }
+        return ssh + mosh + et
     }
 
     /**
@@ -76,9 +100,10 @@ class VncViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _error.value = null
-                val session = sshSessionManager.getSession(sessionId)
+                // Find the SSH client from whichever session manager owns this session
+                val client = findSshClient(sessionId)
                     ?: throw IllegalStateException("SSH session not found. Return to the Terminal tab and check the connection is still active.")
-                val localPort = session.client.setPortForwardingL(
+                val localPort = client.setPortForwardingL(
                     "127.0.0.1", 0, remoteHost, remotePort,
                 )
                 tunnelPort = localPort
@@ -134,6 +159,14 @@ class VncViewModel @Inject constructor(
         _connected.value = true
     }
 
+    /** Find the SSH client for a session across all session managers. */
+    private fun findSshClient(sessionId: String): SshClient? {
+        sshSessionManager.getSession(sessionId)?.let { return it.client }
+        moshSessionManager.sessions.value[sessionId]?.sshClient?.let { return it as? SshClient }
+        etSessionManager.sessions.value[sessionId]?.sshClient?.let { return it as? SshClient }
+        return null
+    }
+
     fun disconnect() {
         viewModelScope.launch(Dispatchers.IO) {
             client?.stop()
@@ -143,8 +176,7 @@ class VncViewModel @Inject constructor(
             val tsId = tunnelSessionId
             if (tp != null && tsId != null) {
                 try {
-                    sshSessionManager.getSession(tsId)?.client
-                        ?.delPortForwardingL("127.0.0.1", tp)
+                    findSshClient(tsId)?.delPortForwardingL("127.0.0.1", tp)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to remove SSH tunnel", e)
                 }

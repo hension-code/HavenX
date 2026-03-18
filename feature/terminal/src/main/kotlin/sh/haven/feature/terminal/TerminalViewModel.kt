@@ -228,10 +228,13 @@ class TerminalViewModel @Inject constructor(
     /** Get VNC connection info for the active terminal tab's SSH host. */
     suspend fun getActiveVncInfo(): VncInfo? {
         val tab = _tabs.value.getOrNull(_activeTabIndex.value) ?: return null
-        val config = sessionManager.getConnectionConfigForProfile(tab.profileId)?.first ?: return null
         val profile = connectionDao.getById(tab.profileId)
+        // For SSH tabs, use the stored connection config; for mosh/ET, use the profile directly
+        val host = sessionManager.getConnectionConfigForProfile(tab.profileId)?.first?.host
+            ?: profile?.host
+            ?: return null
         return VncInfo(
-            host = config.host,
+            host = host,
             port = profile?.vncPort ?: 5900,
             password = profile?.vncPassword,
             sshForward = profile?.vncSshForward ?: true,

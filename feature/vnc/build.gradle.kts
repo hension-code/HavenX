@@ -28,6 +28,8 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:vnc"))
     implementation(project(":core:ssh"))
+    implementation(project(":core:mosh"))
+    implementation(project(":core:et"))
     implementation(project(":core:data"))
 
     implementation(libs.hilt.android)
