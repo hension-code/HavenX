@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,7 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import androidx.core.os.LocaleListCompat
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import sh.haven.app.navigation.HavenNavHost
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.security.BiometricAuthenticator
@@ -59,6 +63,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        lifecycleScope.launch {
+            preferencesRepository.languageMode.collect { mode ->
+                val locales = mode.tag?.let { LocaleListCompat.forLanguageTags(it) }
+                    ?: LocaleListCompat.getEmptyLocaleList()
+                AppCompatDelegate.setApplicationLocales(locales)
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             val themeMode by preferencesRepository.theme

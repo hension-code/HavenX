@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import sh.haven.core.data.preferences.UserPreferencesRepository
@@ -89,9 +90,10 @@ fun HavenNavHost(
             if (!desktopFullscreen) {
                 NavigationBar {
                     screens.forEachIndexed { index, screen ->
+                        val label = stringResource(screen.labelRes)
                         NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.label) },
-                            label = { Text(screen.label) },
+                            icon = { Icon(screen.icon, contentDescription = label) },
+                            label = { Text(label) },
                             selected = pagerState.currentPage == index,
                             onClick = {
                                 coroutineScope.launch {

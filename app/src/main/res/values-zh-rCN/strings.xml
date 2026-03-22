@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HavenX</string>
+    <string name="nav_connections">连接</string>
+    <string name="nav_terminal">终端</string>
+    <string name="nav_desktop">桌面</string>
+    <string name="nav_sftp">文件</string>
+    <string name="nav_keys">密钥</string>
+    <string name="nav_settings">设置</string>
+</resources>

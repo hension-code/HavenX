@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -113,6 +114,7 @@ fun RdpScreen(
     onFullscreenChanged: (Boolean) -> Unit = {},
     viewModel: RdpViewModel = hiltViewModel(),
 ) {
+    val zh = Locale.current.language == "zh"
     val connected by viewModel.connected.collectAsState()
 
     // Auto-connect when navigated from a saved profile
@@ -197,11 +199,13 @@ fun RdpScreen(
             onKeyUp = { scancode -> viewModel.sendKey(scancode, false) },
             onToggleFullscreen = { fullscreen = !fullscreen },
             onDisconnect = { viewModel.disconnect() },
+            zh = zh,
         )
     } else {
         DesktopPlaceholder(
             protocol = "RDP",
             error = error,
+            zh = zh,
         )
     }
 }
@@ -210,6 +214,7 @@ fun RdpScreen(
 private fun DesktopPlaceholder(
     protocol: String,
     error: String?,
+    zh: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -221,7 +226,7 @@ private fun DesktopPlaceholder(
         Text(protocol, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Add a connection on the Connections tab",
+            if (zh) "请在“连接”页面添加连接" else "Add a connection on the Connections tab",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -262,6 +267,7 @@ private fun RdpViewer(
     onKeyUp: (Int) -> Unit,
     onToggleFullscreen: () -> Unit,
     onDisconnect: () -> Unit,
+    zh: Boolean,
 ) {
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     val imageBitmap = remember(frame) { frame.asImageBitmap() }
@@ -511,7 +517,7 @@ private fun RdpViewer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Button(onClick = onDisconnect) {
-                    Text("Disconnect")
+                    Text(if (zh) "断开连接" else "Disconnect")
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -528,7 +534,7 @@ private fun RdpViewer(
                     Icon(
                         if (keyboardVisible) Icons.Default.KeyboardHide
                         else Icons.Default.Keyboard,
-                        contentDescription = "Toggle keyboard",
+                        contentDescription = if (zh) "切换键盘" else "Toggle keyboard",
                     )
                 }
 
@@ -540,13 +546,13 @@ private fun RdpViewer(
                         panX = 0f
                         panY = 0f
                     }) {
-                        Text("Reset Zoom")
+                        Text(if (zh) "重置缩放" else "Reset Zoom")
                     }
                     Spacer(Modifier.width(8.dp))
                 }
 
                 IconButton(onClick = onToggleFullscreen) {
-                    Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen")
+                    Icon(Icons.Default.Fullscreen, contentDescription = if (zh) "全屏" else "Fullscreen")
                 }
             }
         }
@@ -578,7 +584,7 @@ private fun RdpViewer(
             ) {
                 Icon(
                     Icons.Default.Menu,
-                    contentDescription = "Session menu",
+                    contentDescription = if (zh) "会话菜单" else "Session menu",
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier
                         .padding(8.dp)
@@ -606,7 +612,7 @@ private fun RdpViewer(
                         overlayVisible = false
                         onDisconnect()
                     }) {
-                        Icon(Icons.Default.Close, contentDescription = "Disconnect")
+                        Icon(Icons.Default.Close, contentDescription = if (zh) "断开连接" else "Disconnect")
                     }
                     IconButton(onClick = {
                         keyboardVisible = !keyboardVisible
@@ -620,7 +626,7 @@ private fun RdpViewer(
                         Icon(
                             if (keyboardVisible) Icons.Default.KeyboardHide
                             else Icons.Default.Keyboard,
-                            contentDescription = "Toggle keyboard",
+                            contentDescription = if (zh) "切换键盘" else "Toggle keyboard",
                         )
                     }
                     if (zoom != 1f || panX != 0f || panY != 0f) {
@@ -631,7 +637,7 @@ private fun RdpViewer(
                         }) {
                             Icon(
                                 Icons.Default.FullscreenExit,
-                                contentDescription = "Reset zoom",
+                                contentDescription = if (zh) "重置缩放" else "Reset zoom",
                             )
                         }
                     }
@@ -639,7 +645,10 @@ private fun RdpViewer(
                         overlayVisible = false
                         onToggleFullscreen()
                     }) {
-                        Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen")
+                        Icon(
+                            Icons.Default.FullscreenExit,
+                            contentDescription = if (zh) "退出全屏" else "Exit fullscreen",
+                        )
                     }
                 }
             }

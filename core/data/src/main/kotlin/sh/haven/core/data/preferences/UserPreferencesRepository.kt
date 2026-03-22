@@ -30,6 +30,7 @@ class UserPreferencesRepository @Inject constructor(
     private val sessionCommandOverrideKey = stringPreferencesKey("session_command_override")
     private val sftpSortModeKey = stringPreferencesKey("sftp_sort_mode")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
+    private val languageModeKey = stringPreferencesKey("language_mode")
 
     val biometricEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[biometricEnabledKey] ?: false
@@ -59,6 +60,10 @@ class UserPreferencesRepository @Inject constructor(
         ThemeMode.fromString(prefs[themeKey])
     }
 
+    val languageMode: Flow<LanguageMode> = dataStore.data.map { prefs ->
+        LanguageMode.fromString(prefs[languageModeKey])
+    }
+
     suspend fun setTerminalFontSize(sizeSp: Int) {
         dataStore.edit { prefs ->
             prefs[terminalFontSizeKey] = sizeSp.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
@@ -68,6 +73,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setTheme(mode: ThemeMode) {
         dataStore.edit { prefs ->
             prefs[themeKey] = mode.name
+        }
+    }
+
+    suspend fun setLanguageMode(mode: LanguageMode) {
+        dataStore.edit { prefs ->
+            prefs[languageModeKey] = mode.name
         }
     }
 
@@ -233,6 +244,17 @@ class UserPreferencesRepository @Inject constructor(
 
         companion object {
             fun fromString(value: String?): ThemeMode =
+                entries.find { it.name == value } ?: SYSTEM
+        }
+    }
+
+    enum class LanguageMode(val tag: String?) {
+        SYSTEM(null),
+        ENGLISH("en"),
+        CHINESE_SIMPLIFIED("zh-Hans");
+
+        companion object {
+            fun fromString(value: String?): LanguageMode =
                 entries.find { it.name == value } ?: SYSTEM
         }
     }

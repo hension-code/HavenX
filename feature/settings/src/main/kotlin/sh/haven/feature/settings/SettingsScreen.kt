@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardAlt
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TextFields
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
@@ -83,6 +85,7 @@ fun SettingsScreen(
     val lockTimeout by viewModel.lockTimeout.collectAsState()
     val fontSize by viewModel.terminalFontSize.collectAsState()
     val theme by viewModel.theme.collectAsState()
+    val languageMode by viewModel.languageMode.collectAsState()
     val sessionManager by viewModel.sessionManager.collectAsState()
     val colorScheme by viewModel.terminalColorScheme.collectAsState()
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
@@ -96,8 +99,10 @@ fun SettingsScreen(
     var showToolbarConfigDialog by remember { mutableStateOf(false) }
     var showBackupPasswordDialog by remember { mutableStateOf<BackupAction?>(null) }
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val zh = Locale.current.language == "zh"
 
     // SAF launchers for backup/restore
     var pendingPassword by remember { mutableStateOf("") }
@@ -134,31 +139,31 @@ fun SettingsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text("Settings") })
+        TopAppBar(title = { Text(if (zh) "设置" else "Settings") })
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
         if (viewModel.biometricAvailable) {
             SettingsToggleItem(
                 icon = Icons.Filled.Fingerprint,
-                title = "Biometric unlock",
-                subtitle = "Require biometrics to open Haven",
+                title = if (zh) "生物识别解锁" else "Biometric unlock",
+                subtitle = if (zh) "需要生物识别才能打开 HavenX" else "Require biometrics to open HavenX",
                 checked = biometricEnabled,
                 onCheckedChange = viewModel::setBiometricEnabled,
             )
             if (biometricEnabled) {
                 SettingsItem(
                     icon = Icons.Filled.Timer,
-                    title = "Lock timeout",
-                    subtitle = lockTimeout.label,
+                    title = if (zh) "锁定超时" else "Lock timeout",
+                    subtitle = lockTimeoutLabel(lockTimeout, zh),
                     onClick = { showLockTimeoutDialog = true },
                 )
             }
         }
         SettingsItem(
             icon = Icons.Filled.Terminal,
-            title = "Session persistence",
+            title = if (zh) "会话持久化" else "Session persistence",
             subtitle = if (sessionManager == UserPreferencesRepository.SessionManager.NONE) {
-                "None"
+                if (zh) "无" else "None"
             } else {
                 sessionManager.label
             },
@@ -166,43 +171,53 @@ fun SettingsScreen(
         )
         SettingsItem(
             icon = Icons.Filled.TextFields,
-            title = "Terminal font size",
+            title = if (zh) "终端字体大小" else "Terminal font size",
             subtitle = "${fontSize}sp",
             onClick = { showFontSizeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.Palette,
-            title = "Terminal color scheme",
-            subtitle = colorScheme.label,
+            title = if (zh) "终端配色方案" else "Terminal color scheme",
+            subtitle = colorSchemeLabel(colorScheme, zh),
             onClick = { showColorSchemeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.KeyboardAlt,
-            title = "Keyboard toolbar",
-            subtitle = "Configure toolbar keys and layout",
+            title = if (zh) "键盘工具栏" else "Keyboard toolbar",
+            subtitle = if (zh) "配置工具栏按键和布局" else "Configure toolbar keys and layout",
             onClick = { showToolbarConfigDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.ColorLens,
-            title = "Theme",
-            subtitle = theme.label,
+            title = if (zh) "主题" else "Theme",
+            subtitle = themeModeLabel(theme, zh),
             onClick = { showThemeDialog = true },
+        )
+        SettingsItem(
+            icon = Icons.Filled.Language,
+            title = if (zh) "语言" else "Language",
+            subtitle = when (languageMode) {
+                UserPreferencesRepository.LanguageMode.SYSTEM -> if (zh) "跟随系统" else "System default"
+                UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
+                UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
+            },
+            onClick = { showLanguageDialog = true },
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         SettingsItem(
             icon = Icons.Filled.CloudUpload,
-            title = "Export backup",
-            subtitle = "Keys, connections, and settings",
+            title = if (zh) "导出备份" else "Export backup",
+            subtitle = if (zh) "密钥、连接和设置" else "Keys, connections, and settings",
             onClick = {
                 showBackupPasswordDialog = BackupAction.Export
             },
         )
         SettingsItem(
             icon = Icons.Filled.CloudDownload,
-            title = "Restore backup",
-            subtitle = "Import from a backup file",
+            title = if (zh) "恢复备份" else "Restore backup",
+            subtitle = if (zh) "从备份文件导入" else "Import from a backup file",
             onClick = {
                 importLauncher.launch(arrayOf("*/*"))
             },
@@ -210,7 +225,7 @@ fun SettingsScreen(
 
         if (backupStatus is SettingsViewModel.BackupStatus.InProgress) {
             ListItem(
-                headlineContent = { Text("Working...") },
+                headlineContent = { Text(if (zh) "处理中..." else "Working...") },
                 leadingContent = {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 },
@@ -222,7 +237,7 @@ fun SettingsScreen(
 
         SettingsItem(
             icon = Icons.Filled.Info,
-            title = "About HavenX",
+            title = if (zh) "关于 HavenX" else "About HavenX",
             subtitle = "v${packageInfo.versionName}",
             onClick = { showAboutDialog = true },
         )
@@ -239,6 +254,7 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 packageInfo.versionCode.toLong()
             },
+            zh = zh,
             onDismiss = { showAboutDialog = false },
             onOpenGitHub = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
@@ -249,6 +265,7 @@ fun SettingsScreen(
     if (showThemeDialog) {
         ThemeDialog(
             currentTheme = theme,
+            zh = zh,
             onDismiss = { showThemeDialog = false },
             onSelect = { selected ->
                 viewModel.setTheme(selected)
@@ -257,9 +274,21 @@ fun SettingsScreen(
         )
     }
 
+    if (showLanguageDialog) {
+        LanguageDialog(
+            currentLanguage = languageMode,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = { selected ->
+                viewModel.setLanguageMode(selected)
+                showLanguageDialog = false
+            },
+        )
+    }
+
     if (showColorSchemeDialog) {
         ColorSchemeDialog(
             currentScheme = colorScheme,
+            zh = zh,
             onDismiss = { showColorSchemeDialog = false },
             onSelect = { selected ->
                 viewModel.setTerminalColorScheme(selected)
@@ -271,7 +300,7 @@ fun SettingsScreen(
     if (showLockTimeoutDialog) {
         AlertDialog(
             onDismissRequest = { showLockTimeoutDialog = false },
-            title = { Text("Lock timeout") },
+            title = { Text(if (zh) "锁定超时" else "Lock timeout") },
             text = {
                 Column {
                     UserPreferencesRepository.LockTimeout.entries.forEach { timeout ->
@@ -280,7 +309,7 @@ fun SettingsScreen(
                                 viewModel.setLockTimeout(timeout)
                                 showLockTimeoutDialog = false
                             },
-                            headlineContent = { Text(timeout.label) },
+                            headlineContent = { Text(lockTimeoutLabel(timeout, zh)) },
                             leadingContent = {
                                 RadioButton(
                                     selected = lockTimeout == timeout,
@@ -294,7 +323,7 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showLockTimeoutDialog = false }) {
-                    Text("Cancel")
+                    Text(if (zh) "取消" else "Cancel")
                 }
             },
         )
@@ -305,6 +334,7 @@ fun SettingsScreen(
         SessionManagerDialog(
             current = sessionManager,
             commandOverride = sessionCmdOverride,
+            zh = zh,
             onDismiss = { showSessionManagerDialog = false },
             onSelect = { selected ->
                 viewModel.setSessionManager(selected)
@@ -317,6 +347,7 @@ fun SettingsScreen(
     if (showFontSizeDialog) {
         FontSizeDialog(
             currentSize = fontSize,
+            zh = zh,
             onDismiss = { showFontSizeDialog = false },
             onConfirm = { newSize ->
                 viewModel.setTerminalFontSize(newSize)
@@ -329,6 +360,7 @@ fun SettingsScreen(
         ToolbarConfigDialog(
             layout = toolbarLayout,
             layoutJson = toolbarLayoutJson,
+            zh = zh,
             onDismiss = { showToolbarConfigDialog = false },
             onSaveLayout = { layout ->
                 viewModel.setToolbarLayout(layout)
@@ -344,6 +376,7 @@ fun SettingsScreen(
     showBackupPasswordDialog?.let { action ->
         BackupPasswordDialog(
             isExport = action is BackupAction.Export,
+            zh = zh,
             onDismiss = { showBackupPasswordDialog = null },
             onConfirm = { password ->
                 showBackupPasswordDialog = null
@@ -369,15 +402,22 @@ private sealed interface BackupAction {
 @Composable
 private fun BackupPasswordDialog(
     isExport: Boolean,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    val title = if (isExport) "Export Backup" else "Restore Backup"
-    val passwordError = if (isExport && password.length in 1..5) "At least 6 characters" else null
+    val title = if (isExport) {
+        if (zh) "导出备份" else "Export Backup"
+    } else {
+        if (zh) "恢复备份" else "Restore Backup"
+    }
+    val passwordError = if (isExport && password.length in 1..5) {
+        if (zh) "至少 6 个字符" else "At least 6 characters"
+    } else null
     val confirmError = if (isExport && confirmPassword.isNotEmpty() && confirmPassword != password) {
-        "Passwords don't match"
+        if (zh) "两次密码不一致" else "Passwords don't match"
     } else null
     val canConfirm = if (isExport) {
         password.length >= 6 && password == confirmPassword
@@ -392,9 +432,13 @@ private fun BackupPasswordDialog(
             Column {
                 Text(
                     text = if (isExport) {
-                        "Encrypt your backup with a password. This protects your SSH keys and connection data."
+                        if (zh) {
+                            "使用密码加密备份，以保护你的 SSH 密钥和连接数据。"
+                        } else {
+                            "Encrypt your backup with a password. This protects your SSH keys and connection data."
+                        }
                     } else {
-                        "Enter the password used when the backup was created."
+                        if (zh) "输入创建备份时使用的密码。" else "Enter the password used when the backup was created."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -403,7 +447,7 @@ private fun BackupPasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text(if (zh) "密码" else "Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     isError = passwordError != null,
@@ -415,7 +459,7 @@ private fun BackupPasswordDialog(
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
-                        label = { Text("Confirm password") },
+                        label = { Text(if (zh) "确认密码" else "Confirm password") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         isError = confirmError != null,
@@ -427,11 +471,17 @@ private fun BackupPasswordDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(password) }, enabled = canConfirm) {
-                Text(if (isExport) "Export" else "Restore")
+                Text(
+                    if (isExport) {
+                        if (zh) "导出" else "Export"
+                    } else {
+                        if (zh) "恢复" else "Restore"
+                    }
+                )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(if (zh) "取消" else "Cancel") }
         },
     )
 }
@@ -442,12 +492,13 @@ private const val GITHUB_URL = "https://github.com/hension-code/HavenX"
 private fun AboutDialog(
     versionName: String,
     versionCode: Long,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("About HavenX") },
+        title = { Text(if (zh) "关于 HavenX" else "About HavenX") },
         text = {
             Column {
                 Text(
@@ -456,13 +507,17 @@ private fun AboutDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Open source remote client for Android",
+                    text = if (zh) "面向 Android 的开源远程连接客户端" else "Open source remote client for Android",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Version $versionName (build $versionCode)",
+                    text = if (zh) {
+                        "版本 $versionName（构建 $versionCode）"
+                    } else {
+                        "Version $versionName (build $versionCode)"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -473,7 +528,7 @@ private fun AboutDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(if (zh) "关闭" else "Close")
             }
         },
         dismissButton = {
@@ -485,19 +540,61 @@ private fun AboutDialog(
 }
 
 @Composable
+private fun LanguageDialog(
+    currentLanguage: UserPreferencesRepository.LanguageMode,
+    onDismiss: () -> Unit,
+    onSelect: (UserPreferencesRepository.LanguageMode) -> Unit,
+) {
+    val zh = Locale.current.language == "zh"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (zh) "语言" else "Language") },
+        text = {
+            Column {
+                UserPreferencesRepository.LanguageMode.entries.forEach { mode ->
+                    val label = when (mode) {
+                        UserPreferencesRepository.LanguageMode.SYSTEM -> if (zh) "跟随系统" else "System default"
+                        UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
+                        UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
+                    }
+                    ListItem(
+                        headlineContent = { Text(label) },
+                        leadingContent = {
+                            RadioButton(
+                                selected = mode == currentLanguage,
+                                onClick = null,
+                            )
+                        },
+                        modifier = Modifier.clickable(role = Role.RadioButton) {
+                            onSelect(mode)
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (zh) "取消" else "Cancel")
+            }
+        },
+    )
+}
+
+@Composable
 private fun ThemeDialog(
     currentTheme: UserPreferencesRepository.ThemeMode,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSelect: (UserPreferencesRepository.ThemeMode) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Theme") },
+        title = { Text(if (zh) "主题" else "Theme") },
         text = {
             Column {
                 UserPreferencesRepository.ThemeMode.entries.forEach { mode ->
                     ListItem(
-                        headlineContent = { Text(mode.label) },
+                        headlineContent = { Text(themeModeLabel(mode, zh)) },
                         leadingContent = {
                             RadioButton(
                                 selected = mode == currentTheme,
@@ -513,7 +610,7 @@ private fun ThemeDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -522,12 +619,13 @@ private fun ThemeDialog(
 @Composable
 private fun ColorSchemeDialog(
     currentScheme: UserPreferencesRepository.TerminalColorScheme,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSelect: (UserPreferencesRepository.TerminalColorScheme) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Terminal color scheme") },
+        title = { Text(if (zh) "终端配色方案" else "Terminal color scheme") },
         text = {
             Column {
                 UserPreferencesRepository.TerminalColorScheme.entries.forEach { scheme ->
@@ -553,7 +651,7 @@ private fun ColorSchemeDialog(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(scheme.label)
+                                Text(colorSchemeLabel(scheme, zh))
                             }
                         },
                         leadingContent = {
@@ -571,7 +669,7 @@ private fun ColorSchemeDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -581,6 +679,7 @@ private fun ColorSchemeDialog(
 private fun SessionManagerDialog(
     current: UserPreferencesRepository.SessionManager,
     commandOverride: String?,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSelect: (UserPreferencesRepository.SessionManager) -> Unit,
     onCommandOverrideChange: (String?) -> Unit,
@@ -589,7 +688,7 @@ private fun SessionManagerDialog(
     var overrideText by remember(commandOverride) { mutableStateOf(commandOverride ?: "") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Session persistence") },
+        title = { Text(if (zh) "会话持久化" else "Session persistence") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 UserPreferencesRepository.SessionManager.entries.forEach { manager ->
@@ -597,7 +696,7 @@ private fun SessionManagerDialog(
                         headlineContent = {
                             if (manager.url != null) {
                                 Text(
-                                    text = manager.label,
+                                    text = sessionManagerLabel(manager, zh),
                                     color = MaterialTheme.colorScheme.primary,
                                     textDecoration = TextDecoration.Underline,
                                     modifier = Modifier.clickable {
@@ -607,11 +706,11 @@ private fun SessionManagerDialog(
                                     },
                                 )
                             } else {
-                                Text(manager.label)
+                                Text(sessionManagerLabel(manager, zh))
                             }
                         },
                         supportingContent = if (!manager.supportsScrollback) {
-                            { Text("No touch scrollback") }
+                            { Text(if (zh) "不支持触摸回滚" else "No touch scrollback") }
                         } else null,
                         leadingContent = {
                             RadioButton(
@@ -631,10 +730,16 @@ private fun SessionManagerDialog(
                     OutlinedTextField(
                         value = overrideText,
                         onValueChange = { overrideText = it },
-                        label = { Text("Custom command") },
+                        label = { Text(if (zh) "自定义命令" else "Custom command") },
                         placeholder = { Text(defaultCommand, maxLines = 1) },
                         supportingText = {
-                            Text("Use {name} for session name. Leave blank for default.")
+                            Text(
+                                if (zh) {
+                                    "使用 {name} 作为会话名。留空则使用默认命令。"
+                                } else {
+                                    "Use {name} for session name. Leave blank for default."
+                                }
+                            )
                         },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -645,7 +750,7 @@ private fun SessionManagerDialog(
                                 onCommandOverrideChange(overrideText.ifBlank { null })
                             },
                         ) {
-                            Text("Save command")
+                            Text(if (zh) "保存命令" else "Save command")
                         }
                     }
                 }
@@ -653,7 +758,7 @@ private fun SessionManagerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(if (zh) "关闭" else "Close")
             }
         },
     )
@@ -662,6 +767,7 @@ private fun SessionManagerDialog(
 @Composable
 private fun FontSizeDialog(
     currentSize: Int,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
 ) {
@@ -670,14 +776,14 @@ private fun FontSizeDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Terminal font size") },
+        title = { Text(if (zh) "终端字体大小" else "Terminal font size") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Sample text",
+                    text = if (zh) "示例文本" else "Sample text",
                     fontFamily = FontFamily.Monospace,
                     fontSize = displaySize.sp,
                     modifier = Modifier.padding(vertical = 16.dp),
@@ -699,12 +805,12 @@ private fun FontSizeDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(displaySize) }) {
-                Text("OK")
+                Text(if (zh) "确定" else "OK")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -752,6 +858,42 @@ private fun SettingsItem(
     )
 }
 
+private fun themeModeLabel(mode: UserPreferencesRepository.ThemeMode, zh: Boolean): String =
+    when (mode) {
+        UserPreferencesRepository.ThemeMode.SYSTEM -> if (zh) "跟随系统" else "System default"
+        UserPreferencesRepository.ThemeMode.LIGHT -> if (zh) "浅色" else "Light"
+        UserPreferencesRepository.ThemeMode.DARK -> if (zh) "深色" else "Dark"
+    }
+
+private fun lockTimeoutLabel(timeout: UserPreferencesRepository.LockTimeout, zh: Boolean): String =
+    when (timeout) {
+        UserPreferencesRepository.LockTimeout.IMMEDIATE -> if (zh) "立即" else "Immediately"
+        UserPreferencesRepository.LockTimeout.THIRTY_SECONDS -> if (zh) "30 秒" else "30 seconds"
+        UserPreferencesRepository.LockTimeout.ONE_MINUTE -> if (zh) "1 分钟" else "1 minute"
+        UserPreferencesRepository.LockTimeout.FIVE_MINUTES -> if (zh) "5 分钟" else "5 minutes"
+        UserPreferencesRepository.LockTimeout.NEVER -> if (zh) "从不" else "Never"
+    }
+
+private fun sessionManagerLabel(
+    manager: UserPreferencesRepository.SessionManager,
+    zh: Boolean,
+): String = when (manager) {
+    UserPreferencesRepository.SessionManager.NONE -> if (zh) "无" else "None"
+    else -> manager.label
+}
+
+private fun colorSchemeLabel(
+    scheme: UserPreferencesRepository.TerminalColorScheme,
+    zh: Boolean,
+): String = when (scheme) {
+    UserPreferencesRepository.TerminalColorScheme.HAVEN -> "Haven"
+    UserPreferencesRepository.TerminalColorScheme.CLASSIC_GREEN -> if (zh) "经典绿色" else "Classic Green"
+    UserPreferencesRepository.TerminalColorScheme.LIGHT -> if (zh) "浅色" else "Light"
+    UserPreferencesRepository.TerminalColorScheme.SOLARIZED_DARK -> if (zh) "Solarized 深色" else "Solarized Dark"
+    UserPreferencesRepository.TerminalColorScheme.DRACULA -> "Dracula"
+    UserPreferencesRepository.TerminalColorScheme.MONOKAI -> "Monokai"
+}
+
 /** Assignment for a key in the toolbar config dialog. */
 private enum class KeyAssignment { ROW1, ROW2, OFF }
 
@@ -759,6 +901,7 @@ private enum class KeyAssignment { ROW1, ROW2, OFF }
 private fun ToolbarConfigDialog(
     layout: ToolbarLayout,
     layoutJson: String,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSaveLayout: (ToolbarLayout) -> Unit,
     onSaveJson: (String) -> Unit,
@@ -768,6 +911,7 @@ private fun ToolbarConfigDialog(
     if (advancedMode) {
         ToolbarJsonEditor(
             json = layoutJson,
+            zh = zh,
             onDismiss = onDismiss,
             onSave = onSaveJson,
             onSimpleMode = { advancedMode = false },
@@ -775,6 +919,7 @@ private fun ToolbarConfigDialog(
     } else {
         ToolbarSimpleEditor(
             layout = layout,
+            zh = zh,
             onDismiss = onDismiss,
             onSave = onSaveLayout,
             onAdvancedMode = { advancedMode = true },
@@ -785,6 +930,7 @@ private fun ToolbarConfigDialog(
 @Composable
 private fun ToolbarSimpleEditor(
     layout: ToolbarLayout,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSave: (ToolbarLayout) -> Unit,
     onAdvancedMode: () -> Unit,
@@ -816,11 +962,11 @@ private fun ToolbarSimpleEditor(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Keyboard toolbar") },
+        title = { Text(if (zh) "键盘工具栏" else "Keyboard toolbar") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    text = "Assign each key to Row 1, Row 2, or Off",
+                    text = if (zh) "为每个按键分配到第 1 行、第 2 行或关闭" else "Assign each key to Row 1, Row 2, or Off",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -828,7 +974,7 @@ private fun ToolbarSimpleEditor(
 
                 if (hasCustomKeys) {
                     Text(
-                        text = "Custom keys are preserved. Use Edit JSON for full control.",
+                        text = if (zh) "自定义按键会被保留。使用“编辑 JSON”可进行完整控制。" else "Custom keys are preserved. Use Edit JSON for full control.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(bottom = 4.dp),
@@ -836,7 +982,7 @@ private fun ToolbarSimpleEditor(
                 }
 
                 Text(
-                    "Function keys",
+                    if (zh) "功能键" else "Function keys",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
@@ -844,6 +990,7 @@ private fun ToolbarSimpleEditor(
                 ToolbarKey.entries.filter { it.isAction || it.isModifier }.forEach { key ->
                     ToolbarKeyRow(
                         label = key.label,
+                        zh = zh,
                         assignment = assignments[key] ?: KeyAssignment.OFF,
                         onAssign = { assignments = assignments + (key to it) },
                     )
@@ -852,7 +999,7 @@ private fun ToolbarSimpleEditor(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    "Symbols",
+                    if (zh) "符号" else "Symbols",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -860,6 +1007,7 @@ private fun ToolbarSimpleEditor(
                 ToolbarKey.entries.filter { !it.isAction && !it.isModifier }.forEach { key ->
                     ToolbarKeyRow(
                         label = key.label,
+                        zh = zh,
                         assignment = assignments[key] ?: KeyAssignment.OFF,
                         onAssign = { assignments = assignments + (key to it) },
                     )
@@ -879,7 +1027,7 @@ private fun ToolbarSimpleEditor(
                     .map { ToolbarItem.BuiltIn(it) } + customRow2
                 onSave(ToolbarLayout(listOf(newRow1, newRow2)))
             }) {
-                Text("Save")
+                Text(if (zh) "保存" else "Save")
             }
         },
         dismissButton = {
@@ -892,14 +1040,14 @@ private fun ToolbarSimpleEditor(
                             else -> KeyAssignment.OFF
                         }
                     }
-                }) {
-                    Text("Reset")
+                    }) {
+                    Text(if (zh) "重置" else "Reset")
                 }
                 TextButton(onClick = onAdvancedMode) {
-                    Text("Edit JSON")
+                    Text(if (zh) "编辑 JSON" else "Edit JSON")
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(if (zh) "取消" else "Cancel")
                 }
             }
         },
@@ -909,6 +1057,7 @@ private fun ToolbarSimpleEditor(
 @Composable
 private fun ToolbarJsonEditor(
     json: String,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
     onSimpleMode: () -> Unit,
@@ -918,11 +1067,15 @@ private fun ToolbarJsonEditor(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit toolbar JSON") },
+        title = { Text(if (zh) "编辑工具栏 JSON" else "Edit toolbar JSON") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    text = "String = built-in key ID, Object = custom key {\"label\": \"...\", \"send\": \"...\"}",
+                    text = if (zh) {
+                        "字符串 = 内置按键 ID，对象 = 自定义按键 {\"label\": \"...\", \"send\": \"...\"}"
+                    } else {
+                        "String = built-in key ID, Object = custom key {\"label\": \"...\", \"send\": \"...\"}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
@@ -948,7 +1101,11 @@ private fun ToolbarJsonEditor(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Built-in IDs: keyboard, esc, tab, shift, ctrl, alt, arrow_left, arrow_up, arrow_down, arrow_right, home, end, pgup, pgdn, sym_pipe, sym_tilde, sym_slash, sym_dash, sym_underscore, sym_equals, sym_plus, sym_backslash, sym_squote, sym_dquote, sym_semicolon, sym_colon, sym_bang, sym_question, sym_at, sym_hash, sym_dollar, sym_percent, sym_caret, sym_amp, sym_star, sym_lparen, sym_rparen, sym_lbracket, sym_rbracket, sym_lbrace, sym_rbrace, sym_lt, sym_gt, sym_backtick",
+                    text = if (zh) {
+                        "内置 ID：keyboard, esc, tab, shift, ctrl, alt, arrow_left, arrow_up, arrow_down, arrow_right, home, end, pgup, pgdn, sym_pipe, sym_tilde, sym_slash, sym_dash, sym_underscore, sym_equals, sym_plus, sym_backslash, sym_squote, sym_dquote, sym_semicolon, sym_colon, sym_bang, sym_question, sym_at, sym_hash, sym_dollar, sym_percent, sym_caret, sym_amp, sym_star, sym_lparen, sym_rparen, sym_lbracket, sym_rbracket, sym_lbrace, sym_rbrace, sym_lt, sym_gt, sym_backtick"
+                    } else {
+                        "Built-in IDs: keyboard, esc, tab, shift, ctrl, alt, arrow_left, arrow_up, arrow_down, arrow_right, home, end, pgup, pgdn, sym_pipe, sym_tilde, sym_slash, sym_dash, sym_underscore, sym_equals, sym_plus, sym_backslash, sym_squote, sym_dquote, sym_semicolon, sym_colon, sym_bang, sym_question, sym_at, sym_hash, sym_dollar, sym_percent, sym_caret, sym_amp, sym_star, sym_lparen, sym_rparen, sym_lbracket, sym_rbracket, sym_lbrace, sym_rbrace, sym_lt, sym_gt, sym_backtick"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp,
@@ -964,7 +1121,7 @@ private fun ToolbarJsonEditor(
                     onSave(text)
                 }
             }) {
-                Text("Save")
+                Text(if (zh) "保存" else "Save")
             }
         },
         dismissButton = {
@@ -973,13 +1130,13 @@ private fun ToolbarJsonEditor(
                     text = ToolbarLayout.DEFAULT.toJson()
                     error = null
                 }) {
-                    Text("Reset")
+                    Text(if (zh) "重置" else "Reset")
                 }
                 TextButton(onClick = onSimpleMode) {
-                    Text("Simple")
+                    Text(if (zh) "简易模式" else "Simple")
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(if (zh) "取消" else "Cancel")
                 }
             }
         },
@@ -989,6 +1146,7 @@ private fun ToolbarJsonEditor(
 @Composable
 private fun ToolbarKeyRow(
     label: String,
+    zh: Boolean,
     assignment: KeyAssignment,
     onAssign: (KeyAssignment) -> Unit,
 ) {
@@ -1012,7 +1170,7 @@ private fun ToolbarKeyRow(
                         when (option) {
                             KeyAssignment.ROW1 -> "R1"
                             KeyAssignment.ROW2 -> "R2"
-                            KeyAssignment.OFF -> "Off"
+                            KeyAssignment.OFF -> if (zh) "关" else "Off"
                         },
                         fontSize = 11.sp,
                     )

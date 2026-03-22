@@ -92,6 +92,14 @@ class SettingsViewModel @Inject constructor(
             UserPreferencesRepository.ThemeMode.SYSTEM,
         )
 
+    val languageMode: StateFlow<UserPreferencesRepository.LanguageMode> =
+        preferencesRepository.languageMode
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserPreferencesRepository.LanguageMode.SYSTEM,
+            )
+
     val sessionManager: StateFlow<UserPreferencesRepository.SessionManager> =
         preferencesRepository.sessionManager
             .stateIn(
@@ -158,6 +166,12 @@ class SettingsViewModel @Inject constructor(
     fun setTheme(mode: UserPreferencesRepository.ThemeMode) {
         viewModelScope.launch {
             preferencesRepository.setTheme(mode)
+        }
+    }
+
+    fun setLanguageMode(mode: UserPreferencesRepository.LanguageMode) {
+        viewModelScope.launch {
+            preferencesRepository.setLanguageMode(mode)
         }
     }
 

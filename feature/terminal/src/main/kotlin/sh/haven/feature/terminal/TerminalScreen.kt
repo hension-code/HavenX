@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,6 +106,7 @@ fun TerminalScreen(
     onSelectionActiveChanged: (Boolean) -> Unit = {},
     viewModel: TerminalViewModel = hiltViewModel(),
 ) {
+    val zh = Locale.current.language == "zh"
     val tabs by viewModel.tabs.collectAsState()
     val activeTabIndex by viewModel.activeTabIndex.collectAsState()
     val ctrlActive by viewModel.ctrlActive.collectAsState()
@@ -180,6 +182,7 @@ fun TerminalScreen(
                 onNavigateToVnc(info.host, port, password, sshForward, info.sessionId)
             },
             onDismiss = { vncDialogInfo = null },
+            zh = zh,
         )
     }
 
@@ -196,6 +199,7 @@ fun TerminalScreen(
             onRename = { old, new -> viewModel.renameRemoteSession(old, new) },
             onNewSession = { viewModel.onNewTabSessionSelected(selection.sessionId, null) },
             onDismiss = { viewModel.dismissNewTabSessionPicker() },
+            zh = zh,
         )
     }
 
@@ -205,6 +209,7 @@ fun TerminalScreen(
                 fontSize = fontSize,
                 backgroundColor = Color(colorScheme.background),
                 foregroundColor = Color(colorScheme.foreground),
+                zh = zh,
             )
         } else {
             // Tab row — always show when tabs exist so "+" button is accessible
@@ -248,7 +253,7 @@ fun TerminalScreen(
                                 if (reconnecting) {
                                     Icon(
                                         Icons.Filled.Autorenew,
-                                        contentDescription = "Reconnecting",
+                                        contentDescription = if (zh) "重连中" else "Reconnecting",
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.error,
                                     )
@@ -263,7 +268,7 @@ fun TerminalScreen(
                                     ) {
                                         Icon(
                                             Icons.Filled.Add,
-                                            contentDescription = "Clone tab",
+                                            contentDescription = if (zh) "克隆标签页" else "Clone tab",
                                             modifier = Modifier.size(14.dp),
                                         )
                                     }
@@ -274,7 +279,7 @@ fun TerminalScreen(
                                 ) {
                                     Icon(
                                         Icons.Filled.Close,
-                                        contentDescription = "Close tab",
+                                        contentDescription = if (zh) "关闭标签页" else "Close tab",
                                         modifier = Modifier.size(14.dp),
                                     )
                                 }
@@ -445,6 +450,7 @@ private fun EmptyTerminalState(
     fontSize: Int,
     backgroundColor: Color,
     foregroundColor: Color,
+    zh: Boolean,
 ) {
     Box(
         modifier = Modifier
@@ -454,7 +460,7 @@ private fun EmptyTerminalState(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "Connect to a server to start a session.",
+            text = if (zh) "连接到服务器以开始会话。" else "Connect to a server to start a session.",
             fontFamily = FontFamily.Monospace,
             fontSize = fontSize.sp,
             color = foregroundColor,
@@ -474,6 +480,7 @@ private fun NewTabSessionPickerDialog(
     onRename: (old: String, new: String) -> Unit = { _, _ -> },
     onNewSession: () -> Unit,
     onDismiss: () -> Unit,
+    zh: Boolean,
 ) {
     var renamingSession by remember { mutableStateOf<String?>(null) }
 
@@ -485,12 +492,13 @@ private fun NewTabSessionPickerDialog(
                 onRename(name, newName)
                 renamingSession = null
             },
+            zh = zh,
         )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$managerLabel sessions") },
+        title = { Text(if (zh) "$managerLabel 会话" else "$managerLabel sessions") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 if (error != null) {
@@ -509,7 +517,7 @@ private fun NewTabSessionPickerDialog(
                                     IconButton(onClick = { renamingSession = name }) {
                                         Icon(
                                             Icons.Filled.DriveFileRenameOutline,
-                                            contentDescription = "Rename session",
+                                            contentDescription = if (zh) "重命名会话" else "Rename session",
                                         )
                                     }
                                 }
@@ -517,7 +525,7 @@ private fun NewTabSessionPickerDialog(
                                     IconButton(onClick = { onKill(name) }) {
                                         Icon(
                                             Icons.Filled.Delete,
-                                            contentDescription = "Kill session",
+                                            contentDescription = if (zh) "结束会话" else "Kill session",
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -531,7 +539,7 @@ private fun NewTabSessionPickerDialog(
                 ListItem(
                     headlineContent = {
                         Text(
-                            "New session",
+                            if (zh) "新建会话" else "New session",
                             color = MaterialTheme.colorScheme.primary,
                         )
                     },
@@ -548,7 +556,7 @@ private fun NewTabSessionPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -855,6 +863,7 @@ private fun VncSettingsDialog(
     initialSshForward: Boolean,
     onConnect: (port: Int, password: String?, sshForward: Boolean, save: Boolean) -> Unit,
     onDismiss: () -> Unit,
+    zh: Boolean,
 ) {
     var port by remember { mutableStateOf(initialPort.toString()) }
     var password by remember { mutableStateOf(initialPassword ?: "") }
@@ -863,15 +872,18 @@ private fun VncSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("VNC Desktop") },
+        title = { Text(if (zh) "VNC 桌面" else "VNC Desktop") },
         text = {
             Column {
-                Text("Connect to $host", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    if (zh) "连接到 $host" else "Connect to $host",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 androidx.compose.foundation.layout.Spacer(Modifier.size(12.dp))
                 OutlinedTextField(
                     value = port,
                     onValueChange = { port = it },
-                    label = { Text("Port") },
+                    label = { Text(if (zh) "端口" else "Port") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -879,7 +891,7 @@ private fun VncSettingsDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text(if (zh) "密码" else "Password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -889,14 +901,14 @@ private fun VncSettingsDialog(
                         checked = sshForward,
                         onCheckedChange = { sshForward = it },
                     )
-                    Text("Tunnel through SSH")
+                    Text(if (zh) "通过 SSH 隧道" else "Tunnel through SSH")
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(
                         checked = save,
                         onCheckedChange = { save = it },
                     )
-                    Text("Save for this connection")
+                    Text(if (zh) "保存到此连接" else "Save for this connection")
                 }
             }
         },
@@ -907,12 +919,12 @@ private fun VncSettingsDialog(
                     onConnect(p, password.ifEmpty { null }, sshForward, save)
                 },
             ) {
-                Text("Connect")
+                Text(if (zh) "连接" else "Connect")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -923,17 +935,18 @@ private fun RenameSessionDialog(
     currentLabel: String,
     onDismiss: () -> Unit,
     onRename: (String) -> Unit,
+    zh: Boolean,
 ) {
     var label by remember { mutableStateOf(currentLabel) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Session") },
+        title = { Text(if (zh) "重命名会话" else "Rename Session") },
         text = {
             OutlinedTextField(
                 value = label,
                 onValueChange = { label = it },
-                label = { Text("Name") },
+                label = { Text(if (zh) "名称" else "Name") },
                 singleLine = true,
             )
         },
@@ -942,12 +955,12 @@ private fun RenameSessionDialog(
                 onClick = { onRename(label) },
                 enabled = label.isNotBlank() && label != currentLabel,
             ) {
-                Text("Rename")
+                Text(if (zh) "重命名" else "Rename")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )

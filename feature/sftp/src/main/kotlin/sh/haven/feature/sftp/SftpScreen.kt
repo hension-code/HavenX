@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -76,6 +77,7 @@ fun SftpScreen(
     pendingSmbProfileId: String? = null,
     viewModel: SftpViewModel = hiltViewModel(),
 ) {
+    val zh = ComposeLocale.current.language == "zh"
     val connectedProfiles by viewModel.connectedProfiles.collectAsState()
     val activeProfileId by viewModel.activeProfileId.collectAsState()
     val currentPath by viewModel.currentPath.collectAsState()
@@ -108,8 +110,8 @@ fun SftpScreen(
         val dl = lastDownload ?: return@LaunchedEffect
         viewModel.dismissMessage() // clear the plain message so it doesn't double-show
         val result = snackbarHostState.showSnackbar(
-            message = "Downloaded ${dl.fileName}",
-            actionLabel = "Open",
+            message = if (zh) "已下载 ${dl.fileName}" else "Downloaded ${dl.fileName}",
+            actionLabel = if (zh) "打开" else "Open",
             duration = androidx.compose.material3.SnackbarDuration.Long,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -121,7 +123,7 @@ fun SftpScreen(
                 }
                 context.startActivity(intent)
             } catch (e: Exception) {
-                snackbarHostState.showSnackbar("No app found to open this file")
+                snackbarHostState.showSnackbar(if (zh) "未找到可打开该文件的应用" else "No app found to open this file")
             }
         }
         viewModel.clearLastDownload()
@@ -180,7 +182,7 @@ fun SftpScreen(
                 navigationIcon = {
                     if (currentPath != "/" && activeProfileId != null) {
                         IconButton(onClick = { viewModel.navigateUp() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Navigate up")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, if (zh) "返回上级目录" else "Navigate up")
                         }
                     }
                 },
@@ -189,16 +191,21 @@ fun SftpScreen(
                         IconButton(onClick = { viewModel.toggleShowHidden() }) {
                             Icon(
                                 if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (showHidden) "Hide hidden files" else "Show hidden files",
+                                contentDescription = if (showHidden) {
+                                    if (zh) "隐藏隐藏文件" else "Hide hidden files"
+                                } else {
+                                    if (zh) "显示隐藏文件" else "Show hidden files"
+                                },
                             )
                         }
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
-                                Icon(Icons.AutoMirrored.Filled.Sort, "Sort")
+                                Icon(Icons.AutoMirrored.Filled.Sort, if (zh) "排序" else "Sort")
                             }
                             SortDropdown(
                                 expanded = showSortMenu,
                                 currentMode = sortMode,
+                                zh = zh,
                                 onDismiss = { showSortMenu = false },
                                 onSelect = { mode ->
                                     viewModel.setSortMode(mode)
@@ -207,7 +214,7 @@ fun SftpScreen(
                             )
                         }
                         IconButton(onClick = { viewModel.refresh() }) {
-                            Icon(Icons.Filled.Refresh, "Refresh")
+                            Icon(Icons.Filled.Refresh, if (zh) "刷新" else "Refresh")
                         }
                     }
                 },
@@ -217,7 +224,7 @@ fun SftpScreen(
         floatingActionButton = {
             if (activeProfileId != null) {
                 FloatingActionButton(onClick = { uploadLauncher.launch(arrayOf("*/*")) }) {
-                    Icon(Icons.Filled.Upload, "Upload file")
+                    Icon(Icons.Filled.Upload, if (zh) "上传文件" else "Upload file")
                 }
             }
         },
@@ -262,7 +269,7 @@ fun SftpScreen(
             }
 
             if (connectedProfiles.isEmpty()) {
-                EmptyState()
+                EmptyState(zh = zh)
             } else {
                 // Server tabs
                 if (connectedProfiles.size > 1) {
@@ -290,7 +297,7 @@ fun SftpScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            "Empty directory",
+                            if (zh) "空目录" else "Empty directory",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -313,9 +320,10 @@ fun SftpScreen(
                                 onCopyPath = {
                                     clipboardManager.setText(AnnotatedString(entry.path))
                                     scope.launch {
-                                        snackbarHostState.showSnackbar("Path copied")
+                                        snackbarHostState.showSnackbar(if (zh) "路径已复制" else "Path copied")
                                     }
                                 },
+                                zh = zh,
                             )
                         }
                     }
@@ -333,6 +341,7 @@ private fun FileListItem(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onCopyPath: () -> Unit,
+    zh: Boolean,
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
@@ -343,14 +352,22 @@ private fun FileListItem(
         ListItem(
             headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
-                val sizeText = if (entry.isDirectory) "Directory" else Formatter.formatFileSize(context, entry.size)
+                val sizeText = if (entry.isDirectory) {
+                    if (zh) "文件夹" else "Directory"
+                } else {
+                    Formatter.formatFileSize(context, entry.size)
+                }
                 val dateText = dateFormat.format(Date(entry.modifiedTime * 1000))
                 Text("$sizeText  $dateText")
             },
             leadingContent = {
                 Icon(
                     if (entry.isDirectory) Icons.Filled.Folder else Icons.Filled.Description,
-                    contentDescription = if (entry.isDirectory) "Directory" else "File",
+                    contentDescription = if (entry.isDirectory) {
+                        if (zh) "文件夹" else "Directory"
+                    } else {
+                        if (zh) "文件" else "File"
+                    },
                     tint = if (entry.isDirectory) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -370,18 +387,18 @@ private fun FileListItem(
         ) {
             if (!entry.isDirectory) {
                 DropdownMenuItem(
-                    text = { Text("Download") },
+                    text = { Text(if (zh) "下载" else "Download") },
                     leadingIcon = { Icon(Icons.Filled.Download, null) },
                     onClick = { showMenu = false; onDownload() },
                 )
             }
             DropdownMenuItem(
-                text = { Text("Copy path") },
+                text = { Text(if (zh) "复制路径" else "Copy path") },
                 leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
                 onClick = { showMenu = false; onCopyPath() },
             )
             DropdownMenuItem(
-                text = { Text("Delete") },
+                text = { Text(if (zh) "删除" else "Delete") },
                 leadingIcon = { Icon(Icons.Filled.Delete, null) },
                 onClick = { showMenu = false; onDelete() },
             )
@@ -393,18 +410,19 @@ private fun FileListItem(
 private fun SortDropdown(
     expanded: Boolean,
     currentMode: SortMode,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onSelect: (SortMode) -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         SortMode.entries.forEach { mode ->
             val label = when (mode) {
-                SortMode.NAME_ASC -> "Name A-Z"
-                SortMode.NAME_DESC -> "Name Z-A"
-                SortMode.SIZE_ASC -> "Size (smallest)"
-                SortMode.SIZE_DESC -> "Size (largest)"
-                SortMode.DATE_ASC -> "Date (oldest)"
-                SortMode.DATE_DESC -> "Date (newest)"
+                SortMode.NAME_ASC -> if (zh) "名称 A-Z" else "Name A-Z"
+                SortMode.NAME_DESC -> if (zh) "名称 Z-A" else "Name Z-A"
+                SortMode.SIZE_ASC -> if (zh) "大小（小->大）" else "Size (smallest)"
+                SortMode.SIZE_DESC -> if (zh) "大小（大->小）" else "Size (largest)"
+                SortMode.DATE_ASC -> if (zh) "日期（最早）" else "Date (oldest)"
+                SortMode.DATE_DESC -> if (zh) "日期（最新）" else "Date (newest)"
             }
             DropdownMenuItem(
                 text = { Text(label) },
@@ -421,7 +439,7 @@ private fun SortDropdown(
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(zh: Boolean) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -434,13 +452,13 @@ private fun EmptyState() {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            "SFTP File Browser",
+            if (zh) "SFTP 文件浏览器" else "SFTP File Browser",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            "Connect to a server to browse files",
+            if (zh) "连接到服务器后可浏览文件" else "Connect to a server to browse files",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.connectbot.terminal.SelectionController
@@ -410,6 +411,7 @@ fun SelectionToolbarContent(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val zh = Locale.current.language == "zh"
     val anchorMover = remember(controller) { AnchorMover(controller) }
     var anchorTarget by remember { mutableStateOf(AnchorTarget.END) }
 
@@ -419,15 +421,15 @@ fun SelectionToolbarContent(
         horizontalArrangement = Arrangement.Center,
     ) {
         // Copy — smart processing happens in SmartTerminalClipboard interceptor
-        SelectionIconButton(Icons.Filled.ContentCopy, "Copy") {
+        SelectionIconButton(Icons.Filled.ContentCopy, if (zh) "复制" else "Copy") {
             val text = controller.copySelection()
             if (!text.isNullOrEmpty()) {
-                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, if (zh) "已复制" else "Copied", Toast.LENGTH_SHORT).show()
             }
         }
 
         // Paste (wrapped in bracket paste sequences when mode 2004 is active)
-        SelectionIconButton(Icons.Filled.ContentPaste, "Paste") {
+        SelectionIconButton(Icons.Filled.ContentPaste, if (zh) "粘贴" else "Paste") {
             val text = clipboardManager.getText()?.text
             if (!text.isNullOrEmpty()) {
                 controller.clearSelection()
@@ -442,7 +444,7 @@ fun SelectionToolbarContent(
         // Open URL (detected in selection text, or from OSC 8 hyperlink)
         // Try the raw selection first, then with newlines stripped to handle
         // URLs split across lines by the program or terminal wrapping.
-        SelectionIconButton(Icons.AutoMirrored.Filled.OpenInNew, "Open") {
+        SelectionIconButton(Icons.AutoMirrored.Filled.OpenInNew, if (zh) "打开" else "Open") {
             val raw = controller.copySelection()?.trim()
             val joined = raw?.replace(Regex("\\s*\\n\\s*"), "")
             val url = detectUrl(raw) ?: detectUrl(joined) ?: hyperlinkUri
@@ -452,14 +454,18 @@ fun SelectionToolbarContent(
                 )))
                 controller.clearSelection()
             } else {
-                Toast.makeText(context, "No URL detected", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, if (zh) "未检测到链接" else "No URL detected", Toast.LENGTH_SHORT).show()
             }
         }
 
         // Anchor target toggle: Start / End
         if (anchorMover.available) {
             SelectionToggleButton(
-                label = if (anchorTarget == AnchorTarget.START) "Start" else "End",
+                label = if (anchorTarget == AnchorTarget.START) {
+                    if (zh) "起点" else "Start"
+                } else {
+                    if (zh) "终点" else "End"
+                },
                 active = anchorTarget == AnchorTarget.START,
                 onClick = {
                     anchorTarget = if (anchorTarget == AnchorTarget.END)
@@ -469,21 +475,21 @@ fun SelectionToolbarContent(
         }
 
         // D-pad arrows
-        SelectionIconButton(Icons.Filled.KeyboardArrowUp, "Up") {
+        SelectionIconButton(Icons.Filled.KeyboardArrowUp, if (zh) "上" else "Up") {
             moveAnchor(anchorMover, anchorTarget, 0, -1)
         }
-        SelectionIconButton(Icons.Filled.KeyboardArrowDown, "Down") {
+        SelectionIconButton(Icons.Filled.KeyboardArrowDown, if (zh) "下" else "Down") {
             moveAnchor(anchorMover, anchorTarget, 0, 1)
         }
-        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left") {
+        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, if (zh) "左" else "Left") {
             moveAnchor(anchorMover, anchorTarget, -1, 0)
         }
-        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right") {
+        SelectionIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, if (zh) "右" else "Right") {
             moveAnchor(anchorMover, anchorTarget, 1, 0)
         }
 
         // Dismiss selection
-        SelectionIconButton(Icons.Filled.Close, "Cancel") {
+        SelectionIconButton(Icons.Filled.Close, if (zh) "取消" else "Cancel") {
             controller.clearSelection()
         }
     }

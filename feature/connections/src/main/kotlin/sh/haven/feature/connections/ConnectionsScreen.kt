@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
@@ -192,16 +193,20 @@ fun ConnectionsScreen(
         }
     }
 
+    val context = LocalContext.current
+    val zh = Locale.current.language == "zh"
+
     LaunchedEffect(deploySuccess) {
         if (deploySuccess) {
-            snackbarHostState.showSnackbar("SSH key deployed successfully")
+            snackbarHostState.showSnackbar(
+                if (zh) "SSH 密钥部署成功" else "SSH key deployed successfully"
+            )
             viewModel.dismissDeploySuccess()
         }
     }
 
     // Request POST_NOTIFICATIONS permission on Android 13+ so the foreground
     // service notification is visible and "Disconnect All" action works.
-    val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* granted or denied — either way, foreground service still works */ }
@@ -258,7 +263,7 @@ fun ConnectionsScreen(
                     it.host in listOf("localhost", "127.0.0.1") && it.port == port && it.username == "droid"
                 }
                 val profile = existing ?: ConnectionProfile(
-                    label = "Linux VM",
+                    label = if (zh) "Linux 虚拟机" else "Linux VM",
                     host = "localhost",
                     port = port,
                     username = "droid",
@@ -274,7 +279,7 @@ fun ConnectionsScreen(
                 }
                 val profile = (existing?.copy(vncPort = port, vncSshForward = false))
                     ?: ConnectionProfile(
-                        label = "Linux VM",
+                        label = if (zh) "Linux 虚拟机" else "Linux VM",
                         host = "localhost",
                         port = sshPort,
                         username = "droid",
@@ -390,6 +395,7 @@ fun ConnectionsScreen(
             sessionNames = selection.sessionNames,
             canKill = selection.manager.killCommand != null,
             canRename = selection.manager.renameCommand != null,
+            zh = zh,
             onSelect = { name -> viewModel.onSessionSelected(selection.sessionId, name) },
             onKill = { name -> viewModel.killRemoteSession(name) },
             onRename = { old, new -> viewModel.renameRemoteSession(old, new) },
@@ -402,15 +408,19 @@ fun ConnectionsScreen(
         val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { viewModel.dismissMoshSetupGuide() },
-            title = { Text("Mosh not found on server") },
+            title = { Text(if (zh) "服务器未安装 Mosh" else "Mosh not found on server") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "The remote host doesn't have mosh-server installed. " +
-                            "Mosh (Mobile Shell) keeps your session alive across " +
-                            "network changes and high-latency connections."
+                        if (zh) {
+                            "远程主机未安装 mosh-server。Mosh（Mobile Shell）可以在网络切换和高延迟场景下保持会话不断开。"
+                        } else {
+                            "The remote host doesn't have mosh-server installed. " +
+                                "Mosh (Mobile Shell) keeps your session alive across " +
+                                "network changes and high-latency connections."
+                        }
                     )
-                    Text("Install it on the server:")
+                    Text(if (zh) "请在服务器上安装：" else "Install it on the server:")
                     Text(
                         "  Ubuntu/Debian:  sudo apt install mosh\n" +
                             "  Fedora/RHEL:    sudo dnf install mosh\n" +
@@ -418,16 +428,16 @@ fun ConnectionsScreen(
                             "  macOS:          brew install mosh",
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    Text("UDP port 60001 must be open on the server firewall.")
+                    Text(if (zh) "请确保服务器防火墙已开放 UDP 60001 端口。" else "UDP port 60001 must be open on the server firewall.")
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     uriHandler.openUri("https://github.com/mobile-shell/mosh")
-                }) { Text("Mosh on GitHub") }
+                }) { Text(if (zh) "Mosh GitHub" else "Mosh on GitHub") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissMoshSetupGuide() }) { Text("OK") }
+                TextButton(onClick = { viewModel.dismissMoshSetupGuide() }) { Text(if (zh) "确定" else "OK") }
             },
         )
     }
@@ -436,38 +446,46 @@ fun ConnectionsScreen(
         val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { viewModel.dismissMoshClientMissing() },
-            title = { Text("Mosh client not built") },
+            title = { Text(if (zh) "Mosh 客户端未构建" else "Mosh client not built") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "The mosh-client binary is not included in this build. " +
-                            "It needs to be cross-compiled for Android using the NDK."
+                        if (zh) {
+                            "当前构建不包含 mosh-client 二进制。需要使用 Android NDK 进行交叉编译。"
+                        } else {
+                            "The mosh-client binary is not included in this build. " +
+                                "It needs to be cross-compiled for Android using the NDK."
+                        }
                     )
                     Text(
-                        "Run tools/build-mosh.sh with Android NDK r27+ to build " +
-                            "the mosh-client binary, then rebuild the app.",
+                        if (zh) {
+                            "请使用 Android NDK r27+ 运行 tools/build-mosh.sh 构建 mosh-client，然后重新编译应用。"
+                        } else {
+                            "Run tools/build-mosh.sh with Android NDK r27+ to build " +
+                                "the mosh-client binary, then rebuild the app."
+                        },
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     uriHandler.openUri("https://github.com/mobile-shell/mosh")
-                }) { Text("Mosh on GitHub") }
+                }) { Text(if (zh) "Mosh GitHub" else "Mosh on GitHub") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissMoshClientMissing() }) { Text("OK") }
+                TextButton(onClick = { viewModel.dismissMoshClientMissing() }) { Text(if (zh) "确定" else "OK") }
             },
         )
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Connections") })
+            TopAppBar(title = { Text(if (zh) "连接" else "Connections") })
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add connection")
+                Icon(Icons.Filled.Add, contentDescription = if (zh) "新增连接" else "Add connection")
             }
         },
     ) { innerPadding ->
@@ -480,27 +498,27 @@ fun ConnectionsScreen(
             OutlinedTextField(
                 value = quickConnectText,
                 onValueChange = { quickConnectText = it },
-                placeholder = { Text("user@host or host:port") },
+                placeholder = { Text(if (zh) "user@host 或 host:port" else "user@host or host:port") },
                 singleLine = true,
                 trailingIcon = {
                     IconButton(
                         onClick = {
                             quickConnectAction(
-                                quickConnectText, viewModel, sshKeys,
+                                quickConnectText, viewModel, sshKeys, zh,
                                 { connectingProfile = it },
                                 { quickConnectText = "" },
                             )
                         },
                         enabled = quickConnectText.isNotBlank(),
                     ) {
-                        Icon(Icons.Filled.Cable, contentDescription = "Connect")
+                        Icon(Icons.Filled.Cable, contentDescription = if (zh) "连接" else "Connect")
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(
                     onGo = {
                         quickConnectAction(
-                            quickConnectText, viewModel, sshKeys,
+                            quickConnectText, viewModel, sshKeys, zh,
                             { connectingProfile = it },
                             { quickConnectText = "" },
                         )
@@ -515,13 +533,14 @@ fun ConnectionsScreen(
             if (localVmStatus.terminalAppInstalled) {
                 LinuxVmCard(
                     vmStatus = localVmStatus,
+                    zh = zh,
                     onClick = { showVmSetup = true },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
 
             if (connections.isEmpty()) {
-                EmptyState()
+                EmptyState(zh = zh)
             } else {
                 // Build tree: top-level profiles first, then dependents nested beneath.
                 // A profile is a child if it has a jumpProfileId (SSH multihop) or
@@ -550,6 +569,7 @@ fun ConnectionsScreen(
                                 hasKeys = sshKeys.isNotEmpty(),
                                 hasDependents = profile.id in dependentsByParent,
                                 jumpHostLabel = profile.jumpProfileId?.let { profileMap[it]?.label },
+                                zh = zh,
                                 onTap = { onTapProfile(profile, profileStatuses[profile.id], sshKeys, viewModel) { connectingProfile = profile } },
                                 onRename = { newLabel -> viewModel.saveConnection(profile.copy(label = newLabel)) },
                                 onEdit = { editingProfileId = profile.id },
@@ -574,6 +594,7 @@ fun ConnectionsScreen(
                                     hasKeys = sshKeys.isNotEmpty(),
                                     hasDependents = false,
                                     jumpHostLabel = null,
+                                    zh = zh,
                                     onTap = { onTapProfile(dep, profileStatuses[dep.id], sshKeys, viewModel) { connectingProfile = dep } },
                                     onRename = { newLabel -> viewModel.saveConnection(dep.copy(label = newLabel)) },
                                     onEdit = { editingProfileId = dep.id },
@@ -597,12 +618,15 @@ private fun quickConnectAction(
     input: String,
     viewModel: ConnectionsViewModel,
     sshKeys: List<sh.haven.core.data.db.entities.SshKey>,
+    zh: Boolean,
     showPasswordDialog: (ConnectionProfile) -> Unit,
     clearInput: () -> Unit,
 ) {
     val profile = viewModel.parseQuickConnect(input)
     if (profile == null) {
-        viewModel.showError("Use format: user@host or user@host:port")
+        viewModel.showError(
+            if (zh) "格式应为：user@host 或 user@host:port" else "Use format: user@host or user@host:port"
+        )
         return
     }
     viewModel.saveConnection(profile)
@@ -665,6 +689,7 @@ private fun ConnectionTreeItem(
     hasKeys: Boolean,
     hasDependents: Boolean,
     jumpHostLabel: String?,
+    zh: Boolean,
     onTap: () -> Unit,
     onRename: (String) -> Unit,
     onEdit: () -> Unit,
@@ -682,6 +707,7 @@ private fun ConnectionTreeItem(
     if (showRenameDialog) {
         RenameDialog(
             currentLabel = profile.label,
+            zh = zh,
             onDismiss = { showRenameDialog = false },
             onRename = { newLabel ->
                 onRename(newLabel)
@@ -724,9 +750,17 @@ private fun ConnectionTreeItem(
                 headlineContent = { Text(profile.label) },
                 supportingContent = {
                     if (profile.isReticulum) {
-                        Text("RNS: ${profile.destinationHash?.take(12) ?: ""}... via ${profile.reticulumHost}:${profile.reticulumPort}")
+                        Text(
+                            if (zh) {
+                                "RNS：${profile.destinationHash?.take(12) ?: ""}...，经由 ${profile.reticulumHost}:${profile.reticulumPort}"
+                            } else {
+                                "RNS: ${profile.destinationHash?.take(12) ?: ""}... via ${profile.reticulumHost}:${profile.reticulumPort}"
+                            }
+                        )
                     } else {
-                        val suffix = if (jumpHostLabel != null && indent == 0) " via $jumpHostLabel" else ""
+                        val suffix = if (jumpHostLabel != null && indent == 0) {
+                            if (zh) "（跳板：$jumpHostLabel）" else " via $jumpHostLabel"
+                        } else ""
                         Text("${profile.username}@${profile.host}:${profile.port}$suffix")
                     }
                 },
@@ -736,19 +770,19 @@ private fun ConnectionTreeItem(
                         profileStatus == ProfileStatus.RECONNECTING -> CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
                         profileStatus == ProfileStatus.CONNECTED -> Icon(
                             Icons.Filled.Circle,
-                            contentDescription = "Connected",
+                            contentDescription = if (zh) "已连接" else "Connected",
                             tint = profileColors[profile.id] ?: Color(0xFF4CAF50),
                             modifier = Modifier.size(12.dp),
                         )
                         profileStatus == ProfileStatus.ERROR -> Icon(
                             Icons.Filled.Circle,
-                            contentDescription = "Error",
+                            contentDescription = if (zh) "错误" else "Error",
                             tint = Color(0xFFF44336),
                             modifier = Modifier.size(12.dp),
                         )
                         else -> Icon(
                             Icons.Filled.Circle,
-                            contentDescription = "Disconnected",
+                            contentDescription = if (zh) "未连接" else "Disconnected",
                             tint = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.size(12.dp),
                         )
@@ -768,52 +802,52 @@ private fun ConnectionTreeItem(
             onDismissRequest = { showMenu = false },
         ) {
             DropdownMenuItem(
-                text = { Text("Rename") },
+                text = { Text(if (zh) "重命名" else "Rename") },
                 leadingIcon = { Icon(Icons.Filled.DriveFileRenameOutline, null) },
                 onClick = { showMenu = false; showRenameDialog = true },
             )
             DropdownMenuItem(
-                text = { Text("Edit") },
+                text = { Text(if (zh) "编辑" else "Edit") },
                 leadingIcon = { Icon(Icons.Filled.Edit, null) },
                 onClick = { showMenu = false; onEdit() },
             )
             if (profile.isSsh) {
                 DropdownMenuItem(
-                    text = { Text("Port Forwards") },
+                    text = { Text(if (zh) "端口转发" else "Port Forwards") },
                     leadingIcon = { Icon(Icons.Filled.SyncAlt, null) },
                     onClick = { showMenu = false; onPortForwards() },
                 )
             }
             if (profile.isSsh && profileStatus != ProfileStatus.CONNECTED) {
                 DropdownMenuItem(
-                    text = { Text("Connect with password") },
+                    text = { Text(if (zh) "使用密码连接" else "Connect with password") },
                     leadingIcon = { Icon(Icons.Filled.Password, null) },
                     onClick = { showMenu = false; onConnectWithPassword() },
                 )
             }
             if (profile.isSsh && profileStatus == ProfileStatus.CONNECTED) {
                 DropdownMenuItem(
-                    text = { Text("New Session") },
+                    text = { Text(if (zh) "新建会话" else "New Session") },
                     leadingIcon = { Icon(Icons.Filled.Add, null) },
                     onClick = { showMenu = false; onNewSession() },
                 )
             }
             if (profileStatus == ProfileStatus.CONNECTED) {
                 DropdownMenuItem(
-                    text = { Text("Disconnect") },
+                    text = { Text(if (zh) "断开连接" else "Disconnect") },
                     leadingIcon = { Icon(Icons.Filled.LinkOff, null) },
                     onClick = { showMenu = false; onDisconnect() },
                 )
             }
             if (profile.isSsh && hasKeys) {
                 DropdownMenuItem(
-                    text = { Text("Deploy SSH Key") },
+                    text = { Text(if (zh) "部署 SSH 密钥" else "Deploy SSH Key") },
                     leadingIcon = { Icon(Icons.Filled.VpnKey, null) },
                     onClick = { showMenu = false; onDeployKey() },
                 )
             }
             DropdownMenuItem(
-                text = { Text("Delete") },
+                text = { Text(if (zh) "删除" else "Delete") },
                 leadingIcon = { Icon(Icons.Filled.Delete, null) },
                 onClick = { showMenu = false; onDelete() },
             )
@@ -822,7 +856,7 @@ private fun ConnectionTreeItem(
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(zh: Boolean) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -835,13 +869,13 @@ private fun EmptyState() {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            "No connections yet",
+            if (zh) "还没有连接" else "No connections yet",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            "Tap + to add a server, or type user@host above",
+            if (zh) "点击 + 添加服务器，或在上方输入 user@host" else "Tap + to add a server, or type user@host above",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
@@ -853,6 +887,7 @@ private fun EmptyState() {
 private fun SessionPickerDialog(
     managerLabel: String,
     sessionNames: List<String>,
+    zh: Boolean,
     canKill: Boolean = false,
     canRename: Boolean = false,
     onSelect: (String) -> Unit,
@@ -866,6 +901,7 @@ private fun SessionPickerDialog(
     renamingSession?.let { name ->
         RenameDialog(
             currentLabel = name,
+            zh = zh,
             onDismiss = { renamingSession = null },
             onRename = { newName ->
                 onRename(name, newName)
@@ -876,7 +912,7 @@ private fun SessionPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$managerLabel sessions") },
+        title = { Text(if (zh) "$managerLabel 会话" else "$managerLabel sessions") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 sessionNames.forEach { name ->
@@ -888,7 +924,7 @@ private fun SessionPickerDialog(
                                     IconButton(onClick = { renamingSession = name }) {
                                         Icon(
                                             Icons.Filled.DriveFileRenameOutline,
-                                            contentDescription = "Rename session",
+                                            contentDescription = if (zh) "重命名会话" else "Rename session",
                                         )
                                     }
                                 }
@@ -896,7 +932,7 @@ private fun SessionPickerDialog(
                                     IconButton(onClick = { onKill(name) }) {
                                         Icon(
                                             Icons.Filled.Delete,
-                                            contentDescription = "Kill session",
+                                            contentDescription = if (zh) "结束会话" else "Kill session",
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -910,7 +946,7 @@ private fun SessionPickerDialog(
                 ListItem(
                     headlineContent = {
                         Text(
-                            "New session",
+                            if (zh) "新建会话" else "New session",
                             color = MaterialTheme.colorScheme.primary,
                         )
                     },
@@ -927,7 +963,7 @@ private fun SessionPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -936,6 +972,7 @@ private fun SessionPickerDialog(
 @Composable
 private fun RenameDialog(
     currentLabel: String,
+    zh: Boolean,
     onDismiss: () -> Unit,
     onRename: (String) -> Unit,
 ) {
@@ -943,12 +980,12 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Connection") },
+        title = { Text(if (zh) "重命名连接" else "Rename Connection") },
         text = {
             OutlinedTextField(
                 value = label,
                 onValueChange = { label = it },
-                label = { Text("Label") },
+                label = { Text(if (zh) "名称" else "Label") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -958,12 +995,12 @@ private fun RenameDialog(
                 onClick = { onRename(label) },
                 enabled = label.isNotBlank(),
             ) {
-                Text("Rename")
+                Text(if (zh) "重命名" else "Rename")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )
@@ -972,6 +1009,7 @@ private fun RenameDialog(
 @Composable
 private fun LinuxVmCard(
     vmStatus: LocalVmStatus,
+    zh: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -993,20 +1031,20 @@ private fun LinuxVmCard(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Linux VM", style = MaterialTheme.typography.titleSmall)
+                Text(if (zh) "Linux 虚拟机" else "Linux VM", style = MaterialTheme.typography.titleSmall)
                 if (hasServices) {
                     val services = buildList {
                         vmStatus.sshPort?.let { add("SSH :$it") }
                         vmStatus.vncPort?.let { add("VNC :$it") }
                     }
                     Text(
-                        services.joinToString(" · ") + " on localhost",
+                        if (zh) services.joinToString(" · ") + "（localhost）" else services.joinToString(" · ") + " on localhost",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Text(
-                        "Tap to set up",
+                        if (zh) "点击进行设置" else "Tap to set up",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1015,7 +1053,7 @@ private fun LinuxVmCard(
             if (hasServices) {
                 Icon(
                     Icons.Filled.Circle,
-                    contentDescription = "Active",
+                    contentDescription = if (zh) "活跃" else "Active",
                     tint = Color(0xFF4CAF50),
                     modifier = Modifier.size(10.dp),
                 )
