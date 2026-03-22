@@ -8,6 +8,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +54,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -107,7 +110,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
+)
 @Composable
 fun SftpScreen(
     pendingSmbProfileId: String? = null,
@@ -242,6 +249,7 @@ fun SftpScreen(
     val clipboardManager = LocalClipboardManager.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.isImeVisible
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var showSortMenu by remember { mutableStateOf(false) }
@@ -249,6 +257,7 @@ fun SftpScreen(
     var pathEditMode by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf(TextFieldValue(currentPath)) }
     var pathEditorEverFocused by remember { mutableStateOf(false) }
+    var imeVisibleWhilePathEditing by remember { mutableStateOf(false) }
     val pathFocusRequester = remember { FocusRequester() }
     var requestPathFocus by remember { mutableStateOf(false) }
     LaunchedEffect(currentPath, pathEditMode) {
@@ -257,8 +266,19 @@ fun SftpScreen(
     LaunchedEffect(pathEditMode) {
         if (!pathEditMode) {
             requestPathFocus = false
+            imeVisibleWhilePathEditing = false
             focusManager.clearFocus(force = true)
             keyboardController?.hide()
+        }
+    }
+    LaunchedEffect(pathEditMode, isActive, imeVisible) {
+        if (!pathEditMode || !isActive) return@LaunchedEffect
+        if (imeVisible) {
+            imeVisibleWhilePathEditing = true
+        } else if (imeVisibleWhilePathEditing) {
+            requestPathFocus = false
+            focusManager.clearFocus(force = true)
+            pathEditMode = false
         }
     }
     LaunchedEffect(isActive) {
