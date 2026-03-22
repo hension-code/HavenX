@@ -95,7 +95,7 @@ Notifications appear as a toast in the foreground or as an Android notification 
 
 ```bash
 git clone https://github.com/hension-code/HavenX.git
-cd Haven
+cd HavenX
 ./gradlew assembleDebug
 ```
 

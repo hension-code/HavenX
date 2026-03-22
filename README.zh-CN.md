@@ -28,7 +28,7 @@
 
 ```bash
 git clone https://github.com/hension-code/HavenX.git
-cd Haven
+cd HavenX
 ./gradlew assembleDebug
 ```
 
