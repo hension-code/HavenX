@@ -1,0 +1,419 @@
+/*
+ * ConnectBot Terminal
+ * Copyright 2025 Kenny Root
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.connectbot.terminal
+
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEvent as ComposeKeyEvent
+
+/**
+ * Handles keyboard input conversion for terminal emulation.
+ *
+ * Converts Android/Compose keyboard events to terminal escape sequences
+ * and control characters that can be sent to the terminal via TerminalEmulator.dispatchKey()
+ * or TerminalEmulator.dispatchCharacter().
+ *
+ * @param terminalEmulator Terminal to send keyboard events to
+ * @param modifierManager Optional modifier manager for sticky modifier support.
+ *                        If provided, sticky modifiers from UI buttons will be combined
+ *                        with hardware keyboard modifiers. If null, only hardware
+ *                        keyboard modifiers are used.
+ * @param selectionController Optional selection controller for keyboard-based selection.
+ *                            When provided and selection is active, arrow keys will move
+ *                            the selection instead of sending to terminal.
+ * @param onInputProcessed Optional callback invoked after input is successfully processed
+ *                         and sent to terminal. Use this to reset scroll position to bottom.
+ */
+internal class KeyboardHandler(
+    private val terminalEmulator: TerminalEmulator,
+    var modifierManager: ModifierManager? = null,
+    var selectionController: SelectionController? = null,
+    var onInputProcessed: (() -> Unit)? = null
+) {
+    var composeMode: ComposeMode? = null
+
+    /**
+     * Process a Compose KeyEvent and send to terminal.
+     * Returns true if the event was handled.
+     */
+    fun onKeyEvent(event: ComposeKeyEvent): Boolean {
+        if (event.type != KeyEventType.KeyDown) {
+            return false
+        }
+
+        val key = event.key
+        val ctrl = event.isCtrlPressed
+        val alt = event.isAltPressed
+        val shift = event.isShiftPressed
+
+        // If compose mode is active, intercept all input
+        val compose = composeMode
+        if (compose != null && compose.isActive) {
+            when (key) {
+                Key.Enter -> {
+                    val text = compose.commit()
+                    text?.forEach { char ->
+                        terminalEmulator.dispatchCharacter(0, char)
+                    }
+                    onInputProcessed?.invoke()
+                }
+                Key.Escape -> compose.cancel()
+                Key.Backspace -> compose.deleteLastChar()
+                else -> {
+                    if (!ctrl && !alt) {
+                        val char = getCharacterFromKey(key, shift)
+                        if (char != null) {
+                            compose.appendChar(char)
+                        }
+                    }
+                }
+            }
+            return true
+        }
+
+        // If selection is active, intercept arrow keys for selection movement
+        val selection = selectionController
+        if (selection != null && selection.isSelectionActive) {
+            when (key) {
+                Key.DirectionUp -> {
+                    selection.moveSelectionUp()
+                    return true
+                }
+                Key.DirectionDown -> {
+                    selection.moveSelectionDown()
+                    return true
+                }
+                Key.DirectionLeft -> {
+                    selection.moveSelectionLeft()
+                    return true
+                }
+                Key.DirectionRight -> {
+                    selection.moveSelectionRight()
+                    return true
+                }
+                Key.Enter -> {
+                    // Finish selection (stop extending, but keep selected for copying)
+                    selection.finishSelection()
+                    return true
+                }
+                Key.Escape -> {
+                    // Cancel selection
+                    selection.clearSelection()
+                    return true
+                }
+                // Any other key clears selection and goes to terminal
+                else -> {
+                    selection.clearSelection()
+                    // Fall through to normal key handling
+                }
+            }
+        }
+
+        // Build modifier mask for libvterm (combine sticky + hardware modifiers)
+        val modifiers = buildModifierMask(ctrl, alt, shift)
+
+        // Check if this is a special key that libvterm handles
+        val vtermKey = mapToVTermKey(key)
+        if (vtermKey != null) {
+            terminalEmulator.dispatchKey(modifiers, vtermKey)
+            modifierManager?.clearTransients()
+            onInputProcessed?.invoke()
+            return true
+        }
+
+        // Handle regular printable characters
+        val char = getCharacterFromKey(key, shift || modifierManager?.isShiftActive() == true)
+        if (char != null) {
+            terminalEmulator.dispatchCharacter(modifiers, char)
+            modifierManager?.clearTransients()
+            onInputProcessed?.invoke()
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Process a character input (from IME or hardware keyboard).
+     * This is called for printable characters.
+     */
+    fun onCharacterInput(char: Char, ctrl: Boolean = false, alt: Boolean = false): Boolean {
+        val compose = composeMode
+        if (compose != null && compose.isActive) {
+            compose.appendChar(char)
+            return true
+        }
+
+        val modifiers = buildModifierMask(ctrl, alt, false)
+
+        terminalEmulator.dispatchCharacter(modifiers, char)
+        modifierManager?.clearTransients()
+        onInputProcessed?.invoke()
+        return true
+    }
+
+    /**
+     * Process text input from IME (Input Method Editor).
+     * This handles multi-byte UTF-8 text from the software keyboard.
+     */
+    fun onTextInput(bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+
+        val compose = composeMode
+        if (compose != null && compose.isActive) {
+            val text = bytes.toString(Charsets.UTF_8)
+            compose.appendText(text)
+            return
+        }
+
+        val modifiers = getModifierMask()
+        val text = bytes.toString(Charsets.UTF_8)
+
+        text.forEach { char ->
+            terminalEmulator.dispatchCharacter(modifiers, char)
+        }
+        modifierManager?.clearTransients()
+        onInputProcessed?.invoke()
+    }
+
+    /**
+     * Build VTerm modifier mask.
+     * Bit 0: Shift
+     * Bit 1: Alt
+     * Bit 2: Ctrl
+     */
+    private fun buildModifierMask(ctrl: Boolean, alt: Boolean, shift: Boolean): Int {
+        var mask = getModifierMask()
+        if (shift) mask = mask or 1
+        if (alt) mask = mask or 2
+        if (ctrl) mask = mask or 4
+        return mask
+    }
+
+    /**
+     * Get VTerm modifier mask for current sticky state.
+     *
+     * Returns a bitmask where:
+     * - Bit 0 (0x01): Shift
+     * - Bit 1 (0x02): Alt
+     * - Bit 2 (0x04): Ctrl
+     *
+     * This matches the format expected by Terminal.dispatchKey() and dispatchCharacter().
+     */
+    fun getModifierMask(): Int {
+        return modifierManager?.let {
+            var mask = 0
+            if (it.isShiftActive() == true) mask = mask or 1  // Bit 0: Shift
+            if (it.isAltActive() == true) mask = mask or 2    // Bit 1: Alt
+            if (it.isCtrlActive() == true) mask = mask or 4   // Bit 2: Ctrl
+            return mask
+        } ?: 0
+    }
+
+    /**
+     * Convert a Compose Key to its character representation.
+     * Returns null if not a printable character.
+     */
+    private fun getCharacterFromKey(key: Key, shift: Boolean): Char? {
+        return when (key) {
+            // Letters
+            Key.A -> if (shift) 'A' else 'a'
+            Key.B -> if (shift) 'B' else 'b'
+            Key.C -> if (shift) 'C' else 'c'
+            Key.D -> if (shift) 'D' else 'd'
+            Key.E -> if (shift) 'E' else 'e'
+            Key.F -> if (shift) 'F' else 'f'
+            Key.G -> if (shift) 'G' else 'g'
+            Key.H -> if (shift) 'H' else 'h'
+            Key.I -> if (shift) 'I' else 'i'
+            Key.J -> if (shift) 'J' else 'j'
+            Key.K -> if (shift) 'K' else 'k'
+            Key.L -> if (shift) 'L' else 'l'
+            Key.M -> if (shift) 'M' else 'm'
+            Key.N -> if (shift) 'N' else 'n'
+            Key.O -> if (shift) 'O' else 'o'
+            Key.P -> if (shift) 'P' else 'p'
+            Key.Q -> if (shift) 'Q' else 'q'
+            Key.R -> if (shift) 'R' else 'r'
+            Key.S -> if (shift) 'S' else 's'
+            Key.T -> if (shift) 'T' else 't'
+            Key.U -> if (shift) 'U' else 'u'
+            Key.V -> if (shift) 'V' else 'v'
+            Key.W -> if (shift) 'W' else 'w'
+            Key.X -> if (shift) 'X' else 'x'
+            Key.Y -> if (shift) 'Y' else 'y'
+            Key.Z -> if (shift) 'Z' else 'z'
+
+            // Numbers (top row)
+            Key.Zero -> if (shift) ')' else '0'
+            Key.One -> if (shift) '!' else '1'
+            Key.Two -> if (shift) '@' else '2'
+            Key.Three -> if (shift) '#' else '3'
+            Key.Four -> if (shift) '$' else '4'
+            Key.Five -> if (shift) '%' else '5'
+            Key.Six -> if (shift) '^' else '6'
+            Key.Seven -> if (shift) '&' else '7'
+            Key.Eight -> if (shift) '*' else '8'
+            Key.Nine -> if (shift) '(' else '9'
+
+            // Symbols
+            Key.Spacebar -> ' '
+            Key.Minus -> if (shift) '_' else '-'
+            Key.Equals -> if (shift) '+' else '='
+            Key.LeftBracket -> if (shift) '{' else '['
+            Key.RightBracket -> if (shift) '}' else ']'
+            Key.Backslash -> if (shift) '|' else '\\'
+            Key.Semicolon -> if (shift) ':' else ';'
+            Key.Apostrophe -> if (shift) '"' else '\''
+            Key.Grave -> if (shift) '~' else '`'
+            Key.Comma -> if (shift) '<' else ','
+            Key.Period -> if (shift) '>' else '.'
+            Key.Slash -> if (shift) '?' else '/'
+
+            else -> null
+        }
+    }
+
+    /**
+     * Map Compose Key to VTerm key code.
+     * Returns null if not a special key.
+     */
+    private fun mapToVTermKey(key: Key): Int? {
+        return when (key) {
+            // Function keys
+            Key.F1 -> VTermKey.FUNCTION_1
+            Key.F2 -> VTermKey.FUNCTION_2
+            Key.F3 -> VTermKey.FUNCTION_3
+            Key.F4 -> VTermKey.FUNCTION_4
+            Key.F5 -> VTermKey.FUNCTION_5
+            Key.F6 -> VTermKey.FUNCTION_6
+            Key.F7 -> VTermKey.FUNCTION_7
+            Key.F8 -> VTermKey.FUNCTION_8
+            Key.F9 -> VTermKey.FUNCTION_9
+            Key.F10 -> VTermKey.FUNCTION_10
+            Key.F11 -> VTermKey.FUNCTION_11
+            Key.F12 -> VTermKey.FUNCTION_12
+
+            // Arrow keys
+            Key.DirectionUp -> VTermKey.UP
+            Key.DirectionDown -> VTermKey.DOWN
+            Key.DirectionLeft -> VTermKey.LEFT
+            Key.DirectionRight -> VTermKey.RIGHT
+
+            // Editing keys
+            Key.Insert -> VTermKey.INS
+            Key.Delete -> VTermKey.DEL
+            Key.Home -> VTermKey.HOME
+            Key.MoveEnd -> VTermKey.END
+            Key.PageUp -> VTermKey.PAGEUP
+            Key.PageDown -> VTermKey.PAGEDOWN
+
+            // Special keys
+            Key.Enter -> VTermKey.ENTER
+            Key.Tab -> VTermKey.TAB
+            Key.Backspace -> VTermKey.BACKSPACE
+            Key.Escape -> VTermKey.ESCAPE
+
+            // KP (Keypad) keys
+            Key.NumPad0 -> VTermKey.KP_0
+            Key.NumPad1 -> VTermKey.KP_1
+            Key.NumPad2 -> VTermKey.KP_2
+            Key.NumPad3 -> VTermKey.KP_3
+            Key.NumPad4 -> VTermKey.KP_4
+            Key.NumPad5 -> VTermKey.KP_5
+            Key.NumPad6 -> VTermKey.KP_6
+            Key.NumPad7 -> VTermKey.KP_7
+            Key.NumPad8 -> VTermKey.KP_8
+            Key.NumPad9 -> VTermKey.KP_9
+            Key.NumPadMultiply -> VTermKey.KP_MULT
+            Key.NumPadAdd -> VTermKey.KP_PLUS
+            Key.NumPadComma -> VTermKey.KP_COMMA
+            Key.NumPadSubtract -> VTermKey.KP_MINUS
+            Key.NumPadDot -> VTermKey.KP_PERIOD
+            Key.NumPadDivide -> VTermKey.KP_DIVIDE
+            Key.NumPadEnter -> VTermKey.KP_ENTER
+            Key.NumPadEquals -> VTermKey.KP_EQUAL
+
+            else -> null
+        }
+    }
+
+}
+
+/**
+ * VTerm key codes from libvterm.
+ * These correspond to VTermKey enum in vterm.h
+ */
+object VTermKey {
+    const val NONE = 0
+    const val ENTER = 1
+    const val TAB = 2
+    const val BACKSPACE = 3
+    const val ESCAPE = 4
+
+    const val UP = 5
+    const val DOWN = 6
+    const val LEFT = 7
+    const val RIGHT = 8
+
+    const val INS = 9
+    const val DEL = 10
+    const val HOME = 11
+    const val END = 12
+    const val PAGEUP = 13
+    const val PAGEDOWN = 14
+
+    // In vterm_keycodes.h enum VTERM_KEY_FUNCTION_0 = 256
+    const val FUNCTION_0 = 256
+    const val FUNCTION_1 = 257
+    const val FUNCTION_2 = 258
+    const val FUNCTION_3 = 259
+    const val FUNCTION_4 = 260
+    const val FUNCTION_5 = 261
+    const val FUNCTION_6 = 262
+    const val FUNCTION_7 = 263
+    const val FUNCTION_8 = 264
+    const val FUNCTION_9 = 265
+    const val FUNCTION_10 = 266
+    const val FUNCTION_11 = 267
+    const val FUNCTION_12 = 268
+
+    // Keypad keys (start after FUNCTION_MAX which is 256 + 255 = 511)
+    const val KP_0 = 512
+    const val KP_1 = 513
+    const val KP_2 = 514
+    const val KP_3 = 515
+    const val KP_4 = 516
+    const val KP_5 = 517
+    const val KP_6 = 518
+    const val KP_7 = 519
+    const val KP_8 = 520
+    const val KP_9 = 521
+    const val KP_MULT = 522
+    const val KP_PLUS = 523
+    const val KP_COMMA = 524
+    const val KP_MINUS = 525
+    const val KP_PERIOD = 526
+    const val KP_DIVIDE = 527
+    const val KP_ENTER = 528
+    const val KP_EQUAL = 529
+}

@@ -1,0 +1,186 @@
+// Signature format: 4.0
+package org.connectbot.terminal {
+
+  public interface ComposeController {
+    method public String getComposedText();
+    method @InaccessibleFromKotlin public boolean isComposeModeActive();
+    method public void startComposeMode();
+    method public void stopComposeMode();
+    method public void toggleComposeMode();
+    property public abstract boolean isComposeModeActive;
+  }
+
+  public interface ModifierManager {
+    method public void clearTransients();
+    method public boolean isAltActive();
+    method public boolean isCtrlActive();
+    method public boolean isShiftActive();
+  }
+
+  public enum ProgressState {
+    enum_constant public static final org.connectbot.terminal.ProgressState DEFAULT;
+    enum_constant public static final org.connectbot.terminal.ProgressState ERROR;
+    enum_constant public static final org.connectbot.terminal.ProgressState HIDDEN;
+    enum_constant public static final org.connectbot.terminal.ProgressState INDETERMINATE;
+    enum_constant public static final org.connectbot.terminal.ProgressState WARNING;
+  }
+
+  public interface SelectionController {
+    method public void clearSelection();
+    method public String copySelection();
+    method public void finishSelection();
+    method @InaccessibleFromKotlin public boolean isSelectionActive();
+    method public void moveSelectionDown();
+    method public void moveSelectionLeft();
+    method public void moveSelectionRight();
+    method public void moveSelectionUp();
+    method public void startSelection(optional org.connectbot.terminal.SelectionMode mode);
+    method public void toggleSelection();
+    method public void toggleSelectionMode();
+    property public abstract boolean isSelectionActive;
+  }
+
+  public enum SelectionMode {
+    enum_constant public static final org.connectbot.terminal.SelectionMode BLOCK;
+    enum_constant public static final org.connectbot.terminal.SelectionMode LINE;
+    enum_constant public static final org.connectbot.terminal.SelectionMode NONE;
+  }
+
+  public final class TerminalDimensions {
+    ctor public TerminalDimensions(int rows, int columns);
+    method public int component1();
+    method public int component2();
+    method public org.connectbot.terminal.TerminalDimensions copy(optional int rows, optional int columns);
+    method @InaccessibleFromKotlin public int getColumns();
+    method @InaccessibleFromKotlin public int getRows();
+    property public int columns;
+    property public int rows;
+  }
+
+  public sealed nonexhaustive interface TerminalEmulator {
+    method public void applyColorScheme(int[] ansiColors, int defaultForeground, int defaultBackground);
+    method public void clearScreen();
+    method public void dispatchCharacter(int modifiers, char character);
+    method public void dispatchKey(int modifiers, int key);
+    method @InaccessibleFromKotlin public org.connectbot.terminal.TerminalDimensions getDimensions();
+    method public String? getLastCommandOutput();
+    method public void resize(int newRows, int newCols);
+    method public int setAnsiPalette(int[] ansiColors);
+    method public int setDefaultColors(int foreground, int background);
+    method public void writeInput(byte[] data, optional int offset, optional int length);
+    method public void writeInput(java.nio.ByteBuffer buffer, int length);
+    property public abstract org.connectbot.terminal.TerminalDimensions dimensions;
+  }
+
+  public final class TerminalEmulatorFactory {
+    ctor public TerminalEmulatorFactory();
+    field public static final org.connectbot.terminal.TerminalEmulatorFactory.Companion Companion;
+  }
+
+  public static final class TerminalEmulatorFactory.Companion {
+    method @KotlinOnly public org.connectbot.terminal.TerminalEmulator create(optional android.os.Looper looper, optional int initialRows, optional int initialCols, optional androidx.compose.ui.graphics.Color defaultForeground, optional androidx.compose.ui.graphics.Color defaultBackground, optional kotlin.jvm.functions.Function1<byte[],kotlin.Unit> onKeyboardInput, optional kotlin.jvm.functions.Function0<kotlin.Unit>? onBell, optional kotlin.jvm.functions.Function1<org.connectbot.terminal.TerminalDimensions,kotlin.Unit>? onResize, optional kotlin.jvm.functions.Function1<java.lang.String,kotlin.Unit>? onClipboardCopy, optional kotlin.jvm.functions.Function2<org.connectbot.terminal.ProgressState,java.lang.Integer,kotlin.Unit>? onProgressChange);
+  }
+
+  public final class TerminalKt {
+    method @KotlinOnly @androidx.compose.runtime.Composable public static void Terminal(org.connectbot.terminal.TerminalEmulator terminalEmulator, optional androidx.compose.ui.Modifier modifier, optional android.graphics.Typeface typeface, optional androidx.compose.ui.unit.TextUnit initialFontSize, optional androidx.compose.ui.unit.TextUnit minFontSize, optional androidx.compose.ui.unit.TextUnit maxFontSize, optional androidx.compose.ui.graphics.Color backgroundColor, optional androidx.compose.ui.graphics.Color foregroundColor, optional boolean keyboardEnabled, optional boolean showSoftKeyboard, optional androidx.compose.ui.focus.FocusRequester focusRequester, optional kotlin.jvm.functions.Function0<kotlin.Unit> onTerminalTap, optional kotlin.jvm.functions.Function1<java.lang.Boolean,kotlin.Unit> onImeVisibilityChanged, optional kotlin.Pair<java.lang.Integer,java.lang.Integer>? forcedSize, optional org.connectbot.terminal.ModifierManager? modifierManager, optional kotlin.jvm.functions.Function1<org.connectbot.terminal.SelectionController,kotlin.Unit>? onSelectionControllerAvailable, optional kotlin.jvm.functions.Function1<java.lang.String,kotlin.Unit> onHyperlinkClick, optional kotlin.jvm.functions.Function1<org.connectbot.terminal.ComposeController,kotlin.Unit>? onComposeControllerAvailable);
+    method @KotlinOnly @VisibleForTesting @androidx.compose.runtime.Composable public static void TerminalWithAccessibility(org.connectbot.terminal.TerminalEmulator terminalEmulator, optional androidx.compose.ui.Modifier modifier, optional android.graphics.Typeface typeface, optional androidx.compose.ui.unit.TextUnit initialFontSize, optional androidx.compose.ui.unit.TextUnit minFontSize, optional androidx.compose.ui.unit.TextUnit maxFontSize, optional androidx.compose.ui.graphics.Color backgroundColor, optional androidx.compose.ui.graphics.Color foregroundColor, optional boolean keyboardEnabled, optional boolean showSoftKeyboard, optional androidx.compose.ui.focus.FocusRequester focusRequester, optional kotlin.jvm.functions.Function0<kotlin.Unit> onTerminalTap, optional kotlin.jvm.functions.Function1<java.lang.Boolean,kotlin.Unit> onImeVisibilityChanged, optional kotlin.Pair<java.lang.Integer,java.lang.Integer>? forcedSize, optional org.connectbot.terminal.ModifierManager? modifierManager, optional Boolean? forceAccessibilityEnabled, optional kotlin.jvm.functions.Function1<org.connectbot.terminal.SelectionController,kotlin.Unit>? onSelectionControllerAvailable, optional kotlin.jvm.functions.Function1<java.lang.String,kotlin.Unit> onHyperlinkClick, optional kotlin.jvm.functions.Function1<org.connectbot.terminal.ComposeController,kotlin.Unit>? onComposeControllerAvailable);
+  }
+
+  public final class VTermKey {
+    property public static int BACKSPACE;
+    property public static int DEL;
+    property public static int DOWN;
+    property public static int END;
+    property public static int ENTER;
+    property public static int ESCAPE;
+    property public static int FUNCTION_0;
+    property public static int FUNCTION_1;
+    property public static int FUNCTION_10;
+    property public static int FUNCTION_11;
+    property public static int FUNCTION_12;
+    property public static int FUNCTION_2;
+    property public static int FUNCTION_3;
+    property public static int FUNCTION_4;
+    property public static int FUNCTION_5;
+    property public static int FUNCTION_6;
+    property public static int FUNCTION_7;
+    property public static int FUNCTION_8;
+    property public static int FUNCTION_9;
+    property public static int HOME;
+    property public static int INS;
+    property public static int KP_0;
+    property public static int KP_1;
+    property public static int KP_2;
+    property public static int KP_3;
+    property public static int KP_4;
+    property public static int KP_5;
+    property public static int KP_6;
+    property public static int KP_7;
+    property public static int KP_8;
+    property public static int KP_9;
+    property public static int KP_COMMA;
+    property public static int KP_DIVIDE;
+    property public static int KP_ENTER;
+    property public static int KP_EQUAL;
+    property public static int KP_MINUS;
+    property public static int KP_MULT;
+    property public static int KP_PERIOD;
+    property public static int KP_PLUS;
+    property public static int LEFT;
+    property public static int NONE;
+    property public static int PAGEDOWN;
+    property public static int PAGEUP;
+    property public static int RIGHT;
+    property public static int TAB;
+    property public static int UP;
+    field public static final int BACKSPACE = 3; // 0x3
+    field public static final int DEL = 10; // 0xa
+    field public static final int DOWN = 6; // 0x6
+    field public static final int END = 12; // 0xc
+    field public static final int ENTER = 1; // 0x1
+    field public static final int ESCAPE = 4; // 0x4
+    field public static final int FUNCTION_0 = 256; // 0x100
+    field public static final int FUNCTION_1 = 257; // 0x101
+    field public static final int FUNCTION_10 = 266; // 0x10a
+    field public static final int FUNCTION_11 = 267; // 0x10b
+    field public static final int FUNCTION_12 = 268; // 0x10c
+    field public static final int FUNCTION_2 = 258; // 0x102
+    field public static final int FUNCTION_3 = 259; // 0x103
+    field public static final int FUNCTION_4 = 260; // 0x104
+    field public static final int FUNCTION_5 = 261; // 0x105
+    field public static final int FUNCTION_6 = 262; // 0x106
+    field public static final int FUNCTION_7 = 263; // 0x107
+    field public static final int FUNCTION_8 = 264; // 0x108
+    field public static final int FUNCTION_9 = 265; // 0x109
+    field public static final int HOME = 11; // 0xb
+    field public static final int INS = 9; // 0x9
+    field public static final org.connectbot.terminal.VTermKey INSTANCE;
+    field public static final int KP_0 = 512; // 0x200
+    field public static final int KP_1 = 513; // 0x201
+    field public static final int KP_2 = 514; // 0x202
+    field public static final int KP_3 = 515; // 0x203
+    field public static final int KP_4 = 516; // 0x204
+    field public static final int KP_5 = 517; // 0x205
+    field public static final int KP_6 = 518; // 0x206
+    field public static final int KP_7 = 519; // 0x207
+    field public static final int KP_8 = 520; // 0x208
+    field public static final int KP_9 = 521; // 0x209
+    field public static final int KP_COMMA = 524; // 0x20c
+    field public static final int KP_DIVIDE = 527; // 0x20f
+    field public static final int KP_ENTER = 528; // 0x210
+    field public static final int KP_EQUAL = 529; // 0x211
+    field public static final int KP_MINUS = 525; // 0x20d
+    field public static final int KP_MULT = 522; // 0x20a
+    field public static final int KP_PERIOD = 526; // 0x20e
+    field public static final int KP_PLUS = 523; // 0x20b
+    field public static final int LEFT = 7; // 0x7
+    field public static final int NONE = 0; // 0x0
+    field public static final int PAGEDOWN = 14; // 0xe
+    field public static final int PAGEUP = 13; // 0xd
+    field public static final int RIGHT = 8; // 0x8
+    field public static final int TAB = 2; // 0x2
+    field public static final int UP = 5; // 0x5
+  }
+
+}
+

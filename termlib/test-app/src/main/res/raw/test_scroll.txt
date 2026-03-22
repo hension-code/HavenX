@@ -1,0 +1,102 @@
+Scrolling Test - Line Counter
+
+Line 001 - This is a scrolling test with many lines
+Line 002 - The terminal should handle scrolling properly
+Line 003 - As new lines are added, older ones scroll up
+Line 004 - Fullwidth test: 日本語テスト
+Line 005 - Fullwidth test: 中文测试内容
+Line 006 - Fullwidth test: 한글테스트
+Line 007 - Colors: [31mRed[0m [32mGreen[0m [34mBlue[0m
+Line 008 - Bold: [1mThis is bold text[0m
+Line 009 - Italic: [3mThis is italic text[0m
+Line 010 - Underline: [4mThis is underlined[0m
+Line 011 - Mixed: [1m[31mBold Red[0m [3m[32mItalic Green[0m
+Line 012 - Reverse: [7mReverse Video[0m
+Line 013 - Strike: [9mStrikethrough[0m
+Line 014 - Unicode: ♠ ♣ ♥ ♦
+Line 015 - Box: ┌─┬─┐
+Line 016 - Box: │ │ │
+Line 017 - Box: ├─┼─┤
+Line 018 - Box: │ │ │
+Line 019 - Box: └─┴─┘
+Line 020 - Arrows: ← ↑ → ↓
+Line 021 - Math: ∀x∈ℝ ∑∫∂∇
+Line 022 - Greek: αβγδε ΑΒΓΔε
+Line 023 - Blocks: ▀▄█▌▐
+Line 024 - Shades: ░▒▓
+Line 025 - End of scrolling test
+Line 026 - Braille: ⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏
+Line 027 - Braille: ⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏
+Line 028 - Currency: $ € £ ¥ ¢ ₹ ₩ ₪ ₫ ฿
+Line 029 - Fractions: ½ ⅓ ⅔ ¼ ¾ ⅕ ⅖ ⅗ ⅘ ⅙ ⅚
+Line 030 - Superscript: x¹²³ + y⁴⁵⁶ = z⁷⁸⁹
+Line 031 - Subscript: H₂O CO₂ H₂SO₄
+Line 032 - Temperature: -40°F = -40°C
+Line 033 - Weather: ☀ ☁ ☂ ☃ ☄ ★ ☆ ☇
+Line 034 - Chess White: ♔ ♕ ♖ ♗ ♘ ♙
+Line 035 - Chess Black: ♚ ♛ ♜ ♝ ♞ ♟
+Line 036 - Cards: 🂡 🂢 🂣 🂤 🂥 🂦 🂧 🂨 🂩 🂪 🂫 🂬 🂭 🂮
+Line 037 - Mahjong: 🀀 🀁 🀂 🀃 🀄 🀅 🀆
+Line 038 - Backgrounds: [41m Red [42m Green [43m Yellow [44m Blue [0m
+Line 039 - Bright FG: [91mBright Red[0m [92mBright Green[0m
+Line 040 - Bright BG: [101m B-Red [102m B-Green [104m B-Blue [0m
+Line 041 - Dim Text: [2mThis text is dim/faint[0m
+Line 042 - Blink: [5mThis text might blink[0m
+Line 043 - Hidden: [8m(Hidden)[0m <--- Hidden text
+Line 044 - Overline: [53mThis is overlined[0m
+Line 045 - Emoji: 😀 😂 🤣 😍 😎 🥳 😡 😱
+Line 046 - Animals: 🐈 🐕 🦊 🦄 🐸 🐵 🐔 🐧
+Line 047 - Food: 🍎 🍔 🍕 🍣 🍩 🍪 🍺 🍷
+Line 048 - Tech: 💻 🖥 🖨 🖱 💾 💿 📱 🔋
+Line 049 - Transport: 🚗 🚕 🚌 ✈ 🚀 🛸 🚲 ⚓
+Line 050 - Long Line: This line is intended to test wrapping capabilities of the terminal window. It repeats.
+Line 051 - Long Line: This line is intended to test wrapping capabilities of the terminal window. It repeats.
+Line 052 - Tab Test: Col1	Col2	Col3	Col4
+Line 053 - Tab Test: A	B	C	D
+Line 054 - Runes: ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚳ ᚴ ᚵ ᚶ
+Line 055 - Ogham: ᚁ ᚂ ᚃ 🕓 🕔
+Line 056 - Geometry: ■ □ ▲ △ ▼ ▽ ◆ ◇ ○ ◎ ●
+Line 057 - Arrows: ➔ ➘ ➙ ➚ ➛ ➜ ➝ ➞
+Line 058 - Hands: ☜ ☝ ☞ ☟ ✍ ✌
+Line 059 - Music: ♩ ♪ ♫ ♬ ♭ ♮ ♯
+Line 060 - Stars: ⁎ ⁑ ☸ ✢ ✣ ✤ ✥ ✦ ✧
+Line 061 - Flowers: ✻ ✼ ✽ ✾ ✿ ❀ ❁ ❂ ❃ ❄ ❅ ❆
+Line 062 - Scissors: ✄ ✂ ✃ ✄
+Line 063 - Checkmarks: ✓ ✔ ✕ ✖ ✗ ✘
+Line 064 - Copyright: © ® ℗ ™ ℠
+Line 065 - Quotes: “Smart Quotes” and ‘Single Smart’
+Line 066 - Dashes: Em—Dash En–Dash Hyphen-Minus
+Line 067 - Pipes: ║ ╒ ╓ ╔ ╕ ╖ ╗ ╘ ╙ ╚ ╛ ╜ ╝
+Line 068 - Complex Box: ╠ ╞ ╟ Ì ╡ ╢ ╣ ╤ ╥ ╦ ╧ ╨ ╩ ╪ ╫ ╬
+Line 069 - Technical: ⌀ ⌂ ⌃ ⌄ ⌅ ⌆ ⌇ ⌈ ⌉
+Line 070 - Keyboard: ⌘ ⌥ ⇧ ⌃ ⎋ ⇪ ⏎ ⌫
+Line 071 - Arabic: مرحبا بالعالم (RTL Test)
+Line 072 - Hebrew: שלום עולם (RTL Test)
+Line 073 - Thai: สวัสดีชาวโลก
+Line 074 - Zalgo: H̶̡e comes
+Line 075 - Powerline:        
+Line 076 - Dev Icons:       
+Line 077 - Braille Art: ⣿⣿⣿⣿⣿⣿⣿⣿
+Line 078 - Braille Art: ⣿▀▀▀▀▀▀▀▀▀▀▀▀⣿
+Line 079 - Braille Art: ⣿ █▄ ▄█ █▄ ▄█ ⣿
+Line 080 - Braille Art: ⣿ ██ ██ ██ ██ ⣿
+Line 081 - Braille Art: ⣿▄▄▄▄▄▄▄▄▄▄▄▄⣿
+Line 082 - Spinner: ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+Line 083 - Progress: [████████░░] 80%
+Line 084 - Progress: [▓▓▓▓▓▓▓▓▒▒] 80%
+Line 085 - Histogram:  ▂▃▄▅▆▇█
+Line 086 - Sparkline: ⎼⎽⎼⎻⎺⎻⎼⎽⎼⎻⎺⎻⎼
+Line 087 - Logic: ∴ ∵ ∶ ∷ ∹ ∺ ∻ ∼ ∽ ∾ ∿
+Line 088 - Sets: ∅ ∈ ∉ ⊂ ⊃ ⊆ ⊇ ⊄ ⊅ ⊆ ⊇
+Line 089 - Angles: ∠ ∡ ∢ ∟ ∤ ∥ ∦
+Line 090 - Circles: ⊙ ⊚ ⊛ ⊜ ⊝
+Line 091 - Digits: ➀ ➁ ➂ ➃ ➄ ➅ ➆ ➇ ➈ ➉
+Line 092 - Inverted: ➊ ➋ ➌ ➍ ➎ ➏ ➐ ➑ ➒ ➓
+Line 093 - Dingbats: ❡ ❢ ❣ ❤ ❥ ❦ ❧
+Line 094 - Punctuations: ⸘ ‽ ⸚ ⸛ ⸜ ⸝ ⸠ ⸡
+Line 095 - Phonetic: ə æ ð ŋ ɵ ʍ ɥ ʗ
+Line 096 - URL Test: https://www.example.com
+Line 097 - Path Test: /usr/local/bin/test
+Line 098 - Email Test: user@example.com
+Line 099 - Empty Line:
+Line 100 - Century Mark: One hundred lines reached.
