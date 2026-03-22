@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/hension-code/HavenX/releases/latest"><img src="https://img.shields.io/github/v/release/hension-code/HavenX?style=flat-square" alt="Release" /></a>
   <a href="https://github.com/hension-code/HavenX/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/hension-code/HavenX/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/hension-code/HavenX?style=flat-square" alt="License" /></a>
