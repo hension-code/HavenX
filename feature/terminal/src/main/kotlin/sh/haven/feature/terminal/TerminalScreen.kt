@@ -308,8 +308,10 @@ fun TerminalScreen(
 
                     val focusRequester = remember { FocusRequester() }
 
-                    LaunchedEffect(Unit) {
-                        focusRequester.requestFocus()
+                    LaunchedEffect(isActive) {
+                        if (isActive) {
+                            focusRequester.requestFocus()
+                        }
                     }
 
                     var selectionController by remember {
@@ -401,6 +403,7 @@ fun TerminalScreen(
                                 initialFontSize = fontSize.sp,
                                 typeface = hackTypeface,
                                 keyboardEnabled = true,
+                                showSoftKeyboard = isActive,
                                 backgroundColor = Color(colorScheme.background),
                                 foregroundColor = Color(colorScheme.foreground),
                                 focusRequester = focusRequester,
