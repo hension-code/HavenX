@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Info
@@ -223,17 +222,9 @@ fun SettingsScreen(
 
         SettingsItem(
             icon = Icons.Filled.Info,
-            title = "About Haven",
+            title = "About HavenX",
             subtitle = "v${packageInfo.versionName}",
             onClick = { showAboutDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.Favorite,
-            title = "Support Haven",
-            subtitle = "Buy the developer a coffee",
-            onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
-            },
         )
 
     } // scrollable Column
@@ -251,9 +242,6 @@ fun SettingsScreen(
             onDismiss = { showAboutDialog = false },
             onOpenGitHub = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-            },
-            onOpenKofi = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
             },
         )
     }
@@ -448,8 +436,7 @@ private fun BackupPasswordDialog(
     )
 }
 
-private const val GITHUB_URL = "https://github.com/GlassOnTin/Haven"
-private const val KOFI_URL = "https://ko-fi.com/glassontin"
+private const val GITHUB_URL = "https://github.com/hension-code/HavenX"
 
 @Composable
 private fun AboutDialog(
@@ -457,20 +444,19 @@ private fun AboutDialog(
     versionCode: Long,
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
-    onOpenKofi: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("About Haven") },
+        title = { Text("About HavenX") },
         text = {
             Column {
                 Text(
-                    text = "Haven",
+                    text = "HavenX",
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Open source SSH client for Android",
+                    text = "Open source remote client for Android",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -491,13 +477,8 @@ private fun AboutDialog(
             }
         },
         dismissButton = {
-            Row {
-                TextButton(onClick = onOpenKofi) {
-                    Text("Support")
-                }
-                TextButton(onClick = onOpenGitHub) {
-                    Text("GitHub")
-                }
+            TextButton(onClick = onOpenGitHub) {
+                Text("GitHub")
             }
         },
     )
