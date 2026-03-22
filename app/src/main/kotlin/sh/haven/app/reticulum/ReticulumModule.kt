@@ -1,4 +1,4 @@
-package sh.haven.app.reticulum
+package com.hension.havenx.reticulum
 
 import dagger.Binds
 import dagger.Module

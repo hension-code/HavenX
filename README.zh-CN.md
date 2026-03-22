@@ -29,10 +29,21 @@
 ```bash
 git clone https://github.com/hension-code/HavenX.git
 cd HavenX
+```
+
+Windows（PowerShell）：
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+macOS/Linux：
+
+```bash
 ./gradlew assembleDebug
 ```
 
-输出 APK 路径：`app/build/outputs/apk/debug/haven-*-debug.apk`
+输出 APK 路径：`app/build/outputs/apk/debug/havenx-*-debug.apk`
 
 ## 许可证
 

@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "sh.haven.app"
+    namespace = "com.hension.havenx"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "sh.haven.app"
+        applicationId = "com.hension.havenx"
         minSdk = 26
         targetSdk = 35
         versionCode = 77
@@ -71,7 +71,7 @@ android {
             }
             // e.g., haven-2.0.17-arm64-release.apk
             val abi = variant.productFlavors.first { it.dimension == "abi" }.name
-            output.outputFileName = "haven-${variant.versionName}-$abi-${variant.buildType.name}.apk"
+            output.outputFileName = "havenx-${variant.versionName}-$abi-${variant.buildType.name}.apk"
         }
     }
 

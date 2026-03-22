@@ -1,4 +1,4 @@
-package sh.haven.app
+package com.hension.havenx
 
 import android.content.res.AssetFileDescriptor
 import android.database.Cursor
@@ -54,7 +54,7 @@ class HavenDocumentsProvider : DocumentsProvider() {
     }
 
     companion object {
-        private const val AUTHORITY = "sh.haven.provider"
+        private const val AUTHORITY = "com.hension.havenx.provider"
 
         private val ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,

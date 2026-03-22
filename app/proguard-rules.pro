@@ -13,6 +13,7 @@
 -dontwarn org.ietf.jgss.**
 -dontwarn org.newsclub.net.unix.**
 -dontwarn javax.naming.**
+-dontwarn javax.el.**
 -dontwarn com.sun.jna.**
 
 # Keep termlib classes — native JNI renderer accesses fields by name

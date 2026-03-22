@@ -1,4 +1,4 @@
-package sh.haven.app
+package com.hension.havenx
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

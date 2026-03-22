@@ -96,10 +96,21 @@ Notifications appear as a toast in the foreground or as an Android notification 
 ```bash
 git clone https://github.com/hension-code/HavenX.git
 cd HavenX
+```
+
+Windows (PowerShell):
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+macOS/Linux:
+
+```bash
 ./gradlew assembleDebug
 ```
 
-Output: `app/build/outputs/apk/debug/haven-*-debug.apk`
+Output: `app/build/outputs/apk/debug/havenx-*-debug.apk`
 
 ## License
 

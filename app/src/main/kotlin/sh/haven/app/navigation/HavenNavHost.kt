@@ -1,4 +1,4 @@
-package sh.haven.app.navigation
+package com.hension.havenx.navigation
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown

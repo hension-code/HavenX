@@ -1,4 +1,4 @@
-package sh.haven.app
+package com.hension.havenx
 
 import android.content.Intent
 import android.os.Bundle
@@ -22,7 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.core.os.LocaleListCompat
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import sh.haven.app.navigation.HavenNavHost
+import com.hension.havenx.navigation.HavenNavHost
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.security.BiometricAuthenticator
 import sh.haven.core.ssh.SshConnectionService

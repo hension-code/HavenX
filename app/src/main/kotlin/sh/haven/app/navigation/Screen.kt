@@ -1,4 +1,4 @@
-package sh.haven.app.navigation
+package com.hension.havenx.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cable
@@ -8,7 +8,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.ui.graphics.vector.ImageVector
-import sh.haven.app.R
+import com.hension.havenx.R
 
 enum class Screen(
     val route: String,

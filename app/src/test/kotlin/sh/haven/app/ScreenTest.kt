@@ -1,8 +1,8 @@
-package sh.haven.app
+package com.hension.havenx
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import sh.haven.app.navigation.Screen
+import com.hension.havenx.navigation.Screen
 
 class ScreenTest {
 

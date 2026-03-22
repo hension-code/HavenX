@@ -1,4 +1,4 @@
-package sh.haven.app
+package com.hension.havenx
 
 import android.app.Application
 import com.chaquo.python.Python
