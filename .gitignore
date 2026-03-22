@@ -17,3 +17,6 @@ local.properties
 /releases
 build-mosh/
 com/jcraft/jsch/
+.kotlin/
+**/.kotlin/
+*.salive
