@@ -60,7 +60,6 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
@@ -120,7 +119,6 @@ fun TerminalScreen(
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
     val hackTypeface = remember {
         ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.hack_regular)
             ?: android.graphics.Typeface.MONOSPACE
@@ -328,14 +326,11 @@ fun TerminalScreen(
                     // the View hierarchy, bypassing termlib's hardcoded US QWERTY
                     // symbol table.
                     val currentSelectionActive by rememberUpdatedState(selectionActive)
-                    val hasHardwareKeyboard by rememberUpdatedState(
-                        configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS,
-                    )
                     DisposableEffect(activeTab) {
                         val interceptor = { event: android.view.KeyEvent ->
                             handleLayoutAwareKeyEvent(
                                 event, activeTab,
-                                currentSelectionActive, hasHardwareKeyboard, viewModel,
+                                currentSelectionActive, viewModel,
                             )
                         }
                         KeyEventInterceptor.handler = interceptor
@@ -584,7 +579,6 @@ private fun handleLayoutAwareKeyEvent(
     event: android.view.KeyEvent,
     activeTab: TerminalTab,
     selectionActive: Boolean,
-    hasHardwareKeyboard: Boolean,
     viewModel: TerminalViewModel,
 ): Boolean {
     if (event.action != android.view.KeyEvent.ACTION_DOWN) return false
@@ -592,7 +586,6 @@ private fun handleLayoutAwareKeyEvent(
     // Only intercept physical keyboard input. Software keyboard / IME events
     // must flow through InputConnection (commitText), otherwise composing input
     // like Chinese Pinyin gets sent as raw Latin letters.
-    if (!hasHardwareKeyboard) return false
     if ((event.flags and android.view.KeyEvent.FLAG_SOFT_KEYBOARD) != 0) return false
     if (event.deviceId == android.view.KeyCharacterMap.VIRTUAL_KEYBOARD) return false
     if (!event.isFromSource(android.view.InputDevice.SOURCE_KEYBOARD)) return false

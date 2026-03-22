@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -31,13 +32,14 @@ fun PasswordDialog(
     hasKeys: Boolean,
     onDismiss: () -> Unit,
     onConnect: (password: String, rememberPassword: Boolean) -> Unit,
+    zh: Boolean = Locale.current.language == "zh",
 ) {
     var password by remember { mutableStateOf("") }
     var rememberPassword by remember { mutableStateOf(!profile.sshPassword.isNullOrBlank()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Connect to ${profile.label}") },
+        title = { Text(if (zh) "连接到 ${profile.label}" else "Connect to ${profile.label}") },
         text = {
             Column {
                 when {
@@ -45,7 +47,7 @@ fun PasswordDialog(
                         Text("${profile.rdpUsername ?: profile.username}@${profile.host}:${profile.rdpPort}")
                         if (!profile.rdpDomain.isNullOrBlank()) {
                             Text(
-                                "Domain: ${profile.rdpDomain}",
+                                "${if (zh) "域" else "Domain"}: ${profile.rdpDomain}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -56,7 +58,7 @@ fun PasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text(if (zh) "密码" else "Password") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
@@ -78,7 +80,7 @@ fun PasswordDialog(
                             onCheckedChange = { rememberPassword = it },
                         )
                         Text(
-                            "Remember password",
+                            if (zh) "记住密码" else "Remember password",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -86,7 +88,7 @@ fun PasswordDialog(
                 if (hasKeys && profile.isSsh) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Leave empty to connect with SSH key",
+                        if (zh) "留空将使用 SSH 密钥连接" else "Leave empty to connect with SSH key",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -95,12 +97,12 @@ fun PasswordDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConnect(password, rememberPassword) }) {
-                Text("Connect")
+                Text(if (zh) "连接" else "Connect")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(if (zh) "取消" else "Cancel")
             }
         },
     )

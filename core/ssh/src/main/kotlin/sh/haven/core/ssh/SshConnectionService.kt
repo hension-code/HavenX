@@ -85,6 +85,7 @@ class SshConnectionService : Service() {
     }
 
     private fun buildNotification(): Notification {
+        val zh = resources.configuration.locales.get(0)?.language == "zh"
         val sshActive = sessionManager.activeSessions
         val rnsActive = reticulumSessionManager.activeSessions
         val moshActive = moshSessionManager.activeSessions
@@ -119,13 +120,13 @@ class SshConnectionService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_haven_notification)
-            .setContentTitle("Haven — $count active session${if (count != 1) "s" else ""}")
+            .setContentTitle("HavenX — $count active session${if (count != 1) "s" else ""}")
             .setContentText(labels.ifEmpty { "Connecting..." })
             .setOngoing(true)
             .setContentIntent(contentPending)
             .addAction(
                 R.drawable.ic_haven_notification,
-                "Disconnect All",
+                if (zh) "断开全部连接" else "Disconnect All",
                 disconnectPending,
             )
             .build()
@@ -137,7 +138,7 @@ class SshConnectionService : Service() {
             "Active Connections",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Active connection status"
+            description = "HavenX active connection status"
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)

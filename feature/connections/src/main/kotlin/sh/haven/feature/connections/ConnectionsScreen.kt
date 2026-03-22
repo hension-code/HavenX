@@ -318,6 +318,7 @@ fun ConnectionsScreen(
         PasswordDialog(
             profile = profile,
             hasKeys = sshKeys.isNotEmpty(),
+            zh = zh,
             onDismiss = { connectingProfile = null },
             onConnect = { password, rememberPassword ->
                 viewModel.connect(profile, password, rememberPassword = rememberPassword)
@@ -330,6 +331,7 @@ fun ConnectionsScreen(
         PasswordDialog(
             profile = profile,
             hasKeys = sshKeys.isNotEmpty(),
+            zh = zh,
             onDismiss = { viewModel.dismissPasswordFallback() },
             onConnect = { password, rememberPassword ->
                 viewModel.connect(profile, password, rememberPassword = rememberPassword)
@@ -343,6 +345,7 @@ fun ConnectionsScreen(
             is ConnectionsViewModel.HostKeyPrompt.NewHost -> {
                 NewHostKeyDialog(
                     entry = prompt.entry,
+                    zh = zh,
                     onTrust = { viewModel.onHostKeyAccepted() },
                     onCancel = { viewModel.onHostKeyRejected() },
                 )
@@ -351,6 +354,7 @@ fun ConnectionsScreen(
                 KeyChangedDialog(
                     oldFingerprint = prompt.oldFingerprint,
                     entry = prompt.entry,
+                    zh = zh,
                     onAccept = { viewModel.onHostKeyAccepted() },
                     onDisconnect = { viewModel.onHostKeyRejected() },
                 )
