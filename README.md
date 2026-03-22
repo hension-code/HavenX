@@ -2,26 +2,31 @@
   <img src="fastlane/metadata/android/en-US/images/icon.png" width="80" alt="Haven icon" />
 </p>
 
-<h1 align="center">Haven</h1>
+<h1 align="center">HavenX</h1>
 
 <p align="center">
   Free SSH, VNC, RDP &amp; SFTP client for Android
 </p>
 
 <p align="center">
-  <a href="https://github.com/GlassOnTin/Haven/releases/latest"><img src="https://img.shields.io/github/v/release/GlassOnTin/Haven?style=flat-square" alt="Release" /></a>
-  <a href="https://github.com/GlassOnTin/Haven/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/GlassOnTin/Haven/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/GlassOnTin/Haven?style=flat-square" alt="License" /></a>
-  <a href="https://ko-fi.com/glassontin"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
+  <a href="https://github.com/hension-code/HavenX/releases/latest"><img src="https://img.shields.io/github/v/release/hension-code/HavenX?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/hension-code/HavenX/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/hension-code/HavenX/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/hension-code/HavenX?style=flat-square" alt="License" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/GlassOnTin/Haven/releases/latest">GitHub Releases</a> &bull;
+  <a href="https://github.com/hension-code/HavenX/releases/latest">GitHub Releases</a> &bull;
   <a href="https://play.google.com/store/apps/details?id=sh.haven.app">Google Play</a> &bull;
   <a href="https://f-droid.org">F-Droid</a>
 </p>
 
 ---
+
+## Upstream Attribution
+
+This repository is derived from [GlassOnTin/Haven](https://github.com/GlassOnTin/Haven), licensed under [GPLv3](LICENSE).
+
+Original copyright and license notices are retained. This fork includes additional modifications maintained by `hension-code` for HavenX.
 
 <p align="center">
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_connections_ssh.png" width="140" />
@@ -82,14 +87,14 @@ Notifications appear as a toast in the foreground or as an Android notification 
 
 | Channel | |
 |---|---|
-| [GitHub Releases](https://github.com/GlassOnTin/Haven/releases/latest) | Free, signed APK |
+| [GitHub Releases](https://github.com/hension-code/HavenX/releases/latest) | Free, signed APK |
 | [Google Play](https://play.google.com/store/apps/details?id=sh.haven.app) | Free, auto-updates |
 | [F-Droid](https://f-droid.org) | Free, built from source |
 
 ### Build from source
 
 ```bash
-git clone https://github.com/GlassOnTin/Haven.git
+git clone https://github.com/hension-code/HavenX.git
 cd Haven
 ./gradlew assembleDebug
 ```

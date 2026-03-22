@@ -1,7 +1,3 @@
-[submodule "termlib"]
-	path = termlib
-	url = https://github.com/GlassOnTin/termlib.git
-	branch = fix-popScrollbackLine-0.0.22
 [submodule "mosh-kotlin"]
 	path = mosh-kotlin
 	url = https://github.com/GlassOnTin/ssp-transport.git
