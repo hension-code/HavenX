@@ -60,6 +60,7 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
@@ -119,6 +120,7 @@ fun TerminalScreen(
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val hackTypeface = remember {
         ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.hack_regular)
             ?: android.graphics.Typeface.MONOSPACE
@@ -327,7 +329,7 @@ fun TerminalScreen(
                     // symbol table.
                     val currentSelectionActive by rememberUpdatedState(selectionActive)
                     val hasHardwareKeyboard by rememberUpdatedState(
-                        context.resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS,
+                        configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS,
                     )
                     DisposableEffect(activeTab) {
                         val interceptor = { event: android.view.KeyEvent ->

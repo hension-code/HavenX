@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <!-- Terminal prompt bracket > with key icon -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,40 L52,54 L32,68 L36,72 L60,54 L36,36 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M62,64 L78,64 L78,68 L62,68 Z" />
-</vector>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="6dp">
+    <bitmap
+        android:gravity="fill"
+        android:src="@drawable/ic_launcher_foreground_image" />
+</inset>
