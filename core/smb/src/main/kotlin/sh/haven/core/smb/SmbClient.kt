@@ -100,6 +100,40 @@ class SmbClient : Closeable {
         }
     }
 
+    fun downloadRange(
+        remotePath: String,
+        start: Long,
+        length: Long,
+        output: OutputStream,
+    ) {
+        if (start < 0 || length < 0) throw IllegalArgumentException("Invalid range")
+        if (length == 0L) return
+        val diskShare = share ?: throw IllegalStateException("Not connected")
+        val smbPath = toSmbPath(remotePath)
+        val file = diskShare.openFile(
+            smbPath,
+            EnumSet.of(AccessMask.GENERIC_READ),
+            null,
+            SMB2ShareAccess.ALL,
+            SMB2CreateDisposition.FILE_OPEN,
+            null,
+        )
+        file.use { f ->
+            val buffer = ByteArray(64 * 1024)
+            var offset = start
+            var remaining = length
+            while (remaining > 0) {
+                val toRead = minOf(buffer.size.toLong(), remaining).toInt()
+                val read = f.read(buffer, offset, 0, toRead)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                offset += read
+                remaining -= read
+            }
+            output.flush()
+        }
+    }
+
     fun upload(
         input: InputStream,
         remotePath: String,

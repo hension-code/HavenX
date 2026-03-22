@@ -46,10 +46,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "@string/app_name_debug"
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
+            manifestPlaceholders["appLabel"] = "@string/app_name"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -133,6 +139,10 @@ dependencies {
     implementation(libs.lifecycle.runtime)
     implementation(libs.biometric)
     implementation(libs.navigation.compose)
+    implementation("io.coil-kt:coil:2.6.0")
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-session:1.3.1")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

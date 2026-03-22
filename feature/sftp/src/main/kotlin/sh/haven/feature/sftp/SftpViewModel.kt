@@ -3,6 +3,7 @@ package sh.haven.feature.sftp
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jcraft.jsch.ChannelSftp
@@ -10,10 +11,12 @@ import com.jcraft.jsch.SftpProgressMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.haven.core.data.db.entities.ConnectionProfile
@@ -26,6 +29,7 @@ import sh.haven.core.smb.SmbSessionManager
 import sh.haven.core.ssh.SshClient
 import sh.haven.core.ssh.SshSessionManager
 import sh.haven.core.ssh.SshSessionManager.SessionState
+import java.io.File
 import java.io.OutputStream
 import javax.inject.Inject
 
@@ -64,6 +68,8 @@ class SftpViewModel @Inject constructor(
     private val preferencesRepository: UserPreferencesRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    private val backHistory = ArrayDeque<String>()
+    private val forwardHistory = ArrayDeque<String>()
 
     private val _connectedProfiles = MutableStateFlow<List<ConnectionProfile>>(emptyList())
     val connectedProfiles: StateFlow<List<ConnectionProfile>> = _connectedProfiles.asStateFlow()
@@ -83,6 +89,12 @@ class SftpViewModel @Inject constructor(
 
     private val _showHidden = MutableStateFlow(false)
     val showHidden: StateFlow<Boolean> = _showHidden.asStateFlow()
+    private val _favoriteDirectories = MutableStateFlow<Set<String>>(emptySet())
+    val favoriteDirectories: StateFlow<Set<String>> = _favoriteDirectories.asStateFlow()
+    private val _canGoBack = MutableStateFlow(false)
+    val canGoBack: StateFlow<Boolean> = _canGoBack.asStateFlow()
+    private val _canGoForward = MutableStateFlow(false)
+    val canGoForward: StateFlow<Boolean> = _canGoForward.asStateFlow()
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
@@ -102,8 +114,23 @@ class SftpViewModel @Inject constructor(
     val lastDownload: StateFlow<DownloadResult?> = _lastDownload.asStateFlow()
     fun clearLastDownload() { _lastDownload.value = null }
 
+    /** Emitted after preparing a local cached preview file. */
+    data class PreviewResult(
+        val remotePath: String,
+        val filePath: String?,
+        val uri: Uri?,
+        val streamUrl: String?,
+        val mimeType: String,
+        val mediaType: MediaTypeResolver.MediaType,
+    )
+    private val _lastPreview = MutableStateFlow<PreviewResult?>(null)
+    val lastPreview: StateFlow<PreviewResult?> = _lastPreview.asStateFlow()
+    fun clearLastPreview() { _lastPreview.value = null }
+
     private var sftpChannel: ChannelSftp? = null
     private var activeSmbClient: SmbClient? = null
+    private val previewReadLock = Any()
+    private var favoritesJob: Job? = null
 
     /** Tracks which active profile is SMB (vs SFTP). */
     private val _isSmbProfile = MutableStateFlow(false)
@@ -119,6 +146,13 @@ class SftpViewModel @Inject constructor(
                 SortMode.valueOf(saved)
             } catch (_: IllegalArgumentException) {
                 SortMode.NAME_ASC
+            }
+        }
+        // Restore hidden files preference
+        viewModelScope.launch {
+            preferencesRepository.sftpShowHidden.collectLatest { hidden ->
+                _showHidden.value = hidden
+                applyFilter()
             }
         }
     }
@@ -162,6 +196,7 @@ class SftpViewModel @Inject constructor(
                 _activeProfileId.value = null
                 sftpChannel = null
                 activeSmbClient = null
+                _favoriteDirectories.value = emptySet()
                 return@launch
             }
 
@@ -191,6 +226,7 @@ class SftpViewModel @Inject constructor(
         // Check if this is an SMB profile
         val isSmb = smbSessionManager.isProfileConnected(profileId)
         _isSmbProfile.value = isSmb
+        observeFavorites(profileId)
 
         if (isSmb) {
             if (profileId == _activeProfileId.value && activeSmbClient?.isConnected == true) return
@@ -200,6 +236,7 @@ class SftpViewModel @Inject constructor(
             _currentPath.value = "/"
             _allEntries.value = emptyList()
             _entries.value = emptyList()
+            clearHistory()
             openSmbAndList(profileId)
         } else {
             if (profileId == _activeProfileId.value && sftpChannel?.isConnected == true) return
@@ -209,18 +246,77 @@ class SftpViewModel @Inject constructor(
             _currentPath.value = "/"
             _allEntries.value = emptyList()
             _entries.value = emptyList()
-            openSftpAndList(profileId, "/")
+            clearHistory()
+            openSftpAndList(profileId)
         }
     }
 
     fun navigateTo(path: String) {
         val profileId = _activeProfileId.value ?: return
-        _currentPath.value = path
+        val normalized = normalizePath(path)
+        val current = _currentPath.value
+        if (normalized == current) return
+        backHistory.addLast(current)
+        if (backHistory.size > 100) backHistory.removeFirst()
+        forwardHistory.clear()
+        updateHistoryFlags()
+        _currentPath.value = normalized
+        persistLastPath(profileId, normalized)
         if (_isSmbProfile.value) {
-            listSmbDirectory(path)
+            listSmbDirectory(normalized)
         } else {
-            listDirectory(profileId, path)
+            listDirectory(profileId, normalized)
         }
+    }
+
+    fun navigateToInput(input: String) {
+        val value = input.trim()
+        if (value.isEmpty()) return
+        val target = if (value.startsWith("/")) {
+            value
+        } else {
+            "${_currentPath.value.trimEnd('/')}/$value"
+        }
+        val profileId = _activeProfileId.value ?: return
+        val normalized = normalizePath(target)
+        viewModelScope.launch {
+            val exists = withContext(Dispatchers.IO) {
+                if (_isSmbProfile.value) {
+                    pathExistsSmb(normalized)
+                } else {
+                    pathExistsSftp(profileId, normalized)
+                }
+            }
+            if (exists) {
+                navigateTo(normalized)
+            } else {
+                _error.value = "Path not found: $normalized"
+            }
+        }
+    }
+
+    fun goBack() {
+        val profileId = _activeProfileId.value ?: return
+        if (backHistory.isEmpty()) return
+        val current = _currentPath.value
+        val target = backHistory.removeLast()
+        forwardHistory.addLast(current)
+        updateHistoryFlags()
+        _currentPath.value = target
+        persistLastPath(profileId, target)
+        if (_isSmbProfile.value) listSmbDirectory(target) else listDirectory(profileId, target)
+    }
+
+    fun goForward() {
+        val profileId = _activeProfileId.value ?: return
+        if (forwardHistory.isEmpty()) return
+        val current = _currentPath.value
+        val target = forwardHistory.removeLast()
+        backHistory.addLast(current)
+        updateHistoryFlags()
+        _currentPath.value = target
+        persistLastPath(profileId, target)
+        if (_isSmbProfile.value) listSmbDirectory(target) else listDirectory(profileId, target)
     }
 
     fun navigateUp() {
@@ -241,8 +337,28 @@ class SftpViewModel @Inject constructor(
     }
 
     fun toggleShowHidden() {
-        _showHidden.value = !_showHidden.value
+        val next = !_showHidden.value
+        _showHidden.value = next
         applyFilter()
+        viewModelScope.launch {
+            preferencesRepository.setSftpShowHidden(next)
+        }
+    }
+
+    fun toggleFavoriteDirectory(path: String) {
+        val profileId = _activeProfileId.value ?: return
+        val normalized = normalizePath(path)
+        viewModelScope.launch {
+            if (_favoriteDirectories.value.contains(normalized)) {
+                preferencesRepository.removeSftpFavoriteDir(profileId, normalized)
+            } else {
+                preferencesRepository.addSftpFavoriteDir(profileId, normalized)
+            }
+        }
+    }
+
+    fun isFavoriteDirectory(path: String): Boolean {
+        return _favoriteDirectories.value.contains(normalizePath(path))
     }
 
     private fun applyFilter() {
@@ -402,10 +518,222 @@ class SftpViewModel @Inject constructor(
         }
     }
 
+    private fun clearHistory() {
+        backHistory.clear()
+        forwardHistory.clear()
+        updateHistoryFlags()
+    }
+
+    private fun persistLastPath(profileId: String, path: String) {
+        viewModelScope.launch {
+            preferencesRepository.setSftpLastPath(profileId, normalizePath(path))
+        }
+    }
+
+    private fun observeFavorites(profileId: String) {
+        favoritesJob?.cancel()
+        favoritesJob = viewModelScope.launch {
+            preferencesRepository.sftpFavoriteDirs(profileId).collectLatest { favorites ->
+                _favoriteDirectories.value = favorites.map { normalizePath(it) }.toSet()
+            }
+        }
+    }
+
+    private fun updateHistoryFlags() {
+        _canGoBack.value = backHistory.isNotEmpty()
+        _canGoForward.value = forwardHistory.isNotEmpty()
+    }
+
+    private fun normalizePath(path: String): String {
+        val parts = path.split('/').filter { it.isNotEmpty() && it != "." }
+        val stack = ArrayDeque<String>()
+        for (p in parts) {
+            if (p == "..") {
+                if (stack.isNotEmpty()) stack.removeLast()
+            } else {
+                stack.addLast(p)
+            }
+        }
+        return if (stack.isEmpty()) "/" else "/" + stack.joinToString("/")
+    }
+
+    private fun pathExistsSftp(profileId: String, path: String): Boolean {
+        return try {
+            val channel = getOrOpenChannel(profileId) ?: return false
+            if (path == "/") {
+                true
+            } else {
+                channel.stat(path)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun pathExistsSmb(path: String): Boolean {
+        return try {
+            val client = activeSmbClient ?: return false
+            if (path == "/") return true
+            val parent = path.trimEnd('/').substringBeforeLast('/', "/")
+            val name = path.trimEnd('/').substringAfterLast('/')
+            client.listDirectory(parent).any { it.name == name && it.isDirectory }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun previewMedia(entry: SftpEntry) {
+        val profileId = _activeProfileId.value ?: return
+        if (entry.isDirectory) return
+        viewModelScope.launch {
+            try {
+                _loading.value = true
+                _transferProgress.value = TransferProgress(entry.name, entry.size, 0)
+                val mimeType = guessMimeType(entry.name)
+                val mediaType = MediaTypeResolver.resolve(entry.path)
+                if (mediaType == MediaTypeResolver.MediaType.VIDEO || mediaType == MediaTypeResolver.MediaType.AUDIO) {
+                    val isSmbProfile = _isSmbProfile.value
+                    val smbClient = if (isSmbProfile) activeSmbClient ?: error("SMB not connected") else null
+                    val streamUrl = withContext(Dispatchers.IO) {
+                        LocalMediaPreviewServer.register(
+                            PreviewByteSource(
+                                totalSize = entry.size,
+                                mimeType = mimeType,
+                                readRange = { start, endInclusive, output ->
+                                    val length = endInclusive - start + 1
+                                    synchronized(previewReadLock) {
+                                        if (isSmbProfile) {
+                                            smbClient?.downloadRange(entry.path, start, length, output)
+                                                ?: error("SMB not connected")
+                                        } else {
+                                            val channel = getOrOpenChannel(profileId) ?: error("Not connected")
+                                            val monitor = object : SftpProgressMonitor {
+                                                override fun init(op: Int, src: String, dest: String, max: Long) = Unit
+                                                override fun count(count: Long): Boolean = true
+                                                override fun end() = Unit
+                                            }
+                                            channel.get(entry.path, monitor, start).use { input ->
+                                                var remaining = length
+                                                val buffer = ByteArray(64 * 1024)
+                                                while (remaining > 0) {
+                                                    val read = input.read(
+                                                        buffer,
+                                                        0,
+                                                        minOf(buffer.size.toLong(), remaining).toInt(),
+                                                    )
+                                                    if (read <= 0) break
+                                                    output.write(buffer, 0, read)
+                                                    remaining -= read
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                    _lastPreview.value = PreviewResult(
+                        remotePath = entry.path,
+                        filePath = null,
+                        uri = null,
+                        streamUrl = streamUrl,
+                        mimeType = mimeType,
+                        mediaType = mediaType,
+                    )
+                } else {
+                    val cacheFile = withContext(Dispatchers.IO) {
+                        val file = SftpCacheManager.getCacheFile(appContext, entry.path)
+                        if (!file.exists() || file.length() <= 0L) {
+                            downloadToFile(profileId, entry, file)
+                        }
+                        SftpCacheManager.trimCache(appContext)
+                        file
+                    }
+                    val uri = SftpCacheManager.toContentUri(appContext, cacheFile)
+                    _lastPreview.value = PreviewResult(
+                        remotePath = entry.path,
+                        filePath = cacheFile.absolutePath,
+                        uri = uri,
+                        streamUrl = null,
+                        mimeType = mimeType,
+                        mediaType = mediaType,
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Preview failed", e)
+                _error.value = "Preview failed: ${e.message}"
+            } finally {
+                _loading.value = false
+                _transferProgress.value = null
+            }
+        }
+    }
+
+    private fun downloadToFile(profileId: String, entry: SftpEntry, file: File) {
+        file.parentFile?.mkdirs()
+        file.outputStream().use { out ->
+            if (_isSmbProfile.value) {
+                val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
+                client.download(entry.path, out) { transferred, total ->
+                    _transferProgress.value = TransferProgress(entry.name, total, transferred)
+                }
+            } else {
+                val channel = getOrOpenChannel(profileId) ?: throw IllegalStateException("Not connected")
+                val monitor = object : SftpProgressMonitor {
+                    private var total = 0L
+                    private var transferred = 0L
+
+                    override fun init(op: Int, src: String, dest: String, max: Long) {
+                        total = if (max == SftpProgressMonitor.UNKNOWN_SIZE) entry.size else max
+                        transferred = 0
+                        _transferProgress.value = TransferProgress(entry.name, total, 0)
+                    }
+
+                    override fun count(bytes: Long): Boolean {
+                        transferred += bytes
+                        _transferProgress.value = TransferProgress(entry.name, total, transferred)
+                        return true
+                    }
+
+                    override fun end() {
+                        _transferProgress.value = TransferProgress(entry.name, total, total)
+                    }
+                }
+                channel.get(entry.path, out, monitor)
+            }
+        }
+    }
+
     fun dismissError() { _error.value = null }
     fun dismissMessage() { _message.value = null }
 
-    private fun openSftpAndList(profileId: String, path: String) {
+    private fun guessMimeType(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        if (ext.isBlank()) return "*/*"
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: when (ext) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "bmp" -> "image/bmp"
+            "svg" -> "image/svg+xml"
+            "mp4", "m4v" -> "video/mp4"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            "mov" -> "video/quicktime"
+            "avi" -> "video/x-msvideo"
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "wav" -> "audio/wav"
+            "ogg", "oga" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            else -> "*/*"
+        }
+    }
+
+    private fun openSftpAndList(profileId: String) {
         viewModelScope.launch {
             try {
                 _loading.value = true
@@ -414,10 +742,18 @@ class SftpViewModel @Inject constructor(
                         ?: openMoshSftpChannel(profileId)
                         ?: throw IllegalStateException("Session not connected")
                     sftpChannel = channel
-                    // Navigate to home directory on first connect
                     val home = channel.home
-                    _currentPath.value = home
-                    loadEntries(channel, home)
+                    val saved = preferencesRepository.getSftpLastPath(profileId)
+                    val target = normalizePath(saved ?: home)
+                    val actual = try {
+                        loadEntries(channel, target)
+                        target
+                    } catch (_: Exception) {
+                        loadEntries(channel, home)
+                        normalizePath(home)
+                    }
+                    _currentPath.value = actual
+                    preferencesRepository.setSftpLastPath(profileId, actual)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "SFTP open failed", e)
@@ -509,8 +845,17 @@ class SftpViewModel @Inject constructor(
                     val client = smbSessionManager.getClientForProfile(profileId)
                         ?: throw IllegalStateException("SMB session not connected")
                     activeSmbClient = client
-                    _currentPath.value = "/"
-                    loadSmbEntries(client, "/")
+                    val saved = preferencesRepository.getSftpLastPath(profileId)
+                    val target = normalizePath(saved ?: "/")
+                    val actual = try {
+                        loadSmbEntries(client, target)
+                        target
+                    } catch (_: Exception) {
+                        loadSmbEntries(client, "/")
+                        "/"
+                    }
+                    _currentPath.value = actual
+                    preferencesRepository.setSftpLastPath(profileId, actual)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "SMB open failed", e)

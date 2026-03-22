@@ -4,4 +4,10 @@
          This config ensures no cleartext HTTP is allowed
          if any HTTP client is ever added. -->
     <base-config cleartextTrafficPermitted="false" />
+
+    <!-- Allow local loopback cleartext for in-app media preview streaming only. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
 </network-security-config>

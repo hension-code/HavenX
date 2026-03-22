@@ -1,5 +1,4 @@
 package com.hension.havenx.navigation
-
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.WindowInsets
@@ -231,7 +230,10 @@ fun HavenNavHost(
                     )
                 }
                 Screen.Sftp -> {
-                    SftpScreen(pendingSmbProfileId = pendingSmbProfileId)
+                    SftpScreen(
+                        pendingSmbProfileId = pendingSmbProfileId,
+                        isActive = pagerState.currentPage == Screen.Sftp.ordinal,
+                    )
                     LaunchedEffect(pendingSmbProfileId) {
                         if (pendingSmbProfileId != null) {
                             pendingSmbProfileId = null

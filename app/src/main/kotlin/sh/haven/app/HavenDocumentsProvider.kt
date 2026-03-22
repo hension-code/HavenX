@@ -54,7 +54,7 @@ class HavenDocumentsProvider : DocumentsProvider() {
     }
 
     companion object {
-        private const val AUTHORITY = "com.hension.havenx.provider"
+        private const val DEFAULT_AUTHORITY = "com.hension.havenx.provider"
 
         private val ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,
@@ -472,7 +472,12 @@ class HavenDocumentsProvider : DocumentsProvider() {
     }
 
     private fun notifyChange(docId: String) {
-        val uri = DocumentsContract.buildDocumentUri(AUTHORITY, docId)
+        val uri = DocumentsContract.buildDocumentUri(providerAuthority(), docId)
         context?.contentResolver?.notifyChange(uri, null)
+    }
+
+    private fun providerAuthority(): String {
+        val pkg = context?.packageName ?: return DEFAULT_AUTHORITY
+        return "$pkg.provider"
     }
 }

@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +31,9 @@ class UserPreferencesRepository @Inject constructor(
     private val toolbarLayoutKey = stringPreferencesKey("toolbar_layout")
     private val sessionCommandOverrideKey = stringPreferencesKey("session_command_override")
     private val sftpSortModeKey = stringPreferencesKey("sftp_sort_mode")
+    private val sftpShowHiddenKey = booleanPreferencesKey("sftp_show_hidden")
+    private val sftpLastPathsKey = stringSetPreferencesKey("sftp_last_paths")
+    private val sftpFavoriteDirsKey = stringSetPreferencesKey("sftp_favorite_dirs")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
     private val languageModeKey = stringPreferencesKey("language_mode")
 
@@ -186,6 +191,73 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    val sftpShowHidden: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[sftpShowHiddenKey] ?: false
+    }
+
+    suspend fun setSftpShowHidden(showHidden: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[sftpShowHiddenKey] = showHidden
+        }
+    }
+
+    suspend fun getSftpLastPath(profileId: String): String? {
+        val entries = dataStore.data.map { it[sftpLastPathsKey].orEmpty() }.first()
+        return decodeScopedEntries(entries, profileId).firstOrNull()
+    }
+
+    suspend fun setSftpLastPath(profileId: String, path: String) {
+        dataStore.edit { prefs ->
+            val existing = prefs[sftpLastPathsKey].orEmpty()
+            val updated = existing
+                .filterNot { decodeScopedEntry(it)?.first == profileId }
+                .toMutableSet()
+            updated += encodeScopedEntry(profileId, path)
+            prefs[sftpLastPathsKey] = updated
+        }
+    }
+
+    fun sftpFavoriteDirs(profileId: String): Flow<Set<String>> = dataStore.data.map { prefs ->
+        decodeScopedEntries(prefs[sftpFavoriteDirsKey].orEmpty(), profileId).toSet()
+    }
+
+    suspend fun addSftpFavoriteDir(profileId: String, path: String) {
+        dataStore.edit { prefs ->
+            val existing = prefs[sftpFavoriteDirsKey].orEmpty().toMutableSet()
+            existing += encodeScopedEntry(profileId, path)
+            prefs[sftpFavoriteDirsKey] = existing
+        }
+    }
+
+    suspend fun removeSftpFavoriteDir(profileId: String, path: String) {
+        dataStore.edit { prefs ->
+            val existing = prefs[sftpFavoriteDirsKey].orEmpty()
+            prefs[sftpFavoriteDirsKey] = existing
+                .filterNot {
+                    val pair = decodeScopedEntry(it)
+                    pair?.first == profileId && pair.second == path
+                }
+                .toSet()
+        }
+    }
+
+    private fun encodeScopedEntry(profileId: String, value: String): String {
+        return "$profileId$SCOPED_ENTRY_SEPARATOR$value"
+    }
+
+    private fun decodeScopedEntry(raw: String): Pair<String, String>? {
+        val idx = raw.indexOf(SCOPED_ENTRY_SEPARATOR)
+        if (idx <= 0 || idx >= raw.length - 1) return null
+        return raw.substring(0, idx) to raw.substring(idx + 1)
+    }
+
+    private fun decodeScopedEntries(rawEntries: Set<String>, profileId: String): List<String> {
+        return rawEntries.mapNotNull { raw ->
+            val pair = decodeScopedEntry(raw) ?: return@mapNotNull null
+            if (pair.first == profileId) pair.second else null
+        }
+    }
+
     val terminalColorScheme: Flow<TerminalColorScheme> = dataStore.data.map { prefs ->
         TerminalColorScheme.fromString(prefs[terminalColorSchemeKey])
     }
@@ -286,5 +358,6 @@ class UserPreferencesRepository @Inject constructor(
         const val DEFAULT_RETICULUM_PORT = 37428
         const val DEFAULT_TOOLBAR_ROW1 = "keyboard,esc,tab,shift,ctrl,alt" // legacy
         const val DEFAULT_TOOLBAR_ROW2 = "arrow_left,arrow_up,arrow_down,arrow_right,sym_pipe,sym_tilde,sym_slash,sym_backslash,sym_backtick" // legacy
+        private const val SCOPED_ENTRY_SEPARATOR = '\u001F'
     }
 }
