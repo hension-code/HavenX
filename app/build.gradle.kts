@@ -15,8 +15,8 @@ android {
         applicationId = "com.hension.havenx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 79
-        versionName = "2.6.2"
+        versionCode = 80
+        versionName = "2.6.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

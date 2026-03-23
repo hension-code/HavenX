@@ -30,4 +30,13 @@
     <string name="rename_session_1">重命名会话</string>
     <string name="name">名称</string>
     <string name="rename">重命名</string>
+    <string name="snippets">⚡ 预设</string>
+    <string name="presets_snippets">预设指令 (Snippets)</string>
+    <string name="add_snippet">添加预设指令</string>
+    <string name="no_saved_snippets">暂无保存的自定义预设指令</string>
+    <string name="edit_snippet_title">编辑预设指令</string>
+    <string name="snippet_name">指令名称 (Name)</string>
+    <string name="command_content">注入的命令 (Command Content)</string>
+    <string name="auto_append_enter">自动附加回车符执行</string>
+    <string name="save">保存</string>
 </resources>

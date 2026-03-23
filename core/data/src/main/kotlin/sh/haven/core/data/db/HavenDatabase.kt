@@ -9,6 +9,7 @@ import sh.haven.core.data.db.entities.ConnectionProfile
 import sh.haven.core.data.db.entities.KnownHost
 import sh.haven.core.data.db.entities.PortForwardRule
 import sh.haven.core.data.db.entities.SshKey
+import sh.haven.core.data.db.entities.Snippet
 
 @Database(
     entities = [
@@ -17,8 +18,9 @@ import sh.haven.core.data.db.entities.SshKey
         ConnectionLog::class,
         SshKey::class,
         PortForwardRule::class,
+        Snippet::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 abstract class HavenDatabase : RoomDatabase() {
@@ -27,6 +29,7 @@ abstract class HavenDatabase : RoomDatabase() {
     abstract fun connectionLogDao(): ConnectionLogDao
     abstract fun sshKeyDao(): SshKeyDao
     abstract fun portForwardRuleDao(): PortForwardRuleDao
+    abstract fun snippetDao(): SnippetDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -159,6 +162,21 @@ abstract class HavenDatabase : RoomDatabase() {
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_profiles ADD COLUMN sshPassword TEXT")
+            }
+        }
+
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `snippets` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `command` TEXT NOT NULL,
+                        `autoReturn` INTEGER NOT NULL,
+                        `sortOrder` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
             }
         }
     }

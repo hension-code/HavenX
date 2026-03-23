@@ -175,6 +175,7 @@ class TerminalViewModel @Inject constructor(
     private val hostKeyVerifier: HostKeyVerifier,
     private val preferencesRepository: UserPreferencesRepository,
     private val connectionDao: sh.haven.core.data.db.ConnectionDao,
+    private val snippetRepository: sh.haven.core.data.repository.SnippetRepository,
 ) : ViewModel() {
 
     override fun onCleared() {
@@ -200,6 +201,32 @@ class TerminalViewModel @Inject constructor(
                 SharingStarted.WhileSubscribed(5000),
                 UserPreferencesRepository.TerminalColorScheme.HAVEN,
             )
+
+    val snippets: StateFlow<List<sh.haven.core.data.db.entities.Snippet>> =
+        snippetRepository.getAllSnippets()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                emptyList(),
+            )
+
+    fun addSnippet(snippet: sh.haven.core.data.db.entities.Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.addSnippet(snippet)
+        }
+    }
+
+    fun updateSnippet(snippet: sh.haven.core.data.db.entities.Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.updateSnippet(snippet)
+        }
+    }
+
+    fun deleteSnippet(snippet: sh.haven.core.data.db.entities.Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.deleteSnippet(snippet)
+        }
+    }
 
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
     val tabs: StateFlow<List<TerminalTab>> = _tabs.asStateFlow()

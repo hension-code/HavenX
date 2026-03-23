@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -333,12 +334,10 @@ fun SftpScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     val canInteract = activeProfileId != null
-                    val actionScroll = rememberScrollState()
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(actionScroll),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
                     ) {
                         IconButton(onClick = { viewModel.goBack() }, enabled = canInteract && canGoBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
@@ -352,46 +351,7 @@ fun SftpScreen(
                         IconButton(onClick = { viewModel.refresh() }, enabled = canInteract) {
                             Icon(Icons.Filled.Refresh, stringResource(R.string.refresh))
                         }
-                        IconButton(onClick = { viewModel.toggleShowHidden() }) {
-                            Icon(
-                                if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (showHidden) {
-                                    stringResource(R.string.hide_hidden_files)
-                                } else {
-                                    stringResource(R.string.show_hidden_files)
-                                },
-                            )
-                        }
-                        Box {
-                            IconButton(onClick = { showSortMenu = true }, enabled = canInteract) {
-                                Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.sort))
-                            }
-                            SortDropdown(
-                                expanded = showSortMenu,
-                                currentMode = sortMode,
-                                zh = zh,
-                                onDismiss = { showSortMenu = false },
-                                onSelect = { mode ->
-                                    viewModel.setSortMode(mode)
-                                    showSortMenu = false
-                                },
-                            )
-                        }
-                        Box {
-                            IconButton(onClick = { showFavoritesMenu = true }, enabled = canInteract) {
-                                Icon(Icons.Filled.StarBorder, stringResource(R.string.favorite_folders))
-                            }
-                            FavoritesDropdown(
-                                expanded = showFavoritesMenu,
-                                favorites = favoriteDirectories.toList().sorted(),
-                                zh = zh,
-                                onDismiss = { showFavoritesMenu = false },
-                                onSelect = { path ->
-                                    viewModel.navigateTo(path)
-                                    showFavoritesMenu = false
-                                },
-                            )
-                        }
+                        
                         Box {
                             val activeCount = transfers.count { it.state == TransferState.DOWNLOADING || it.state == TransferState.PAUSED }
                             IconButton(onClick = { showTransfersMenu = true }, enabled = canInteract) {
@@ -414,6 +374,67 @@ fun SftpScreen(
                                 onResume = { viewModel.resumeTransfer(it) },
                                 onCancel = { viewModel.cancelTransfer(it) },
                                 onRemove = { viewModel.removeTransfer(it) },
+                            )
+                        }
+
+                        var showMoreMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }, enabled = canInteract) {
+                                Icon(Icons.Filled.MoreVert, if (zh) "更多" else "More")
+                            }
+                            
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showMoreMenu,
+                                onDismissRequest = { showMoreMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(if (showHidden) stringResource(R.string.hide_hidden_files) else stringResource(R.string.show_hidden_files)) },
+                                    onClick = { 
+                                        viewModel.toggleShowHidden() 
+                                        showMoreMenu = false
+                                    },
+                                    leadingIcon = { 
+                                        Icon(if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null) 
+                                    }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.sort)) },
+                                    onClick = { 
+                                        showMoreMenu = false
+                                        showSortMenu = true 
+                                    },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.favorite_folders)) },
+                                    onClick = { 
+                                        showMoreMenu = false
+                                        showFavoritesMenu = true 
+                                    },
+                                    leadingIcon = { Icon(Icons.Filled.StarBorder, null) }
+                                )
+                            }
+                            
+                            // Nested dropdowns (their anchor is technically irrelevant as long as it draws)
+                            SortDropdown(
+                                expanded = showSortMenu,
+                                currentMode = sortMode,
+                                zh = zh,
+                                onDismiss = { showSortMenu = false },
+                                onSelect = { mode ->
+                                    viewModel.setSortMode(mode)
+                                    showSortMenu = false
+                                },
+                            )
+                            FavoritesDropdown(
+                                expanded = showFavoritesMenu,
+                                favorites = favoriteDirectories.toList().sorted(),
+                                zh = zh,
+                                onDismiss = { showFavoritesMenu = false },
+                                onSelect = { path ->
+                                    viewModel.navigateTo(path)
+                                    showFavoritesMenu = false
+                                },
                             )
                         }
                     }

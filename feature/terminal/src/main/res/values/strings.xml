@@ -30,4 +30,13 @@
     <string name="rename_session_1">Rename Session</string>
     <string name="name">Name</string>
     <string name="rename">Rename</string>
+    <string name="snippets">⚡ Snippets</string>
+    <string name="presets_snippets">Presets (Snippets)</string>
+    <string name="add_snippet">Add Snippet</string>
+    <string name="no_saved_snippets">No saved snippets yet</string>
+    <string name="edit_snippet_title">Edit Snippet</string>
+    <string name="snippet_name">Snippet Name</string>
+    <string name="command_content">Command Content</string>
+    <string name="auto_append_enter">Auto append Enter</string>
+    <string name="save">Save</string>
 </resources>

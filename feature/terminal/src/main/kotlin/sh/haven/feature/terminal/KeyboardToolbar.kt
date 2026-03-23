@@ -50,6 +50,8 @@ import sh.haven.core.data.preferences.ToolbarItem
 import sh.haven.core.data.preferences.ToolbarKey
 import kotlinx.coroutines.delay
 import sh.haven.core.data.preferences.ToolbarLayout
+import androidx.compose.ui.res.stringResource
+import sh.haven.feature.terminal.R
 
 // VT100/xterm escape sequences for special keys
 private const val ESC = "\u001b"
@@ -106,6 +108,7 @@ fun KeyboardToolbar(
     onToggleCtrl: () -> Unit = {},
     onToggleAlt: () -> Unit = {},
     onVncTap: (() -> Unit)? = null,
+    onSnippetsTap: (() -> Unit)? = null,
     selectionController: SelectionController? = null,
     selectionActive: Boolean = false,
     hyperlinkUri: String? = null,
@@ -139,6 +142,7 @@ fun KeyboardToolbar(
                         onToggleShift = { shiftActive = !shiftActive },
                         onShiftUsed = { shiftActive = false },
                         onVncTap = onVncTap,
+                        onSnippetsTap = onSnippetsTap,
                     )
                 }
                 SelectionToolbarContent(
@@ -164,6 +168,7 @@ fun KeyboardToolbar(
                 onToggleShift = { shiftActive = !shiftActive },
                 onShiftUsed = { shiftActive = false },
                 onVncTap = onVncTap,
+                onSnippetsTap = onSnippetsTap,
             )
         } else {
             // Single-row fallback
@@ -184,6 +189,7 @@ fun KeyboardToolbar(
                             onToggleShift = { shiftActive = !shiftActive },
                             onShiftUsed = { shiftActive = false },
                             onVncTap = onVncTap,
+                            onSnippetsTap = onSnippetsTap,
                         )
                     }
                 }
@@ -213,6 +219,7 @@ private fun AlignedToolbarContent(
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)?,
+    onSnippetsTap: (() -> Unit)?,
 ) {
     // Split each row into: left (non-nav), right (non-nav after nav keys)
     val (row1Left, row1Right) = splitAroundNav(layout.row1)
@@ -229,9 +236,9 @@ private fun AlignedToolbarContent(
     if (presentNavKeys.isEmpty()) {
         Column {
             ToolbarRow(layout.row1, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap)
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap)
             ToolbarRow(layout.row2, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap)
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap)
         }
         return
     }
@@ -248,6 +255,9 @@ private fun AlignedToolbarContent(
                 for (item in row1Left) {
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                         shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
+                        ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                    }
                 }
             }
             KeyRow(Modifier.fillMaxWidth()) {
@@ -258,6 +268,9 @@ private fun AlignedToolbarContent(
                 for (item in row2Left) {
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                         shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
+                        ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                    }
                 }
             }
         }
@@ -292,6 +305,9 @@ private fun AlignedToolbarContent(
                         for (item in row1Right) {
                             RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                                 shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
+                                ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                            }
                         }
                     }
                 } else {
@@ -301,6 +317,9 @@ private fun AlignedToolbarContent(
                     for (item in row2Right) {
                         RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                             shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                        if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
+                            ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                        }
                     }
                 }
             }
@@ -418,6 +437,7 @@ private fun ToolbarRow(
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)? = null,
+    onSnippetsTap: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -430,6 +450,9 @@ private fun ToolbarRow(
                 shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
             if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onVncTap != null) {
                 ToolbarIconButton(Icons.Filled.DesktopWindows, "VNC Desktop", onVncTap)
+            }
+            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
+                ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
             }
         }
     }
