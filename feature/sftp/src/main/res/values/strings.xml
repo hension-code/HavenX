@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="downloaded_dl_filename">Downloaded ${dl.fileName}</string>
+    <string name="downloaded_dl_filename">Downloaded %1$s</string>
     <string name="open">Open</string>
     <string name="no_app_found_to_open">No app found to open this file</string>
     <string name="no_app_found_to_preview">No app found to preview this media</string>

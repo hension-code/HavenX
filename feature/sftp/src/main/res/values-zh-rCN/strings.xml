@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="downloaded_dl_filename">已下载 ${dl.fileName}</string>
+    <string name="downloaded_dl_filename">已下载 %1$s</string>
     <string name="open">打开</string>
     <string name="no_app_found_to_open">未找到可打开该文件的应用</string>
     <string name="no_app_found_to_preview">未找到可预览该媒体的应用</string>

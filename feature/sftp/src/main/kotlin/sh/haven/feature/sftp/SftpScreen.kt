@@ -57,6 +57,10 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -144,6 +148,7 @@ fun SftpScreen(
     val canGoBack by viewModel.canGoBack.collectAsState()
     val canGoForward by viewModel.canGoForward.collectAsState()
     val loading by viewModel.loading.collectAsState()
+    val transfers by viewModel.transfers.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
     val error by viewModel.error.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -166,7 +171,6 @@ fun SftpScreen(
         }
     }
 
-    val downloadMessage = stringResource(R.string.downloaded_dl_filename)
     val downloadActionLabel = stringResource(R.string.open)
     val noAppMessage = stringResource(R.string.no_app_found_to_open)
 
@@ -175,7 +179,7 @@ fun SftpScreen(
         viewModel.dismissMessage() // clear the plain message so it doesn't double-show
         
         val result = snackbarHostState.showSnackbar(
-            message = downloadMessage,
+            message = context.getString(R.string.downloaded_dl_filename, dl.fileName),
             actionLabel = downloadActionLabel,
             duration = androidx.compose.material3.SnackbarDuration.Long,
         )
@@ -253,18 +257,7 @@ fun SftpScreen(
         }
     }
 
-    // Directory picker for download
-    var pendingDownload by remember { mutableStateOf<SftpEntry?>(null) }
-    val downloadLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("*/*")
-    ) { uri ->
-        if (uri != null) {
-            pendingDownload?.let { entry ->
-                viewModel.downloadFile(entry, uri)
-            }
-        }
-        pendingDownload = null
-    }
+
 
     val clipboardManager = LocalClipboardManager.current
     val focusManager = LocalFocusManager.current
@@ -273,6 +266,7 @@ fun SftpScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var showSortMenu by remember { mutableStateOf(false) }
+    var showTransfersMenu by remember { mutableStateOf(false) }
     var showFavoritesMenu by remember { mutableStateOf(false) }
     var pathEditMode by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf(TextFieldValue(currentPath)) }
@@ -396,6 +390,30 @@ fun SftpScreen(
                                     viewModel.navigateTo(path)
                                     showFavoritesMenu = false
                                 },
+                            )
+                        }
+                        Box {
+                            val activeCount = transfers.count { it.state == TransferState.DOWNLOADING || it.state == TransferState.PAUSED }
+                            IconButton(onClick = { showTransfersMenu = true }, enabled = canInteract) {
+                                BadgedBox(
+                                    badge = {
+                                        if (activeCount > 0) {
+                                            Badge { Text(activeCount.toString()) }
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Download, if (zh) "传输任务" else "Transfers")
+                                }
+                            }
+                            TransfersDropdown(
+                                expanded = showTransfersMenu,
+                                transfers = transfers,
+                                zh = zh,
+                                onDismiss = { showTransfersMenu = false },
+                                onPause = { viewModel.pauseTransfer(it) },
+                                onResume = { viewModel.resumeTransfer(it) },
+                                onCancel = { viewModel.cancelTransfer(it) },
+                                onRemove = { viewModel.removeTransfer(it) },
                             )
                         }
                     }
@@ -579,8 +597,11 @@ fun SftpScreen(
                                     }
                                 },
                                 onDownload = {
-                                    pendingDownload = entry
-                                    downloadLauncher.launch(entry.name)
+                                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                    val havenDir = java.io.File(downloadsDir, "HavenX")
+                                    if (!havenDir.exists()) havenDir.mkdirs()
+                                    val destFile = java.io.File(havenDir, entry.name)
+                                    viewModel.downloadFile(entry, android.net.Uri.fromFile(destFile))
                                 },
                                 onDelete = { viewModel.deleteEntry(entry) },
                                 onPreview = { viewModel.previewMedia(entry) },
@@ -798,8 +819,7 @@ private fun resolveFileVisual(entry: SftpEntry): FileVisual {
     val textExt = setOf("txt", "md", "rtf", "log")
     val codeExt = setOf(
         "kt", "java", "js", "ts", "tsx", "jsx", "py", "go", "rs", "c", "cpp", "h",
-        "hpp", "cs", "php", "rb", "swift", "xml", "json", "yaml", "yml", "toml", "sh",
-        "sql", "gradle", "kts",
+        "css", "html", "xml", "json", "yaml", "yml", "sh", "bat", "ps1"
     )
     val archiveExt = setOf("zip", "rar", "7z", "tar", "gz", "bz2", "xz")
 
@@ -852,6 +872,90 @@ private fun resolveFileVisual(entry: SftpEntry): FileVisual {
             enLabel = "File",
             tintColor = { it.onSurfaceVariant },
         )
+    }
+}
+
+@Composable
+fun TransfersDropdown(
+    expanded: Boolean,
+    transfers: List<TransferTask>,
+    zh: Boolean,
+    onDismiss: () -> Unit,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = androidx.compose.ui.Modifier.widthIn(max = 350.dp, min = 250.dp)
+    ) {
+        if (transfers.isEmpty()) {
+            DropdownMenuItem(
+                text = { Text(if (zh) "没有活动的传输任务" else "No active transfers") },
+                onClick = { }
+            )
+        } else {
+            transfers.forEach { task ->
+                TransferItem(
+                    task = task,
+                    zh = zh,
+                    onPause = { onPause(task.id) },
+                    onResume = { onResume(task.id) },
+                    onCancel = { onCancel(task.id) },
+                    onRemove = { onRemove(task.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TransferItem(
+    task: TransferTask,
+    zh: Boolean,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val context = LocalContext.current
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (task.isUpload) Icons.Filled.Upload else Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(task.fileName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(8.dp))
+            when (task.state) {
+                TransferState.DOWNLOADING -> {
+                    IconButton(onClick = onPause, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Pause, null) }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+                TransferState.PAUSED, TransferState.ERROR -> {
+                    IconButton(onClick = onResume, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.PlayArrow, null) }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+                TransferState.DONE, TransferState.CANCELLED -> {
+                    IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.size(4.dp))
+        androidx.compose.material3.LinearProgressIndicator(progress = { task.fraction }, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.size(2.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            val statusText = when (task.state) {
+                TransferState.DOWNLOADING -> "${android.text.format.Formatter.formatFileSize(context, task.transferredBytes)} / ${android.text.format.Formatter.formatFileSize(context, task.totalBytes)}"
+                TransferState.PAUSED -> if (zh) "已暂停" else "Paused"
+                TransferState.ERROR -> if (zh) "出错" else "Error"
+                TransferState.DONE -> if (zh) "完成" else "Done"
+                TransferState.CANCELLED -> if (zh) "已取消" else "Cancelled"
+            }
+            Text(statusText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
 import sh.haven.core.data.db.entities.ConnectionProfile
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.data.repository.ConnectionRepository
@@ -48,7 +49,28 @@ enum class SortMode {
     NAME_ASC, NAME_DESC, SIZE_ASC, SIZE_DESC, DATE_ASC, DATE_DESC
 }
 
-/** Transfer progress for download/upload operations. */
+enum class TransferState { DOWNLOADING, PAUSED, CANCELLED, DONE, ERROR }
+
+data class TransferTask(
+    val id: String,
+    val fileName: String,
+    val totalBytes: Long,
+    val transferredBytes: Long,
+    val state: TransferState,
+    val isUpload: Boolean = false,
+    val destPath: String? = null,
+    val sourceUri: Uri? = null,
+    val destinationUri: Uri? = null,
+    val entry: SftpEntry? = null,
+    val profileId: String,
+    val isSmb: Boolean,
+    val error: String? = null
+) {
+    val fraction: Float
+        get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+}
+
+/** Transfer progress for generic operations. */
 data class TransferProgress(
     val fileName: String,
     val totalBytes: Long,
@@ -98,6 +120,10 @@ class SftpViewModel @Inject constructor(
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    private val _transfers = MutableStateFlow<List<TransferTask>>(emptyList())
+    val transfers: StateFlow<List<TransferTask>> = _transfers.asStateFlow()
+    private val transferJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
 
     private val _transferProgress = MutableStateFlow<TransferProgress?>(null)
     val transferProgress: StateFlow<TransferProgress?> = _transferProgress.asStateFlow()
@@ -377,116 +403,197 @@ class SftpViewModel @Inject constructor(
 
     fun downloadFile(entry: SftpEntry, destinationUri: Uri) {
         val profileId = _activeProfileId.value ?: return
-        viewModelScope.launch {
-            try {
-                _loading.value = true
-                _transferProgress.value = TransferProgress(entry.name, entry.size, 0)
-                withContext(Dispatchers.IO) {
-                    val outputStream: OutputStream = appContext.contentResolver.openOutputStream(destinationUri)
-                        ?: throw IllegalStateException("Cannot open output stream")
-                    outputStream.use { out ->
-                        if (_isSmbProfile.value) {
-                            val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
-                            client.download(entry.path, out) { transferred, total ->
-                                _transferProgress.value = TransferProgress(entry.name, total, transferred)
-                            }
-                        } else {
-                            val channel = getOrOpenChannel(profileId) ?: throw IllegalStateException("Not connected")
-                            val monitor = object : SftpProgressMonitor {
-                                private var total = 0L
-                                private var transferred = 0L
-
-                                override fun init(op: Int, src: String, dest: String, max: Long) {
-                                    total = if (max == SftpProgressMonitor.UNKNOWN_SIZE) entry.size else max
-                                    transferred = 0
-                                    _transferProgress.value = TransferProgress(entry.name, total, 0)
-                                }
-
-                                override fun count(bytes: Long): Boolean {
-                                    transferred += bytes
-                                    _transferProgress.value = TransferProgress(entry.name, total, transferred)
-                                    return true
-                                }
-
-                                override fun end() {
-                                    _transferProgress.value = TransferProgress(entry.name, total, total)
-                                }
-                            }
-                            channel.get(entry.path, out, monitor)
-                        }
-                    }
-                }
-                _lastDownload.value = DownloadResult(entry.name, destinationUri)
-                _message.value = "Downloaded ${entry.name}"
-            } catch (e: Exception) {
-                Log.e(TAG, "Download failed", e)
-                _error.value = "Download failed: ${e.message}"
-            } finally {
-                _loading.value = false
-                _transferProgress.value = null
-            }
-        }
+        val taskId = java.util.UUID.randomUUID().toString()
+        val task = TransferTask(
+            id = taskId,
+            fileName = entry.name,
+            totalBytes = entry.size,
+            transferredBytes = 0L,
+            state = TransferState.DOWNLOADING,
+            isUpload = false,
+            destinationUri = destinationUri,
+            entry = entry,
+            profileId = profileId,
+            isSmb = _isSmbProfile.value
+        )
+        _transfers.value = _transfers.value + task
+        startTransferJob(task)
     }
 
     fun uploadFile(fileName: String, sourceUri: Uri) {
         val profileId = _activeProfileId.value ?: return
         val destPath = _currentPath.value.trimEnd('/') + "/" + fileName
-        Log.d(TAG, "Upload: '$fileName' -> '$destPath' (source: $sourceUri)")
+        
         viewModelScope.launch {
+            val fileSize = appContext.contentResolver.query(sourceUri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (cursor.moveToFirst() && sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
+            } ?: -1L
+            
+            val taskId = java.util.UUID.randomUUID().toString()
+            val task = TransferTask(
+                id = taskId,
+                fileName = fileName,
+                totalBytes = fileSize,
+                transferredBytes = 0L,
+                state = TransferState.DOWNLOADING,
+                isUpload = true,
+                destPath = destPath,
+                sourceUri = sourceUri,
+                profileId = profileId,
+                isSmb = _isSmbProfile.value
+            )
+            _transfers.value = _transfers.value + task
+            startTransferJob(task)
+        }
+    }
+
+    private fun startTransferJob(initialTask: TransferTask) {
+        val job = viewModelScope.launch(Dispatchers.IO) {
             try {
-                _loading.value = true
-                // Get source file size for progress
-                val fileSize = appContext.contentResolver.query(sourceUri, null, null, null, null)?.use { cursor ->
-                    val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                    if (cursor.moveToFirst() && sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L
-                } ?: -1L
-                _transferProgress.value = TransferProgress(fileName, fileSize, 0)
-                withContext(Dispatchers.IO) {
-                    val inputStream = appContext.contentResolver.openInputStream(sourceUri)
-                        ?: throw IllegalStateException("Cannot open input stream")
-                    inputStream.use { input ->
-                        if (_isSmbProfile.value) {
-                            val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
-                            client.upload(input, destPath, fileSize) { transferred, total ->
-                                _transferProgress.value = TransferProgress(fileName, total, transferred)
-                            }
-                        } else {
-                            val channel = getOrOpenChannel(profileId) ?: throw IllegalStateException("Not connected")
-                            val monitor = object : SftpProgressMonitor {
-                                private var total = 0L
-                                private var transferred = 0L
-
-                                override fun init(op: Int, src: String, dest: String, max: Long) {
-                                    total = if (max == SftpProgressMonitor.UNKNOWN_SIZE) fileSize else max
-                                    transferred = 0
-                                    _transferProgress.value = TransferProgress(fileName, total, 0)
-                                }
-
-                                override fun count(bytes: Long): Boolean {
-                                    transferred += bytes
-                                    _transferProgress.value = TransferProgress(fileName, total, transferred)
-                                    return true
-                                }
-
-                                override fun end() {
-                                    _transferProgress.value = TransferProgress(fileName, total, total)
-                                }
-                            }
-                            channel.put(input, destPath, monitor)
-                        }
-                    }
-                    Log.d(TAG, "Upload complete: '$destPath'")
+                if (initialTask.isUpload) {
+                    performUpload(initialTask)
+                } else {
+                    performDownload(initialTask)
                 }
-                _message.value = "Uploaded $fileName"
-                refresh()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Ignore
             } catch (e: Exception) {
-                Log.e(TAG, "Upload failed", e)
-                _error.value = "Upload failed: ${e.message}"
-            } finally {
-                _loading.value = false
-                _transferProgress.value = null
+                Log.e(TAG, "Transfer failed: ${initialTask.fileName}", e)
+                updateTask(initialTask.id) { it.copy(state = TransferState.ERROR, error = e.message) }
             }
         }
+        transferJobs[initialTask.id] = job
+    }
+
+    private suspend fun performDownload(task: TransferTask) {
+        val entry = task.entry ?: return
+        val destUri = task.destinationUri ?: return
+        val isAppend = task.transferredBytes > 0
+        val mode = if (isAppend) "wa" else "w"
+        
+        withContext(Dispatchers.IO) {
+            val outputStream = appContext.contentResolver.openOutputStream(destUri, mode)
+                ?: throw IllegalStateException("Cannot open output stream")
+            outputStream.use { out ->
+                if (task.isSmb) {
+                    val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
+                    var current = task.transferredBytes
+                    if (isAppend && current > 0) {
+                        client.downloadRange(entry.path, current, task.totalBytes - current, out) {
+                            current += it
+                            updateTask(task.id) { t -> t.copy(transferredBytes = current) }
+                            this@withContext.isActive
+                        }
+                    } else {
+                        client.download(entry.path, out) { transferred, _ ->
+                            updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                            this@withContext.isActive
+                        }
+                    }
+                } else {
+                    val channel = openDedicatedSftpChannel(task.profileId) ?: throw IllegalStateException("Not connected")
+                    try {
+                        val monitor = object : SftpProgressMonitor {
+                            private var transferred = task.transferredBytes
+                            override fun init(op: Int, src: String, dest: String, max: Long) {}
+                            override fun count(bytes: Long): Boolean {
+                                transferred += bytes
+                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                                return this@withContext.isActive
+                            }
+                            override fun end() {}
+                        }
+                        if (isAppend) {
+                            channel.get(entry.path, out, monitor, ChannelSftp.RESUME, task.transferredBytes)
+                        } else {
+                            channel.get(entry.path, out, monitor)
+                        }
+                    } finally {
+                        if (channel.isConnected) channel.disconnect()
+                    }
+                }
+            }
+        }
+        
+        val currentState = _transfers.value.find { it.id == task.id }?.state
+        if (currentState == TransferState.DOWNLOADING) {
+            updateTask(task.id) { it.copy(state = TransferState.DONE) }
+            _lastDownload.value = DownloadResult(task.fileName, task.destinationUri)
+        }
+    }
+
+    private suspend fun performUpload(task: TransferTask) {
+        val sourceUri = task.sourceUri ?: return
+        val destPath = task.destPath ?: return
+        
+        withContext(Dispatchers.IO) {
+            val inputStream = appContext.contentResolver.openInputStream(sourceUri)
+                ?: throw IllegalStateException("Cannot open input stream")
+            inputStream.use { input ->
+                // Basic implementation skipping resume for upload for simplicity. 
+                // Always start from 0 for generic content URIs
+                if (task.isSmb) {
+                    val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
+                    client.upload(input, destPath, task.totalBytes) { transferred, _ ->
+                        updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                        this@withContext.isActive
+                    }
+                } else {
+                    val channel = openDedicatedSftpChannel(task.profileId) ?: throw IllegalStateException("Not connected")
+                    try {
+                        val monitor = object : SftpProgressMonitor {
+                            private var transferred = 0L
+                            override fun init(op: Int, src: String, dest: String, max: Long) {}
+                            override fun count(bytes: Long): Boolean {
+                                transferred += bytes
+                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                                return this@withContext.isActive
+                            }
+                            override fun end() {}
+                        }
+                        channel.put(input, destPath, monitor)
+                    } finally {
+                        if (channel.isConnected) channel.disconnect()
+                    }
+                }
+            }
+        }
+        val currentState = _transfers.value.find { it.id == task.id }?.state
+        if (currentState == TransferState.DOWNLOADING) {
+            updateTask(task.id) { it.copy(state = TransferState.DONE) }
+            refresh()
+        }
+    }
+
+    private fun updateTask(id: String, update: (TransferTask) -> TransferTask) {
+        _transfers.value = _transfers.value.map { if (it.id == id) update(it) else it }
+    }
+
+    fun pauseTransfer(id: String) {
+        transferJobs[id]?.cancel()
+        updateTask(id) { it.copy(state = TransferState.PAUSED) }
+    }
+
+    fun resumeTransfer(id: String) {
+        val task = _transfers.value.find { it.id == id } ?: return
+        val workingTask = if (task.isUpload) {
+            task.copy(state = TransferState.DOWNLOADING, error = null, transferredBytes = 0L)
+        } else {
+            task.copy(state = TransferState.DOWNLOADING, error = null)
+        }
+        updateTask(id) { workingTask }
+        startTransferJob(workingTask)
+    }
+
+    fun cancelTransfer(id: String) {
+        transferJobs[id]?.cancel()
+        // Try to remove from list entirely
+        _transfers.value = _transfers.value.filter { it.id != id }
+    }
+
+    fun removeTransfer(id: String) {
+        _transfers.value = _transfers.value.filter { it.id != id }
     }
 
     fun deleteEntry(entry: SftpEntry) {
@@ -677,6 +784,7 @@ class SftpViewModel @Inject constructor(
                 val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
                 client.download(entry.path, out) { transferred, total ->
                     _transferProgress.value = TransferProgress(entry.name, total, transferred)
+                    true
                 }
             } else {
                 val channel = getOrOpenChannel(profileId) ?: throw IllegalStateException("Not connected")
@@ -813,6 +921,23 @@ class SftpViewModel @Inject constructor(
             ?: return null
         sftpChannel = channel
         return channel
+    }
+
+    private fun openDedicatedSftpChannel(profileId: String): ChannelSftp? {
+        val sshSession = sessionManager.getSessionsForProfile(profileId)
+            .firstOrNull { it.status == sh.haven.core.ssh.SshSessionManager.SessionState.Status.CONNECTED }
+        if (sshSession != null) {
+            return sshSession.client.openSftpChannel()
+        }
+        val moshClient = moshSessionManager.getSshClientForProfile(profileId) as? SshClient
+        if (moshClient != null) {
+            return moshClient.openSftpChannel()
+        }
+        val etClient = etSessionManager.getSshClientForProfile(profileId) as? SshClient
+        if (etClient != null) {
+            return etClient.openSftpChannel()
+        }
+        return null
     }
 
     private fun openMoshSftpChannel(profileId: String): ChannelSftp? {

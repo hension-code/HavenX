@@ -71,7 +71,7 @@ class SmbClient : Closeable {
     fun download(
         remotePath: String,
         output: OutputStream,
-        onProgress: (transferred: Long, total: Long) -> Unit,
+        onProgress: (transferred: Long, total: Long) -> Boolean,
     ) {
         val diskShare = share ?: throw IllegalStateException("Not connected")
         val smbPath = toSmbPath(remotePath)
@@ -94,7 +94,7 @@ class SmbClient : Closeable {
                 if (read == -1) break
                 output.write(buffer, 0, read)
                 transferred += read
-                onProgress(transferred, size)
+                if (!onProgress(transferred, size)) break
             }
             output.flush()
         }
@@ -105,6 +105,7 @@ class SmbClient : Closeable {
         start: Long,
         length: Long,
         output: OutputStream,
+        onProgress: ((readBytes: Long) -> Boolean)? = null,
     ) {
         if (start < 0 || length < 0) throw IllegalArgumentException("Invalid range")
         if (length == 0L) return
@@ -129,6 +130,7 @@ class SmbClient : Closeable {
                 output.write(buffer, 0, read)
                 offset += read
                 remaining -= read
+                if (onProgress != null && !onProgress(read.toLong())) break
             }
             output.flush()
         }
@@ -138,7 +140,7 @@ class SmbClient : Closeable {
         input: InputStream,
         remotePath: String,
         size: Long,
-        onProgress: (transferred: Long, total: Long) -> Unit,
+        onProgress: (transferred: Long, total: Long) -> Boolean,
     ) {
         val diskShare = share ?: throw IllegalStateException("Not connected")
         val smbPath = toSmbPath(remotePath)
@@ -160,7 +162,7 @@ class SmbClient : Closeable {
                 if (read == -1) break
                 outputStream.write(buffer, 0, read)
                 transferred += read
-                onProgress(transferred, size)
+                if (!onProgress(transferred, size)) break
             }
             outputStream.flush()
         }

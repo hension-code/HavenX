@@ -267,7 +267,7 @@ class HavenDocumentsProvider : DocumentsProvider() {
                 return openWritableSmbFile(smbClient, path, cacheFile)
             }
             FileOutputStream(cacheFile).use { out ->
-                smbClient.download(path, out) { _, _ -> }
+                smbClient.download(path, out) { _, _ -> true }
             }
         } else {
             val channel = getSftpChannel(profileId)
@@ -299,7 +299,7 @@ class HavenDocumentsProvider : DocumentsProvider() {
             } else {
                 // Create empty file
                 "".byteInputStream().use { input ->
-                    smbClient.upload(input, childPath, 0) { _, _ -> }
+                    smbClient.upload(input, childPath, 0) { _, _ -> true }
                 }
             }
         } else {
@@ -437,7 +437,7 @@ class HavenDocumentsProvider : DocumentsProvider() {
             if (e == null) {
                 try {
                     cacheFile.inputStream().use { input ->
-                        client.upload(input, remotePath, cacheFile.length()) { _, _ -> }
+                        client.upload(input, remotePath, cacheFile.length()) { _, _ -> true }
                     }
                 } catch (ex: Exception) {
                     Log.e(TAG, "SMB write-back failed: $remotePath", ex)
