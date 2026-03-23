@@ -335,10 +335,20 @@ fun TerminalScreen(
                     }
 
                     val focusRequester = remember { FocusRequester() }
+                    var manuallyRequestedKeyboard by remember { mutableStateOf(false) }
+                    
+                    val isImeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+                    LaunchedEffect(isImeVisible) {
+                        if (!isImeVisible) {
+                            manuallyRequestedKeyboard = false
+                        }
+                    }
 
                     LaunchedEffect(isActive) {
                         if (isActive) {
                             focusRequester.requestFocus()
+                        } else {
+                            manuallyRequestedKeyboard = false
                         }
                     }
 
@@ -431,12 +441,13 @@ fun TerminalScreen(
                                 initialFontSize = fontSize.sp,
                                 typeface = terminalTypeface,
                                 keyboardEnabled = true,
-                                showSoftKeyboard = isActive,
+                                showSoftKeyboard = isActive && manuallyRequestedKeyboard,
                                 backgroundColor = Color(colorScheme.background),
                                 foregroundColor = Color(colorScheme.foreground),
                                 focusRequester = focusRequester,
                                 modifierManager = modifierManager,
                                 onSelectionControllerAvailable = { selectionController = it },
+                                onTerminalTap = { manuallyRequestedKeyboard = true },
                             )
                         }
 
