@@ -42,8 +42,7 @@
                 android:layout_height="100dp"
                 android:layout_gravity="center"
                 android:contentDescription="Album Art"
-                android:src="@android:drawable/ic_media_play"
-                android:tint="#88FFFFFF" />
+                android:src="@drawable/ic_placeholder_music" />
         </FrameLayout>
 
         <!-- Title -->
