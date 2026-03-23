@@ -435,6 +435,9 @@ fun SftpScreen(
                                     viewModel.navigateTo(path)
                                     showFavoritesMenu = false
                                 },
+                                onRemove = { path ->
+                                    viewModel.toggleFavoriteDirectory(path)
+                                }
                             )
                         }
                     }
@@ -655,16 +658,19 @@ fun SftpScreen(
                                 },
                                 onDelete = { entryToDelete = entry },
                                 onPreview = { viewModel.previewMedia(entry) },
-                                isFavoriteDirectory = viewModel.isFavoriteDirectory(entry.path),
+                                isFavoriteDirectory = favoriteDirectories.contains(entry.path),
                                 onToggleFavorite = {
-                                    val wasFav = viewModel.isFavoriteDirectory(entry.path)
+                                    val wasFav = favoriteDirectories.contains(entry.path)
                                     viewModel.toggleFavoriteDirectory(entry.path)
                                     val msg = if (wasFav) {
                                         if (zh) "已取消收藏" else "Favorite removed"
                                     } else {
                                         if (zh) "成功收藏目录" else "Directory favorited"
                                     }
-                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                    scope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        snackbarHostState.showSnackbar(msg)
+                                    }
                                 },
                                 onCopyPath = {
                                     clipboardManager.setText(AnnotatedString(entry.path))
@@ -1025,6 +1031,7 @@ private fun FavoritesDropdown(
     zh: Boolean,
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit,
+    onRemove: (String) -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (favorites.isEmpty()) {
@@ -1043,7 +1050,14 @@ private fun FavoritesDropdown(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                leadingIcon = { Icon(Icons.Filled.Star, null) },
+                leadingIcon = { 
+                    IconButton(
+                        onClick = { onRemove(path) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Filled.Star, stringResource(R.string.remove_favorite), tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
                 onClick = { onSelect(path) },
             )
         }
