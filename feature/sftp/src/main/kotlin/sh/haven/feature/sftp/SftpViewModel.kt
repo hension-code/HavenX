@@ -559,30 +559,43 @@ class SftpViewModel @Inject constructor(
                                             smbClient?.downloadRange(entry.path, start, length, output)
                                                 ?: error("SMB not connected")
                                         } else {
-                                            val channel = getOrOpenChannel(profileId) ?: error("Not connected")
-                                            val monitor = object : SftpProgressMonitor {
-                                                override fun init(op: Int, src: String, dest: String, max: Long) = Unit
-                                                override fun count(count: Long): Boolean = true
-                                                override fun end() = Unit
-                                            }
-                                            channel.get(entry.path, monitor, start).use { input ->
-                                                var remaining = length
-                                                val buffer = ByteArray(64 * 1024)
-                                                while (remaining > 0) {
-                                                    val read = input.read(
-                                                        buffer,
-                                                        0,
-                                                        minOf(buffer.size.toLong(), remaining).toInt(),
-                                                    )
-                                                    if (read <= 0) break
-                                                    output.write(buffer, 0, read)
-                                                    remaining -= read
+                                            val sshSession = sessionManager.getSessionsForProfile(profileId)
+                                                .firstOrNull { it.status == sh.haven.core.ssh.SshSessionManager.SessionState.Status.CONNECTED }
+                                            
+                                            // Ensure preview channel is localized to avoid UI or task channel freezing
+                                            val channel = sshSession?.client?.openSftpChannel()
+                                                ?: moshSessionManager.getSshClientForProfile(profileId)?.openSftpChannel()
+                                                ?: etSessionManager.getSshClientForProfile(profileId)?.openSftpChannel()
+                                                ?: error("Not connected")
+                                                
+                                            try {
+                                                val monitor = object : SftpProgressMonitor {
+                                                    override fun init(op: Int, src: String, dest: String, max: Long) = Unit
+                                                    override fun count(count: Long): Boolean = true
+                                                    override fun end() = Unit
                                                 }
+                                                channel.get(entry.path, monitor, start).use { input ->
+                                                    var remaining = length
+                                                    val buffer = ByteArray(64 * 1024)
+                                                    while (remaining > 0) {
+                                                        val read = input.read(
+                                                            buffer,
+                                                            0,
+                                                            minOf(buffer.size.toLong(), remaining).toInt(),
+                                                        )
+                                                        if (read <= 0) break
+                                                        output.write(buffer, 0, read)
+                                                        remaining -= read
+                                                    }
+                                                }
+                                            } finally {
+                                                if (channel.isConnected) channel.disconnect()
                                             }
                                         }
                                     }
                                 },
                             ),
+                            entry.name
                         )
                     }
                     _lastPreview.value = PreviewResult(

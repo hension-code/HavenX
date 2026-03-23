@@ -1045,7 +1045,7 @@ private fun isMediaPreviewSupported(name: String): Boolean {
     val ext = name.substringAfterLast('.', "").lowercase()
     if (ext.isBlank()) return false
     val image = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "svg")
-    val video = setOf("mp4", "m4v", "webm", "mkv", "mov", "avi")
+    val video = setOf("mp4", "m4v", "webm", "mkv", "mov", "avi", "flv", "ts")
     val audio = setOf("mp3", "m4a", "aac", "wav", "ogg", "oga", "flac")
     return ext in image || ext in video || ext in audio
 }

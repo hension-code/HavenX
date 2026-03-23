@@ -29,7 +29,7 @@ object LocalMediaPreviewServer {
     private val pool = Executors.newCachedThreadPool()
 
     @Synchronized
-    fun register(source: PreviewByteSource): String {
+    fun register(source: PreviewByteSource, fileName: String): String {
         ensureStarted()
         val token = UUID.randomUUID().toString()
         sources[token] = source
@@ -37,7 +37,7 @@ object LocalMediaPreviewServer {
             val first = sources.keys.firstOrNull()
             if (first != null) sources.remove(first)
         }
-        return "http://localhost:$port/media/$token"
+        return "http://localhost:$port/media/$token/${android.net.Uri.encode(fileName)}"
     }
 
     @Synchronized
@@ -79,7 +79,7 @@ object LocalMediaPreviewServer {
                     if (idx > 0) headers[line.substring(0, idx).trim().lowercase(Locale.ROOT)] = line.substring(idx + 1).trim()
                 }
 
-                val token = path.removePrefix("/media/").substringBefore('?')
+                val token = path.removePrefix("/media/").substringBefore('?').substringBefore('/')
                 val source = sources[token] ?: return writeError(output, 404, "Not Found")
                 if (source.totalSize <= 0L) {
                     val resp = "HTTP/1.1 200 OK\r\nContent-Type: ${source.mimeType}\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
