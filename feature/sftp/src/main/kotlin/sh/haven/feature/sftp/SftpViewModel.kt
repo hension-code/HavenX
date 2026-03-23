@@ -564,8 +564,8 @@ class SftpViewModel @Inject constructor(
                                             
                                             // Ensure preview channel is localized to avoid UI or task channel freezing
                                             val channel = sshSession?.client?.openSftpChannel()
-                                                ?: moshSessionManager.getSshClientForProfile(profileId)?.openSftpChannel()
-                                                ?: etSessionManager.getSshClientForProfile(profileId)?.openSftpChannel()
+                                                ?: (moshSessionManager.getSshClientForProfile(profileId) as? sh.haven.core.ssh.SshClient)?.openSftpChannel()
+                                                ?: (etSessionManager.getSshClientForProfile(profileId) as? sh.haven.core.ssh.SshClient)?.openSftpChannel()
                                                 ?: error("Not connected")
                                                 
                                             try {
