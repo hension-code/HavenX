@@ -345,9 +345,7 @@ fun TerminalScreen(
                     }
 
                     LaunchedEffect(isActive) {
-                        if (isActive) {
-                            focusRequester.requestFocus()
-                        } else {
+                        if (!isActive) {
                             manuallyRequestedKeyboard = false
                         }
                     }
