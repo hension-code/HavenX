@@ -202,6 +202,14 @@ class TerminalViewModel @Inject constructor(
                 UserPreferencesRepository.TerminalColorScheme.HAVEN,
             )
 
+    val terminalFont: StateFlow<UserPreferencesRepository.TerminalFont> =
+        preferencesRepository.terminalFont
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserPreferencesRepository.TerminalFont.SYSTEM,
+            )
+
     val snippets: StateFlow<List<sh.haven.core.data.db.entities.Snippet>> =
         snippetRepository.getAllSnippets()
             .stateIn(

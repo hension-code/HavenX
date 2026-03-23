@@ -19,6 +19,7 @@ class UserPreferencesRepository @Inject constructor(
 ) {
     private val biometricEnabledKey = booleanPreferencesKey("biometric_enabled")
     private val terminalFontSizeKey = intPreferencesKey("terminal_font_size")
+    private val terminalFontKey = stringPreferencesKey("terminal_font")
     private val themeKey = stringPreferencesKey("theme")
     private val sessionManagerKey = stringPreferencesKey("session_manager")
     private val reticulumRpcKeyKey = stringPreferencesKey("reticulum_rpc_key")
@@ -43,6 +44,10 @@ class UserPreferencesRepository @Inject constructor(
 
     val terminalFontSize: Flow<Int> = dataStore.data.map { prefs ->
         prefs[terminalFontSizeKey] ?: DEFAULT_FONT_SIZE
+    }
+
+    val terminalFont: Flow<TerminalFont> = dataStore.data.map { prefs ->
+        TerminalFont.fromString(prefs[terminalFontKey])
     }
 
     val sessionManager: Flow<SessionManager> = dataStore.data.map { prefs ->
@@ -72,6 +77,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setTerminalFontSize(sizeSp: Int) {
         dataStore.edit { prefs ->
             prefs[terminalFontSizeKey] = sizeSp.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
+        }
+    }
+
+    suspend fun setTerminalFont(font: TerminalFont) {
+        dataStore.edit { prefs ->
+            prefs[terminalFontKey] = font.name
         }
     }
 
@@ -283,6 +294,17 @@ class UserPreferencesRepository @Inject constructor(
         companion object {
             fun fromString(value: String?): TerminalColorScheme =
                 entries.find { it.name == value } ?: HAVEN
+        }
+    }
+
+    enum class TerminalFont(val label: String) {
+        SYSTEM("System default"),
+        FIRA_CODE("Fira Code"),
+        JETBRAINS_MONO("JetBrains Mono");
+
+        companion object {
+            fun fromString(value: String?): TerminalFont =
+                entries.find { it.name == value } ?: SYSTEM
         }
     }
 

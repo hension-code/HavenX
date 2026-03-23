@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardAlt
@@ -93,11 +94,13 @@ fun SettingsScreen(
     val languageMode by viewModel.languageMode.collectAsState()
     val sessionManager by viewModel.sessionManager.collectAsState()
     val colorScheme by viewModel.terminalColorScheme.collectAsState()
+    val terminalFont by viewModel.terminalFont.collectAsState()
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
     val toolbarLayoutJson by viewModel.toolbarLayoutJson.collectAsState()
     val backupStatus by viewModel.backupStatus.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
     var showSessionManagerDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showColorSchemeDialog by remember { mutableStateOf(false) }
@@ -180,6 +183,12 @@ fun SettingsScreen(
             title = stringResource(R.string.terminal_font_size),
             subtitle = "${fontSize}sp",
             onClick = { showFontSizeDialog = true },
+        )
+        SettingsItem(
+            icon = Icons.Filled.FontDownload,
+            title = if (zh) "终端字体" else "Terminal Font",
+            subtitle = terminalFont.label,
+            onClick = { showFontDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.Palette,
@@ -383,6 +392,18 @@ fun SettingsScreen(
             onConfirm = { newSize ->
                 viewModel.setTerminalFontSize(newSize)
                 showFontSizeDialog = false
+            },
+        )
+    }
+
+    if (showFontDialog) {
+        FontDialog(
+            currentFont = terminalFont,
+            zh = zh,
+            onDismiss = { showFontDialog = false },
+            onSelect = { selected ->
+                viewModel.setTerminalFont(selected)
+                showFontDialog = false
             },
         )
     }
@@ -786,6 +807,35 @@ private fun ThemeDialog(
                         selected = mode == currentTheme,
                         onClick = { onSelect(mode) },
                         headline = { Text(themeModeLabel(mode, zh)) },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun FontDialog(
+    currentFont: UserPreferencesRepository.TerminalFont,
+    zh: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (UserPreferencesRepository.TerminalFont) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (zh) "终端字体" else "Terminal Font") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                UserPreferencesRepository.TerminalFont.entries.forEach { font ->
+                    SelectableDialogRow(
+                        selected = font == currentFont,
+                        onClick = { onSelect(font) },
+                        headline = { Text(font.label) },
                     )
                 }
             }

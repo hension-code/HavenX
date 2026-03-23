@@ -85,6 +85,14 @@ class SettingsViewModel @Inject constructor(
             UserPreferencesRepository.DEFAULT_FONT_SIZE,
         )
 
+    val terminalFont: StateFlow<UserPreferencesRepository.TerminalFont> =
+        preferencesRepository.terminalFont
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserPreferencesRepository.TerminalFont.SYSTEM,
+            )
+
     val theme: StateFlow<UserPreferencesRepository.ThemeMode> = preferencesRepository.theme
         .stateIn(
             viewModelScope,
@@ -160,6 +168,12 @@ class SettingsViewModel @Inject constructor(
     fun setTerminalFontSize(sizeSp: Int) {
         viewModelScope.launch {
             preferencesRepository.setTerminalFontSize(sizeSp)
+        }
+    }
+
+    fun setTerminalFont(font: UserPreferencesRepository.TerminalFont) {
+        viewModelScope.launch {
+            preferencesRepository.setTerminalFont(font)
         }
     }
 

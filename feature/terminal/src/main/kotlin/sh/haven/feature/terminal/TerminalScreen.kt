@@ -113,6 +113,7 @@ fun TerminalScreen(
     val ctrlActive by viewModel.ctrlActive.collectAsState()
     val altActive by viewModel.altActive.collectAsState()
     val colorScheme by viewModel.terminalColorScheme.collectAsState()
+    val terminalFont by viewModel.terminalFont.collectAsState()
     val navigateToConnections by viewModel.navigateToConnections.collectAsState()
     val newTabSessionPicker by viewModel.newTabSessionPicker.collectAsState()
     val newTabLoading by viewModel.newTabLoading.collectAsState()
@@ -121,9 +122,15 @@ fun TerminalScreen(
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val context = LocalContext.current
-    val hackTypeface = remember {
-        ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.hack_regular)
-            ?: android.graphics.Typeface.MONOSPACE
+    val terminalTypeface = remember(terminalFont) {
+        when (terminalFont) {
+            UserPreferencesRepository.TerminalFont.FIRA_CODE ->
+                ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.firacode) ?: android.graphics.Typeface.MONOSPACE
+            UserPreferencesRepository.TerminalFont.JETBRAINS_MONO ->
+                ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.jetbrains_mono) ?: android.graphics.Typeface.MONOSPACE
+            else ->
+                ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.hack_regular) ?: android.graphics.Typeface.MONOSPACE
+        }
     }
     val view = LocalView.current
 
@@ -422,7 +429,7 @@ fun TerminalScreen(
                                 terminalEmulator = activeTab.emulator,
                                 modifier = Modifier.fillMaxSize(),
                                 initialFontSize = fontSize.sp,
-                                typeface = hackTypeface,
+                                typeface = terminalTypeface,
                                 keyboardEnabled = true,
                                 showSoftKeyboard = isActive,
                                 backgroundColor = Color(colorScheme.background),
