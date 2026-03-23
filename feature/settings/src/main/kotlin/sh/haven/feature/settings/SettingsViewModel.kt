@@ -198,4 +198,69 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.setToolbarLayoutJson(json)
         }
     }
+
+    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
+
+    sealed interface UpdateState {
+        data object Idle : UpdateState
+        data object Checking : UpdateState
+        data class Available(val versionName: String, val releaseNotes: String, val downloadUrl: String) : UpdateState
+        data object UpToDate : UpdateState
+        data class Error(val message: String) : UpdateState
+    }
+
+    fun checkUpdate(currentVersion: String) {
+        if (_updateState.value is UpdateState.Checking) return
+        _updateState.value = UpdateState.Checking
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/hension-code/HavenX/releases/latest")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                
+                if (connection.responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    try {
+                        val json = org.json.JSONObject(response)
+                        val latestVersion = json.optString("tag_name", "").removePrefix("v")
+                        val releaseNotes = json.optString("body", "")
+                        val assets = json.optJSONArray("assets")
+                        var downloadUrl = ""
+                        if (assets != null) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                if (asset.optString("name", "").endsWith(".apk")) {
+                                    downloadUrl = asset.optString("browser_download_url", "")
+                                    break
+                                }
+                            }
+                        }
+                        
+                        if (latestVersion.isNotEmpty() && downloadUrl.isNotEmpty()) {
+                            val currentClean = currentVersion.removePrefix("v")
+                            if (latestVersion != currentClean) {
+                                _updateState.value = UpdateState.Available(latestVersion, releaseNotes, downloadUrl)
+                            } else {
+                                _updateState.value = UpdateState.UpToDate
+                            }
+                        } else {
+                            _updateState.value = UpdateState.Error("No APK found in release")
+                        }
+                    } catch (e: Exception) {
+                        _updateState.value = UpdateState.Error("Invalid response format")
+                    }
+                } else {
+                    _updateState.value = UpdateState.Error("HTTP ${connection.responseCode}")
+                }
+            } catch (e: Exception) {
+                _updateState.value = UpdateState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    fun resetUpdateState() {
+        _updateState.value = UpdateState.Idle
+    }
 }

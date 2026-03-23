@@ -1,5 +1,6 @@
 package sh.haven.feature.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -95,6 +96,7 @@ fun SettingsScreen(
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
     val toolbarLayoutJson by viewModel.toolbarLayoutJson.collectAsState()
     val backupStatus by viewModel.backupStatus.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showSessionManagerDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -249,6 +251,12 @@ fun SettingsScreen(
     } // scrollable Column
     } // outer Column
 
+    LaunchedEffect(updateState) {
+        if (updateState is SettingsViewModel.UpdateState.Available) {
+            showAboutDialog = false
+        }
+    }
+
     if (showAboutDialog) {
         AboutDialog(
             versionName = packageInfo.versionName ?: "unknown",
@@ -258,11 +266,30 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 packageInfo.versionCode.toLong()
             },
+            updateState = updateState,
             zh = zh,
-            onDismiss = { showAboutDialog = false },
+            onCheckUpdate = { viewModel.checkUpdate(packageInfo.versionName ?: "") },
+            onDismiss = { 
+                showAboutDialog = false
+                viewModel.resetUpdateState()
+            },
             onOpenGitHub = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-            },
+            }
+        )
+    }
+    
+    if (updateState is SettingsViewModel.UpdateState.Available) {
+        val availableState = updateState as SettingsViewModel.UpdateState.Available
+        UpdateDialog(
+            versionName = availableState.versionName,
+            releaseNotes = availableState.releaseNotes,
+            downloadUrl = availableState.downloadUrl,
+            zh = zh,
+            onDismiss = { 
+                viewModel.resetUpdateState()
+                showAboutDialog = false
+            }
         )
     }
 
@@ -496,7 +523,9 @@ private const val GITHUB_URL = "https://github.com/hension-code/HavenX"
 private fun AboutDialog(
     versionName: String,
     versionCode: Long,
+    updateState: SettingsViewModel.UpdateState,
     zh: Boolean,
+    onCheckUpdate: () -> Unit,
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
 ) {
@@ -531,15 +560,178 @@ private fun AboutDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onOpenGitHub) {
+                    Text("GitHub")
+                }
+                
+                when (updateState) {
+                    is SettingsViewModel.UpdateState.Idle -> {
+                        TextButton(onClick = onCheckUpdate) {
+                            Text(if (zh) "检查更新" else "Check Updates")
+                        }
+                    }
+                    is SettingsViewModel.UpdateState.Checking -> {
+                        TextButton(onClick = {}, enabled = false) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                    is SettingsViewModel.UpdateState.Available -> {
+                        TextButton(onClick = {}, enabled = false) {
+                            Text(if (zh) "发现新版本" else "Update found")
+                        }
+                    }
+                    is SettingsViewModel.UpdateState.UpToDate -> {
+                        TextButton(onClick = {}, enabled = false) {
+                            Text(if (zh) "已是最新" else "Up to date")
+                        }
+                    }
+                    is SettingsViewModel.UpdateState.Error -> {
+                        TextButton(onClick = onCheckUpdate) {
+                            Text(if (zh) "重试" else "Retry")
+                        }
+                    }
+                }
+                
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+        },
+    )
+}
+
+@Composable
+fun UpdateDialog(
+    versionName: String,
+    releaseNotes: String,
+    downloadUrl: String,
+    zh: Boolean,
+    onDismiss: () -> Unit,
+) {
+    var downloadId by remember { mutableStateOf<Long?>(null) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var isDownloading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(downloadId) {
+        if (downloadId == null) return@LaunchedEffect
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+        while (isDownloading) {
+            val q = android.app.DownloadManager.Query().setFilterById(downloadId!!)
+            val c = dm.query(q)
+            if (c != null && c.moveToFirst()) {
+                val downloadedIndex = c.getColumnIndex(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                val totalIndex = c.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                val statusIndex = c.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
+                if (downloadedIndex != -1 && totalIndex != -1 && statusIndex != -1) {
+                    val bytesDownloaded = c.getInt(downloadedIndex)
+                    val bytesTotal = c.getInt(totalIndex)
+                    val status = c.getInt(statusIndex)
+                    
+                    if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                        isDownloading = false
+                        progress = 1f
+                        val uri = dm.getUriForDownloadedFile(downloadId!!)
+                        if (uri != null) {
+                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            try {
+                                context.startActivity(installIntent)
+                            } catch (e: Exception) {}
+                        }
+                        onDismiss()
+                        break
+                    } else if (status == android.app.DownloadManager.STATUS_FAILED) {
+                        isDownloading = false
+                        onDismiss()
+                        break
+                    } else {
+                        if (bytesTotal > 0) {
+                            progress = bytesDownloaded.toFloat() / bytesTotal.toFloat()
+                        }
+                    }
+                }
+            }
+            c?.close()
+            kotlinx.coroutines.delay(200)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            downloadId?.let { id ->
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                dm.remove(id)
+            }
+            onDismiss()
+        },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = !isDownloading,
+            dismissOnClickOutside = !isDownloading
+        ),
+        title = { Text(if (zh) "发现新版本" else "Update Available") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "v$versionName",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                if (isDownloading) {
+                    Text(if (zh) "正在下载..." else "Downloading...")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = releaseNotes.takeIf { it.isNotBlank() } ?: (if (zh) "暂无更新说明" else "No release notes provided"),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (!isDownloading) {
+                TextButton(
+                    onClick = {
+                        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        val request = android.app.DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+                            setTitle("HavenX Update")
+                            setDescription(if (zh) "正在下载更新..." else "Downloading update...")
+                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "HavenX-Update.apk")
+                        }
+                        downloadId = dm.enqueue(request)
+                        isDownloading = true
+                    }
+                ) {
+                    Text(if (zh) "立即更新" else "Update Now")
+                }
+            } else {
+                TextButton(onClick = {}, enabled = false) {
+                    Text("${(progress * 100).toInt()}%")
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onOpenGitHub) {
-                Text("GitHub")
+            TextButton(
+                onClick = {
+                    downloadId?.let { id ->
+                        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        dm.remove(id)
+                    }
+                    onDismiss()
+                }
+            ) {
+                Text(if (zh) "取消" else "Cancel")
             }
-        },
+        }
     )
 }
 
