@@ -20,3 +20,8 @@ com/jcraft/jsch/
 .kotlin/
 **/.kotlin/
 *.salive
+*.dm
+output-metadata.json
+/*/release/
+/*/debug/
+/releases/
