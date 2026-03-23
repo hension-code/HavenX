@@ -656,7 +656,16 @@ fun SftpScreen(
                                 onDelete = { entryToDelete = entry },
                                 onPreview = { viewModel.previewMedia(entry) },
                                 isFavoriteDirectory = viewModel.isFavoriteDirectory(entry.path),
-                                onToggleFavorite = { viewModel.toggleFavoriteDirectory(entry.path) },
+                                onToggleFavorite = {
+                                    val wasFav = viewModel.isFavoriteDirectory(entry.path)
+                                    viewModel.toggleFavoriteDirectory(entry.path)
+                                    val msg = if (wasFav) {
+                                        if (zh) "已取消收藏" else "Favorite removed"
+                                    } else {
+                                        if (zh) "成功收藏目录" else "Directory favorited"
+                                    }
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                },
                                 onCopyPath = {
                                     clipboardManager.setText(AnnotatedString(entry.path))
                                     scope.launch {

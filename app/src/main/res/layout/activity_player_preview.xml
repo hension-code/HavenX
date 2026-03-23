@@ -3,7 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#121212">
+
+    <!-- Gradient Background for Audio Player -->
+    <View
+        android:id="@+id/audioBackgroundGradient"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_audio_player"
+        android:visibility="gone" />
 
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
@@ -21,36 +29,61 @@
         android:padding="32dp"
         android:visibility="gone">
 
-        <ImageButton
-            android:id="@+id/audioPlayPause"
-            android:layout_width="240dp"
-            android:layout_height="240dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="Play/Pause"
-            android:src="@android:drawable/ic_media_pause"
-            android:tint="#FFFFFF" />
+        <!-- Album Art Placeholder -->
+        <FrameLayout
+            android:layout_width="260dp"
+            android:layout_height="260dp"
+            android:layout_marginBottom="48dp"
+            android:background="@drawable/bg_album_art_placeholder"
+            android:elevation="12dp">
+            
+            <ImageView
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:layout_gravity="center"
+                android:contentDescription="Album Art"
+                android:src="@android:drawable/ic_media_play"
+                android:tint="#88FFFFFF" />
+        </FrameLayout>
 
+        <!-- Title -->
         <TextView
             android:id="@+id/audioTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:ellipsize="marquee"
+            android:singleLine="true"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:ellipsize="middle"
-            android:maxLines="2"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp" />
+            android:layout_marginTop="8dp"
+            android:text="SFTP Media Stream"
+            android:textColor="#B3FFFFFF"
+            android:textSize="14sp" />
 
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="32dp" />
+
+        <!-- Progress Bar -->
         <SeekBar
             android:id="@+id/audioSeekBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:max="1000" />
+            android:max="1000"
+            android:progressTint="#1DB954"
+            android:thumbTint="#1DB954" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
+            android:paddingHorizontal="12dp"
             android:orientation="horizontal">
 
             <TextView
@@ -59,7 +92,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="00:00"
-                android:textColor="#FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="12sp" />
 
             <TextView
@@ -67,8 +100,29 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="00:00"
-                android:textColor="#FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="12sp" />
+        </LinearLayout>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+        <!-- Controls -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/audioPlayPause"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_play_pause_button"
+                android:contentDescription="Play/Pause"
+                android:src="@android:drawable/ic_media_pause"
+                android:tint="#121212" />
         </LinearLayout>
 
     </LinearLayout>

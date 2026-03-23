@@ -44,6 +44,7 @@ class PlayerPreviewActivity : AppCompatActivity() {
 
         val playerView = findViewById<PlayerView>(R.id.playerView)
         val audioPanel = findViewById<View>(R.id.audioPanel)
+        val audioBackgroundGradient = findViewById<View>(R.id.audioBackgroundGradient)
         val titleText = findViewById<TextView>(R.id.audioTitle)
         val audioPlayPause = findViewById<ImageButton>(R.id.audioPlayPause)
         val audioSeekBar = findViewById<SeekBar>(R.id.audioSeekBar)
@@ -54,6 +55,7 @@ class PlayerPreviewActivity : AppCompatActivity() {
             playerView.useController = false
             playerView.visibility = View.GONE
             audioPanel.visibility = View.VISIBLE
+            audioBackgroundGradient.visibility = View.VISIBLE
             titleText.text = remotePath.substringAfterLast('/')
         }
 
