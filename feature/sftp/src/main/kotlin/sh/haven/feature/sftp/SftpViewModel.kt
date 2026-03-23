@@ -36,49 +36,7 @@ import javax.inject.Inject
 
 private const val TAG = "SftpViewModel"
 
-data class SftpEntry(
-    val name: String,
-    val path: String,
-    val isDirectory: Boolean,
-    val size: Long,
-    val modifiedTime: Long,
-    val permissions: String,
-)
-
-enum class SortMode {
-    NAME_ASC, NAME_DESC, SIZE_ASC, SIZE_DESC, DATE_ASC, DATE_DESC
-}
-
-enum class TransferState { DOWNLOADING, PAUSED, CANCELLED, DONE, ERROR }
-
-data class TransferTask(
-    val id: String,
-    val fileName: String,
-    val totalBytes: Long,
-    val transferredBytes: Long,
-    val state: TransferState,
-    val isUpload: Boolean = false,
-    val destPath: String? = null,
-    val sourceUri: Uri? = null,
-    val destinationUri: Uri? = null,
-    val entry: SftpEntry? = null,
-    val profileId: String,
-    val isSmb: Boolean,
-    val error: String? = null
-) {
-    val fraction: Float
-        get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
-}
-
-/** Transfer progress for generic operations. */
-data class TransferProgress(
-    val fileName: String,
-    val totalBytes: Long,
-    val transferredBytes: Long,
-) {
-    val fraction: Float
-        get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
-}
+// Models have been moved to SftpModels.kt
 
 @HiltViewModel
 class SftpViewModel @Inject constructor(
@@ -89,6 +47,7 @@ class SftpViewModel @Inject constructor(
     private val repository: ConnectionRepository,
     private val preferencesRepository: UserPreferencesRepository,
     @ApplicationContext private val appContext: Context,
+    private val transferManager: sh.haven.feature.sftp.transfer.SftpTransferManager,
 ) : ViewModel() {
     private val backHistory = ArrayDeque<String>()
     private val forwardHistory = ArrayDeque<String>()
@@ -121,9 +80,7 @@ class SftpViewModel @Inject constructor(
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    private val _transfers = MutableStateFlow<List<TransferTask>>(emptyList())
-    val transfers: StateFlow<List<TransferTask>> = _transfers.asStateFlow()
-    private val transferJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
+    val transfers: StateFlow<List<TransferTask>> = transferManager.transfers
 
     private val _transferProgress = MutableStateFlow<TransferProgress?>(null)
     val transferProgress: StateFlow<TransferProgress?> = _transferProgress.asStateFlow()
@@ -179,6 +136,28 @@ class SftpViewModel @Inject constructor(
             preferencesRepository.sftpShowHidden.collectLatest { hidden ->
                 _showHidden.value = hidden
                 applyFilter()
+            }
+        }
+        
+        // Observe transfer completions
+        viewModelScope.launch {
+            var previousTransfers = emptyList<TransferTask>()
+            transferManager.transfers.collectLatest { currentTransfers ->
+                currentTransfers.forEach { currentTask ->
+                    val prevTask = previousTransfers.find { it.id == currentTask.id }
+                    if (prevTask?.state == TransferState.DOWNLOADING && currentTask.state == TransferState.DONE) {
+                        if (currentTask.isUpload) {
+                            if (currentTask.profileId == _activeProfileId.value) {
+                                refresh()
+                            }
+                        } else {
+                            if (currentTask.destinationUri != null) {
+                                _lastDownload.value = DownloadResult(currentTask.fileName, currentTask.destinationUri)
+                            }
+                        }
+                    }
+                }
+                previousTransfers = currentTransfers
             }
         }
     }
@@ -416,8 +395,7 @@ class SftpViewModel @Inject constructor(
             profileId = profileId,
             isSmb = _isSmbProfile.value
         )
-        _transfers.value = _transfers.value + task
-        startTransferJob(task)
+        transferManager.addTask(task)
     }
 
     fun uploadFile(fileName: String, sourceUri: Uri) {
@@ -443,157 +421,24 @@ class SftpViewModel @Inject constructor(
                 profileId = profileId,
                 isSmb = _isSmbProfile.value
             )
-            _transfers.value = _transfers.value + task
-            startTransferJob(task)
+            transferManager.addTask(task)
         }
-    }
-
-    private fun startTransferJob(initialTask: TransferTask) {
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (initialTask.isUpload) {
-                    performUpload(initialTask)
-                } else {
-                    performDownload(initialTask)
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // Ignore
-            } catch (e: Exception) {
-                Log.e(TAG, "Transfer failed: ${initialTask.fileName}", e)
-                updateTask(initialTask.id) { it.copy(state = TransferState.ERROR, error = e.message) }
-            }
-        }
-        transferJobs[initialTask.id] = job
-    }
-
-    private suspend fun performDownload(task: TransferTask) {
-        val entry = task.entry ?: return
-        val destUri = task.destinationUri ?: return
-        val isAppend = task.transferredBytes > 0
-        val mode = if (isAppend) "wa" else "w"
-        
-        withContext(Dispatchers.IO) {
-            val outputStream = appContext.contentResolver.openOutputStream(destUri, mode)
-                ?: throw IllegalStateException("Cannot open output stream")
-            outputStream.use { out ->
-                if (task.isSmb) {
-                    val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
-                    var current = task.transferredBytes
-                    if (isAppend && current > 0) {
-                        client.downloadRange(entry.path, current, task.totalBytes - current, out) {
-                            current += it
-                            updateTask(task.id) { t -> t.copy(transferredBytes = current) }
-                            this@withContext.isActive
-                        }
-                    } else {
-                        client.download(entry.path, out) { transferred, _ ->
-                            updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
-                            this@withContext.isActive
-                        }
-                    }
-                } else {
-                    val channel = openDedicatedSftpChannel(task.profileId) ?: throw IllegalStateException("Not connected")
-                    try {
-                        val monitor = object : SftpProgressMonitor {
-                            private var transferred = task.transferredBytes
-                            override fun init(op: Int, src: String, dest: String, max: Long) {}
-                            override fun count(bytes: Long): Boolean {
-                                transferred += bytes
-                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
-                                return this@withContext.isActive
-                            }
-                            override fun end() {}
-                        }
-                        if (isAppend) {
-                            channel.get(entry.path, out, monitor, ChannelSftp.RESUME, task.transferredBytes)
-                        } else {
-                            channel.get(entry.path, out, monitor)
-                        }
-                    } finally {
-                        if (channel.isConnected) channel.disconnect()
-                    }
-                }
-            }
-        }
-        
-        val currentState = _transfers.value.find { it.id == task.id }?.state
-        if (currentState == TransferState.DOWNLOADING) {
-            updateTask(task.id) { it.copy(state = TransferState.DONE) }
-            _lastDownload.value = DownloadResult(task.fileName, task.destinationUri)
-        }
-    }
-
-    private suspend fun performUpload(task: TransferTask) {
-        val sourceUri = task.sourceUri ?: return
-        val destPath = task.destPath ?: return
-        
-        withContext(Dispatchers.IO) {
-            val inputStream = appContext.contentResolver.openInputStream(sourceUri)
-                ?: throw IllegalStateException("Cannot open input stream")
-            inputStream.use { input ->
-                // Basic implementation skipping resume for upload for simplicity. 
-                // Always start from 0 for generic content URIs
-                if (task.isSmb) {
-                    val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
-                    client.upload(input, destPath, task.totalBytes) { transferred, _ ->
-                        updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
-                        this@withContext.isActive
-                    }
-                } else {
-                    val channel = openDedicatedSftpChannel(task.profileId) ?: throw IllegalStateException("Not connected")
-                    try {
-                        val monitor = object : SftpProgressMonitor {
-                            private var transferred = 0L
-                            override fun init(op: Int, src: String, dest: String, max: Long) {}
-                            override fun count(bytes: Long): Boolean {
-                                transferred += bytes
-                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
-                                return this@withContext.isActive
-                            }
-                            override fun end() {}
-                        }
-                        channel.put(input, destPath, monitor)
-                    } finally {
-                        if (channel.isConnected) channel.disconnect()
-                    }
-                }
-            }
-        }
-        val currentState = _transfers.value.find { it.id == task.id }?.state
-        if (currentState == TransferState.DOWNLOADING) {
-            updateTask(task.id) { it.copy(state = TransferState.DONE) }
-            refresh()
-        }
-    }
-
-    private fun updateTask(id: String, update: (TransferTask) -> TransferTask) {
-        _transfers.value = _transfers.value.map { if (it.id == id) update(it) else it }
     }
 
     fun pauseTransfer(id: String) {
-        transferJobs[id]?.cancel()
-        updateTask(id) { it.copy(state = TransferState.PAUSED) }
+        transferManager.pauseTransfer(id)
     }
 
     fun resumeTransfer(id: String) {
-        val task = _transfers.value.find { it.id == id } ?: return
-        val workingTask = if (task.isUpload) {
-            task.copy(state = TransferState.DOWNLOADING, error = null, transferredBytes = 0L)
-        } else {
-            task.copy(state = TransferState.DOWNLOADING, error = null)
-        }
-        updateTask(id) { workingTask }
-        startTransferJob(workingTask)
+        transferManager.resumeTransfer(id)
     }
 
     fun cancelTransfer(id: String) {
-        transferJobs[id]?.cancel()
-        // Try to remove from list entirely
-        _transfers.value = _transfers.value.filter { it.id != id }
+        transferManager.cancelTransfer(id)
     }
 
     fun removeTransfer(id: String) {
-        _transfers.value = _transfers.value.filter { it.id != id }
+        transferManager.removeTransfer(id)
     }
 
     fun deleteEntry(entry: SftpEntry) {

@@ -20,6 +20,7 @@ core-ktx = "1.17.0"
 activity-compose = "1.10.1"
 ksp = "2.3.6"
 chaquopy = "17.0.0"
+kotlinx-serialization = "1.6.3"
 
 [libraries]
 # Compose BOM
@@ -78,6 +79,7 @@ jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 # Coroutines
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }
@@ -94,6 +96,7 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 chaquopy = { id = "com.chaquo.python", version.ref = "chaquopy" }

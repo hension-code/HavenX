@@ -49,6 +49,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name="sh.haven.feature.sftp.transfer.SftpTransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <provider
             android:name=".HavenDocumentsProvider"
             android:authorities="${applicationId}.provider"
