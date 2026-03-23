@@ -61,11 +61,15 @@ internal class ImeInputView(
             }
         }
 
+    @Volatile
+    private var isImeAllowed: Boolean = false
+
     /**
      * Show the IME forcefully. This is more reliable than SoftwareKeyboardController.
      */
     @Suppress("DEPRECATION")
     fun showIme() {
+        isImeAllowed = true
         isFocusable = true
         isFocusableInTouchMode = true
         if (requestFocus()) {
@@ -77,6 +81,7 @@ internal class ImeInputView(
      * Hide the IME.
      */
     fun hideIme() {
+        isImeAllowed = false
         inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
         isFocusable = false
         isFocusableInTouchMode = false
@@ -89,7 +94,9 @@ internal class ImeInputView(
         hideIme()
     }
 
-    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        if (!isImeAllowed) return null
+
         // Configure IME options
         outAttrs.imeOptions = outAttrs.imeOptions or
                 EditorInfo.IME_FLAG_NO_EXTRACT_UI or
@@ -117,7 +124,7 @@ internal class ImeInputView(
         return TerminalInputConnection(this, isComposeModeActive).also { activeConnection = it }
     }
 
-    override fun onCheckIsTextEditor(): Boolean = true
+    override fun onCheckIsTextEditor(): Boolean = isImeAllowed
 
     private var activeConnection: TerminalInputConnection? = null
 
