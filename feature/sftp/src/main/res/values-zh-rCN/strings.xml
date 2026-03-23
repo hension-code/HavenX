@@ -25,6 +25,9 @@
     <string name="add_favorite">收藏目录</string>
     <string name="copy_path">复制路径</string>
     <string name="delete">删除</string>
+    <string name="delete_file_confirm">确定要删除文件“%1$s”吗？</string>
+    <string name="delete_folder_confirm">确定要删除文件夹“%1$s”及其所有内容吗？</string>
+    <string name="cancel_button">取消</string>
     <string name="no_favorites_yet">暂无收藏目录</string>
     <string name="root">根目录</string>
     <string name="name_a_z">名称 A-Z</string>

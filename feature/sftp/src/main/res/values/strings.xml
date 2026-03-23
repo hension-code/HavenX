@@ -25,6 +25,9 @@
     <string name="add_favorite">Add favorite</string>
     <string name="copy_path">Copy path</string>
     <string name="delete">Delete</string>
+    <string name="delete_file_confirm">Are you sure you want to delete file \"%1$s\"?</string>
+    <string name="delete_folder_confirm">Are you sure you want to delete folder \"%1$s\" and all its contents?</string>
+    <string name="cancel_button">Cancel</string>
     <string name="no_favorites_yet">No favorites yet</string>
     <string name="root">Root</string>
     <string name="name_a_z">Name A-Z</string>

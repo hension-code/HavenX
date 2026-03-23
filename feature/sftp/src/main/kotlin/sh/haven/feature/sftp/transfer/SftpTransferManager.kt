@@ -203,7 +203,10 @@ class SftpTransferManager @Inject constructor(
 
     private fun openDedicatedSftpChannel(profileId: String): ChannelSftp? {
         var channel: ChannelSftp? = try {
-            sessionManager.openSftpForProfile(profileId)
+            val session = sessionManager.sessions.value.values.firstOrNull { 
+                it.profileId == profileId && it.status == SshSessionManager.SessionState.Status.CONNECTED 
+            }
+            session?.client?.openSftpChannel()
         } catch (e: Exception) { null }
         if (channel == null) {
             channel = try {

@@ -607,6 +607,35 @@ fun SftpScreen(
                         )
                     }
                 } else {
+                    var entryToDelete by remember { mutableStateOf<SftpEntry?>(null) }
+
+                    if (entryToDelete != null) {
+                        val entry = entryToDelete!!
+                        val formatText = if (entry.isDirectory) stringResource(R.string.delete_folder_confirm) else stringResource(R.string.delete_file_confirm)
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { entryToDelete = null },
+                            title = { Text(stringResource(R.string.delete)) },
+                            text = { Text(String.format(formatText, entry.name)) },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        viewModel.deleteEntry(entry)
+                                        entryToDelete = null
+                                    }
+                                ) {
+                                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { entryToDelete = null }
+                                ) {
+                                    Text(stringResource(R.string.cancel_button))
+                                }
+                            }
+                        )
+                    }
+
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(entries, key = { it.path }) { entry ->
                             val pathCopiedMsg = stringResource(R.string.path_copied)
@@ -624,7 +653,7 @@ fun SftpScreen(
                                     val destFile = java.io.File(havenDir, entry.name)
                                     viewModel.downloadFile(entry, android.net.Uri.fromFile(destFile))
                                 },
-                                onDelete = { viewModel.deleteEntry(entry) },
+                                onDelete = { entryToDelete = entry },
                                 onPreview = { viewModel.previewMedia(entry) },
                                 isFavoriteDirectory = viewModel.isFavoriteDirectory(entry.path),
                                 onToggleFavorite = { viewModel.toggleFavoriteDirectory(entry.path) },
