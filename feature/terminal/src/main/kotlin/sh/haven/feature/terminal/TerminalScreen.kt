@@ -1,6 +1,5 @@
 package sh.haven.feature.terminal
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -62,7 +61,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.IntSize
@@ -71,10 +69,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.core.content.res.ResourcesCompat
-import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.core.view.WindowInsetsCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.connectbot.terminal.ModifierManager
 import org.connectbot.terminal.Terminal
@@ -132,23 +128,10 @@ fun TerminalScreen(
                 ResourcesCompat.getFont(context, sh.haven.core.ui.R.font.hack_regular) ?: android.graphics.Typeface.MONOSPACE
         }
     }
-    val view = LocalView.current
-
     LaunchedEffect(navigateToConnections) {
         if (navigateToConnections) {
             onNavigateToConnections()
             viewModel.onNavigatedToConnections()
-        }
-    }
-
-    // Show/hide keyboard when this tab becomes active/inactive
-    LaunchedEffect(isActive) {
-        val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
-        val controller = WindowCompat.getInsetsController(window, view)
-        if (isActive && tabs.isNotEmpty()) {
-            controller.show(WindowInsetsCompat.Type.ime())
-        } else if (!isActive) {
-            controller.hide(WindowInsetsCompat.Type.ime())
         }
     }
 
