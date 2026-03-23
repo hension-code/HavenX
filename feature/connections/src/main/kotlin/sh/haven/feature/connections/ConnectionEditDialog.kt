@@ -34,6 +34,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,9 +126,9 @@ fun ConnectionEditDialog(
     val isEdit = existing != null
     val zh = Locale.current.language == "zh"
     val title = if (isEdit) {
-        if (zh) "编辑连接" else "Edit Connection"
+        stringResource(R.string.edit_connection)
     } else {
-        if (zh) "新建连接" else "New Connection"
+        stringResource(R.string.new_connection)
     }
 
     AlertDialog(
@@ -139,11 +140,11 @@ fun ConnectionEditDialog(
                 val transportOptions = listOf(
                     "SSH" to "SSH",
                     "MOSH" to "Mosh",
-                    "ET" to if (zh) "Eternal Terminal" else "Eternal Terminal",
-                    "VNC" to if (zh) "VNC（桌面）" else "VNC (Desktop)",
-                    "RDP" to if (zh) "RDP（桌面）" else "RDP (Desktop)",
-                    "SMB" to if (zh) "SMB（文件共享）" else "SMB (File Share)",
-                    "RETICULUM" to if (zh) "Reticulum" else "Reticulum",
+                    "ET" to stringResource(R.string.eternal_terminal),
+                    "VNC" to stringResource(R.string.vnc_desktop),
+                    "RDP" to stringResource(R.string.rdp_desktop),
+                    "SMB" to stringResource(R.string.smb_file_share),
+                    "RETICULUM" to stringResource(R.string.reticulum),
                 )
                 var transportExpanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
@@ -154,7 +155,7 @@ fun ConnectionEditDialog(
                         value = transportOptions.first { it.first == selectedTransport }.second,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text(if (zh) "协议" else "Transport") },
+                        label = { Text(stringResource(R.string.transport)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(transportExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -191,15 +192,15 @@ fun ConnectionEditDialog(
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text(if (zh) "名称" else "Label") },
+                    label = { Text(stringResource(R.string.label)) },
                     placeholder = {
                         Text(
                             when (connectionType) {
-                                "VNC" -> if (zh) "我的 VNC 桌面" else "My VNC Desktop"
-                                "RDP" -> if (zh) "我的 RDP 桌面" else "My RDP Desktop"
-                                "SMB" -> if (zh) "我的文件共享" else "My File Share"
-                                "RETICULUM" -> if (zh) "我的节点" else "My Node"
-                                else -> if (zh) "我的服务器" else "My Server"
+                                "VNC" -> stringResource(R.string.my_vnc_desktop)
+                                "RDP" -> stringResource(R.string.my_rdp_desktop)
+                                "SMB" -> stringResource(R.string.my_file_share)
+                                "RETICULUM" -> stringResource(R.string.my_node)
+                                else -> stringResource(R.string.my_server)
                             }
                         )
                     },
@@ -213,7 +214,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = { Text(if (zh) "主机" else "Host") },
+                        label = { Text(stringResource(R.string.host)) },
                         placeholder = { Text("192.168.1.100") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -222,7 +223,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = port,
                         onValueChange = { port = it.filter { c -> c.isDigit() } },
-                        label = { Text(if (zh) "端口" else "Port") },
+                        label = { Text(stringResource(R.string.port)) },
                         placeholder = { Text("5900") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -232,13 +233,13 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = vncPassword,
                         onValueChange = { vncPassword = it },
-                        label = { Text(if (zh) "密码（可选）" else "Password (optional)") },
+                        label = { Text(stringResource(R.string.password_optional)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        if (zh) "VNC 密码最多 8 个字符" else "VNC passwords are limited to 8 characters",
+                        stringResource(R.string.vnc_passwords_are_limited_to),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -247,7 +248,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = { Text(if (zh) "主机" else "Host") },
+                        label = { Text(stringResource(R.string.host)) },
                         placeholder = { Text("192.168.1.100") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -259,7 +260,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = rdpUsername,
                             onValueChange = { rdpUsername = it },
-                            label = { Text(if (zh) "用户名" else "Username") },
+                            label = { Text(stringResource(R.string.username)) },
                             placeholder = { Text("user") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -267,7 +268,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = port,
                             onValueChange = { port = it.filter { c -> c.isDigit() } },
-                            label = { Text(if (zh) "端口" else "Port") },
+                            label = { Text(stringResource(R.string.port)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.width(80.dp),
@@ -277,7 +278,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = rdpPassword,
                         onValueChange = { rdpPassword = it },
-                        label = { Text(if (zh) "密码（可选）" else "Password (optional)") },
+                        label = { Text(stringResource(R.string.password_optional)) },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
@@ -286,7 +287,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = rdpDomain,
                         onValueChange = { rdpDomain = it },
-                        label = { Text(if (zh) "域（可选）" else "Domain (optional)") },
+                        label = { Text(stringResource(R.string.domain_optional)) },
                         placeholder = { Text("WORKGROUP") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -303,7 +304,7 @@ fun ConnectionEditDialog(
                                 if (host == "localhost") host = ""
                             }
                         },
-                        label = { Text(if (zh) "SSH 隧道" else "SSH tunnel") },
+                        label = { Text(stringResource(R.string.ssh_tunnel)) },
                     )
                     if (rdpSshForward) {
                         val sshCandidates = sshProfiles.filter { it.isSsh }
@@ -316,10 +317,10 @@ fun ConnectionEditDialog(
                                 onExpandedChange = { sshExpanded = it },
                             ) {
                                 OutlinedTextField(
-                                    value = selectedSsh?.label ?: if (zh) "选择 SSH 连接" else "Select SSH connection",
+                                    value = selectedSsh?.label ?: stringResource(R.string.select_ssh_connection),
                                     onValueChange = {},
                                     readOnly = true,
-                                    label = { Text(if (zh) "SSH 连接" else "SSH connection") },
+                                    label = { Text(stringResource(R.string.ssh_connection)) },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sshExpanded) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -342,7 +343,7 @@ fun ConnectionEditDialog(
                             }
                         } else {
                             Text(
-                                if (zh) "请先添加一个 SSH 连接" else "Add an SSH connection first",
+                                stringResource(R.string.add_an_ssh_connection_first),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -368,7 +369,7 @@ fun ConnectionEditDialog(
                     ) {
                         if (filteredSmbHosts.isNotEmpty()) {
                             Text(
-                                if (zh) "已发现（${filteredSmbHosts.size}）" else "Discovered (${filteredSmbHosts.size})",
+                                stringResource(R.string.discovered_filteredsmbhosts_size),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1f),
@@ -383,11 +384,11 @@ fun ConnectionEditDialog(
                             if (smbSubnetScanning) {
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(4.dp))
-                                Text(if (zh) "扫描中" else "Scanning", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.scanning), style = MaterialTheme.typography.labelSmall)
                             } else {
                                 Icon(Icons.Filled.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text(if (zh) "扫描网络" else "Scan Network", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.scan_network), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -404,14 +405,14 @@ fun ConnectionEditDialog(
                                     host = it
                                     smbHostExpanded = true
                                 },
-                                label = { Text(if (zh) "主机" else "Host") },
+                                label = { Text(stringResource(R.string.host)) },
                                 placeholder = { Text("192.168.1.100") },
                                 singleLine = true,
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = smbHostExpanded)
                                 },
                                 supportingText = if (filteredSmbHosts.isNotEmpty()) {{
-                                    Text(if (zh) "已发现 ${filteredSmbHosts.size} 台主机" else "${filteredSmbHosts.size} hosts discovered")
+                                    Text(stringResource(R.string.filteredsmbhosts_size_hosts_discovered))
                                 }} else null,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -476,7 +477,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = host,
                             onValueChange = { host = it },
-                            label = { Text(if (zh) "主机" else "Host") },
+                            label = { Text(stringResource(R.string.host)) },
                             placeholder = { Text("192.168.1.100") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -486,7 +487,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = smbShare,
                         onValueChange = { smbShare = it },
-                        label = { Text(if (zh) "共享名" else "Share Name") },
+                        label = { Text(stringResource(R.string.share_name)) },
                         placeholder = { Text("shared") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -498,7 +499,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text(if (zh) "用户名" else "Username") },
+                            label = { Text(stringResource(R.string.username)) },
                             placeholder = { Text("user") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -506,7 +507,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = port,
                             onValueChange = { port = it.filter { c -> c.isDigit() } },
-                            label = { Text(if (zh) "端口" else "Port") },
+                            label = { Text(stringResource(R.string.port)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.width(80.dp),
@@ -516,7 +517,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = smbPassword,
                         onValueChange = { smbPassword = it },
-                        label = { Text(if (zh) "密码（可选）" else "Password (optional)") },
+                        label = { Text(stringResource(R.string.password_optional)) },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
@@ -525,7 +526,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = smbDomain,
                         onValueChange = { smbDomain = it },
-                        label = { Text(if (zh) "域（可选）" else "Domain (optional)") },
+                        label = { Text(stringResource(R.string.domain_optional)) },
                         placeholder = { Text("WORKGROUP") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -542,7 +543,7 @@ fun ConnectionEditDialog(
                                 if (host == "localhost") host = ""
                             }
                         },
-                        label = { Text(if (zh) "SSH 隧道" else "SSH tunnel") },
+                        label = { Text(stringResource(R.string.ssh_tunnel)) },
                     )
                     if (smbSshForward) {
                         val sshCandidates = sshProfiles.filter { it.isSsh }
@@ -555,10 +556,10 @@ fun ConnectionEditDialog(
                                 onExpandedChange = { sshExpanded = it },
                             ) {
                                 OutlinedTextField(
-                                    value = selectedSsh?.label ?: if (zh) "选择 SSH 连接" else "Select SSH connection",
+                                    value = selectedSsh?.label ?: stringResource(R.string.select_ssh_connection),
                                     onValueChange = {},
                                     readOnly = true,
-                                    label = { Text(if (zh) "SSH 连接" else "SSH connection") },
+                                    label = { Text(stringResource(R.string.ssh_connection)) },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sshExpanded) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -581,7 +582,7 @@ fun ConnectionEditDialog(
                             }
                         } else {
                             Text(
-                                if (zh) "请先添加一个 SSH 连接" else "Add an SSH connection first",
+                                stringResource(R.string.add_an_ssh_connection_first),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -607,7 +608,7 @@ fun ConnectionEditDialog(
                     ) {
                         if (filteredHosts.isNotEmpty()) {
                             Text(
-                                if (zh) "已发现（${filteredHosts.size}）" else "Discovered (${filteredHosts.size})",
+                                stringResource(R.string.discovered_filteredhosts_size),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1f),
@@ -622,11 +623,11 @@ fun ConnectionEditDialog(
                             if (subnetScanning) {
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(4.dp))
-                                Text(if (zh) "扫描中" else "Scanning", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.scanning), style = MaterialTheme.typography.labelSmall)
                             } else {
                                 Icon(Icons.Filled.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text(if (zh) "扫描网络" else "Scan Network", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.scan_network), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -645,14 +646,14 @@ fun ConnectionEditDialog(
                                     host = it
                                     hostExpanded = true
                                 },
-                                label = { Text(if (zh) "主机" else "Host") },
+                                label = { Text(stringResource(R.string.host)) },
                                 placeholder = { Text("192.168.1.1") },
                                 singleLine = true,
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostExpanded)
                                 },
                                 supportingText = if (filteredHosts.isNotEmpty()) {{
-                                    Text(if (zh) "已发现 ${filteredHosts.size} 台主机" else "${filteredHosts.size} hosts discovered")
+                                    Text(stringResource(R.string.filteredhosts_size_hosts_discovered))
                                 }} else null,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -720,7 +721,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = host,
                             onValueChange = { host = it },
-                            label = { Text(if (zh) "主机" else "Host") },
+                            label = { Text(stringResource(R.string.host)) },
                             placeholder = { Text("192.168.1.1") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -733,7 +734,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text(if (zh) "用户名" else "Username") },
+                            label = { Text(stringResource(R.string.username)) },
                             placeholder = { Text("root") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -741,7 +742,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = port,
                             onValueChange = { port = it.filter { c -> c.isDigit() } },
-                            label = { Text(if (zh) "端口" else "Port") },
+                            label = { Text(stringResource(R.string.port)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.width(80.dp),
@@ -760,10 +761,10 @@ fun ConnectionEditDialog(
                             onExpandedChange = { jumpExpanded = it },
                         ) {
                             OutlinedTextField(
-                                value = selectedJump?.label ?: if (zh) "无（直连）" else "None (direct)",
+                                value = selectedJump?.label ?: stringResource(R.string.none_direct),
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text(if (zh) "跳板机（-J）" else "Jump Host (-J)") },
+                                label = { Text(stringResource(R.string.jump_host_j)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = jumpExpanded) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -817,8 +818,8 @@ fun ConnectionEditDialog(
                     // Session manager
                     Spacer(Modifier.height(8.dp))
                     val sessionManagerOptions = listOf(
-                        null to if (zh) "默认（$globalSessionManagerLabel）" else "Default ($globalSessionManagerLabel)",
-                        "NONE" to if (zh) "无" else "None",
+                        null to stringResource(R.string.default_globalsessionmanagerlabel, globalSessionManagerLabel),
+                        "NONE" to stringResource(R.string.none),
                         "TMUX" to "tmux",
                         "ZELLIJ" to "zellij",
                         "SCREEN" to "screen",
@@ -831,10 +832,10 @@ fun ConnectionEditDialog(
                     ) {
                         OutlinedTextField(
                             value = sessionManagerOptions.firstOrNull { it.first == selectedSessionManager }?.second
-                                ?: if (zh) "默认（$globalSessionManagerLabel）" else "Default ($globalSessionManagerLabel)",
+                                ?: stringResource(R.string.default_globalsessionmanagerlabel, globalSessionManagerLabel),
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text(if (zh) "会话管理器" else "Session Manager") },
+                            label = { Text(stringResource(R.string.session_manager)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(smExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -873,7 +874,7 @@ fun ConnectionEditDialog(
                     if (selectedTransport == "MOSH") {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            if (zh) "需要远端安装 mosh-server" else "Requires mosh-server on remote host",
+                            stringResource(R.string.requires_mosh_server_on_remote),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -892,9 +893,9 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = sshOptions,
                         onValueChange = { sshOptions = it },
-                        label = { Text(if (zh) "SSH 选项" else "SSH Options") },
+                        label = { Text(stringResource(R.string.ssh_options)) },
                         placeholder = { Text("ServerAliveInterval 60\nServerAliveCountMax 3") },
-                        supportingText = { Text(if (zh) "ssh_config 格式：Key Value（每行一条）" else "ssh_config format: Key Value (one per line)") },
+                        supportingText = { Text(stringResource(R.string.ssh_config_format_key_value)) },
                         minLines = 2,
                         maxLines = 4,
                         modifier = Modifier.fillMaxWidth(),
@@ -910,10 +911,10 @@ fun ConnectionEditDialog(
                             onExpandedChange = { keyExpanded = it },
                         ) {
                             OutlinedTextField(
-                                value = selectedKey?.label ?: if (zh) "任意（尝试所有密钥）" else "Any (try all keys)",
+                                value = selectedKey?.label ?: stringResource(R.string.any_try_all_keys),
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text(if (zh) "SSH 密钥" else "SSH Key") },
+                                label = { Text(stringResource(R.string.ssh_key)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(keyExpanded) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -924,7 +925,7 @@ fun ConnectionEditDialog(
                                 onDismissRequest = { keyExpanded = false },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text(if (zh) "任意（尝试所有密钥）" else "Any (try all keys)") },
+                                    text = { Text(stringResource(R.string.any_try_all_keys)) },
                                     onClick = {
                                         keyId = null
                                         keyExpanded = false
@@ -963,9 +964,9 @@ fun ConnectionEditDialog(
                         val hiddenCount = discoveredDestinations.size - filtered.size
                         Text(
                             text = if (hiddenCount > 0) {
-                                if (zh) "已发现（${filtered.size}/${discoveredDestinations.size}）" else "Discovered (${filtered.size} of ${discoveredDestinations.size})"
+                                stringResource(R.string.discovered_filtered_size_of_discovereddestinations)
                             } else {
-                                if (zh) "已发现（${filtered.size}）" else "Discovered (${filtered.size})"
+                                stringResource(R.string.discovered_filtered_size)
                             },
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -995,8 +996,8 @@ fun ConnectionEditDialog(
                             destinationHash = it.filter { c -> c in "0123456789abcdefABCDEF" }
                                 .take(32)
                         },
-                        label = { Text(if (zh) "目标哈希" else "Destination Hash") },
-                        placeholder = { Text(if (zh) "32 位十六进制" else "32-character hex") },
+                        label = { Text(stringResource(R.string.destination_hash)) },
+                        placeholder = { Text(stringResource(R.string.str_32_character_hex)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1010,7 +1011,7 @@ fun ConnectionEditDialog(
                                 rnsPort = "37428"
                             }
                         },
-                        label = { Text(if (zh) "本地 Sideband" else "Local Sideband") },
+                        label = { Text(stringResource(R.string.local_sideband)) },
                     )
                     if (!localSideband) {
                         Spacer(Modifier.height(8.dp))
@@ -1020,7 +1021,7 @@ fun ConnectionEditDialog(
                             OutlinedTextField(
                                 value = rnsHost,
                                 onValueChange = { rnsHost = it },
-                                label = { Text(if (zh) "网关主机" else "Gateway Host") },
+                                label = { Text(stringResource(R.string.gateway_host)) },
                                 placeholder = { Text("192.168.0.2") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
@@ -1028,7 +1029,7 @@ fun ConnectionEditDialog(
                             OutlinedTextField(
                                 value = rnsPort,
                                 onValueChange = { rnsPort = it.filter { c -> c.isDigit() } },
-                                label = { Text(if (zh) "端口" else "Port") },
+                                label = { Text(stringResource(R.string.port)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.width(80.dp),
@@ -1147,12 +1148,12 @@ fun ConnectionEditDialog(
                 },
                 enabled = canSave,
             ) {
-                Text(if (zh) "保存" else "Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )

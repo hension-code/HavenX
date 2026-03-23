@@ -11,12 +11,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -50,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -139,21 +142,21 @@ fun SettingsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text(if (zh) "设置" else "Settings") })
+        TopAppBar(title = { Text(stringResource(R.string.settings)) })
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
         if (viewModel.biometricAvailable) {
             SettingsToggleItem(
                 icon = Icons.Filled.Fingerprint,
-                title = if (zh) "生物识别解锁" else "Biometric unlock",
-                subtitle = if (zh) "需要生物识别才能打开 HavenX" else "Require biometrics to open HavenX",
+                title = stringResource(R.string.biometric_unlock),
+                subtitle = stringResource(R.string.require_biometrics_to_open_havenx),
                 checked = biometricEnabled,
                 onCheckedChange = viewModel::setBiometricEnabled,
             )
             if (biometricEnabled) {
                 SettingsItem(
                     icon = Icons.Filled.Timer,
-                    title = if (zh) "锁定超时" else "Lock timeout",
+                    title = stringResource(R.string.lock_timeout),
                     subtitle = lockTimeoutLabel(lockTimeout, zh),
                     onClick = { showLockTimeoutDialog = true },
                 )
@@ -161,9 +164,9 @@ fun SettingsScreen(
         }
         SettingsItem(
             icon = Icons.Filled.Terminal,
-            title = if (zh) "会话持久化" else "Session persistence",
+            title = stringResource(R.string.session_persistence),
             subtitle = if (sessionManager == UserPreferencesRepository.SessionManager.NONE) {
-                if (zh) "无" else "None"
+                stringResource(R.string.none)
             } else {
                 sessionManager.label
             },
@@ -171,33 +174,33 @@ fun SettingsScreen(
         )
         SettingsItem(
             icon = Icons.Filled.TextFields,
-            title = if (zh) "终端字体大小" else "Terminal font size",
+            title = stringResource(R.string.terminal_font_size),
             subtitle = "${fontSize}sp",
             onClick = { showFontSizeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.Palette,
-            title = if (zh) "终端配色方案" else "Terminal color scheme",
+            title = stringResource(R.string.terminal_color_scheme),
             subtitle = colorSchemeLabel(colorScheme, zh),
             onClick = { showColorSchemeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.KeyboardAlt,
-            title = if (zh) "键盘工具栏" else "Keyboard toolbar",
-            subtitle = if (zh) "配置工具栏按键和布局" else "Configure toolbar keys and layout",
+            title = stringResource(R.string.keyboard_toolbar),
+            subtitle = stringResource(R.string.configure_toolbar_keys_and_layout),
             onClick = { showToolbarConfigDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.ColorLens,
-            title = if (zh) "主题" else "Theme",
+            title = stringResource(R.string.theme),
             subtitle = themeModeLabel(theme, zh),
             onClick = { showThemeDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.Language,
-            title = if (zh) "语言" else "Language",
+            title = stringResource(R.string.language),
             subtitle = when (languageMode) {
-                UserPreferencesRepository.LanguageMode.SYSTEM -> if (zh) "跟随系统" else "System default"
+                UserPreferencesRepository.LanguageMode.SYSTEM -> stringResource(R.string.system_default)
                 UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
                 UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
             },
@@ -208,16 +211,16 @@ fun SettingsScreen(
 
         SettingsItem(
             icon = Icons.Filled.CloudUpload,
-            title = if (zh) "导出备份" else "Export backup",
-            subtitle = if (zh) "密钥、连接和设置" else "Keys, connections, and settings",
+            title = stringResource(R.string.export_backup),
+            subtitle = stringResource(R.string.keys_connections_and_settings),
             onClick = {
                 showBackupPasswordDialog = BackupAction.Export
             },
         )
         SettingsItem(
             icon = Icons.Filled.CloudDownload,
-            title = if (zh) "恢复备份" else "Restore backup",
-            subtitle = if (zh) "从备份文件导入" else "Import from a backup file",
+            title = stringResource(R.string.restore_backup),
+            subtitle = stringResource(R.string.import_from_a_backup_file),
             onClick = {
                 importLauncher.launch(arrayOf("*/*"))
             },
@@ -225,7 +228,7 @@ fun SettingsScreen(
 
         if (backupStatus is SettingsViewModel.BackupStatus.InProgress) {
             ListItem(
-                headlineContent = { Text(if (zh) "处理中..." else "Working...") },
+                headlineContent = { Text(stringResource(R.string.working)) },
                 leadingContent = {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 },
@@ -237,7 +240,7 @@ fun SettingsScreen(
 
         SettingsItem(
             icon = Icons.Filled.Info,
-            title = if (zh) "关于 HavenX" else "About HavenX",
+            title = stringResource(R.string.about_havenx),
             subtitle = "v${packageInfo.versionName}",
             onClick = { showAboutDialog = true },
         )
@@ -300,7 +303,7 @@ fun SettingsScreen(
     if (showLockTimeoutDialog) {
         AlertDialog(
             onDismissRequest = { showLockTimeoutDialog = false },
-            title = { Text(if (zh) "锁定超时" else "Lock timeout") },
+            title = { Text(stringResource(R.string.lock_timeout)) },
             text = {
                 Column {
                     UserPreferencesRepository.LockTimeout.entries.forEach { timeout ->
@@ -323,7 +326,7 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showLockTimeoutDialog = false }) {
-                    Text(if (zh) "取消" else "Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -409,15 +412,15 @@ private fun BackupPasswordDialog(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     val title = if (isExport) {
-        if (zh) "导出备份" else "Export Backup"
+        stringResource(R.string.export_backup_1)
     } else {
-        if (zh) "恢复备份" else "Restore Backup"
+        stringResource(R.string.restore_backup_1)
     }
     val passwordError = if (isExport && password.length in 1..5) {
-        if (zh) "至少 6 个字符" else "At least 6 characters"
+        stringResource(R.string.at_least_6_characters)
     } else null
     val confirmError = if (isExport && confirmPassword.isNotEmpty() && confirmPassword != password) {
-        if (zh) "两次密码不一致" else "Passwords don't match"
+        stringResource(R.string.passwords_don_t_match)
     } else null
     val canConfirm = if (isExport) {
         password.length >= 6 && password == confirmPassword
@@ -438,7 +441,7 @@ private fun BackupPasswordDialog(
                             "Encrypt your backup with a password. This protects your SSH keys and connection data."
                         }
                     } else {
-                        if (zh) "输入创建备份时使用的密码。" else "Enter the password used when the backup was created."
+                        stringResource(R.string.enter_the_password_used_when)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -447,7 +450,7 @@ private fun BackupPasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(if (zh) "密码" else "Password") },
+                    label = { Text(stringResource(R.string.password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     isError = passwordError != null,
@@ -459,7 +462,7 @@ private fun BackupPasswordDialog(
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
-                        label = { Text(if (zh) "确认密码" else "Confirm password") },
+                        label = { Text(stringResource(R.string.confirm_password)) },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         isError = confirmError != null,
@@ -473,15 +476,15 @@ private fun BackupPasswordDialog(
             TextButton(onClick = { onConfirm(password) }, enabled = canConfirm) {
                 Text(
                     if (isExport) {
-                        if (zh) "导出" else "Export"
+                        stringResource(R.string.export)
                     } else {
-                        if (zh) "恢复" else "Restore"
+                        stringResource(R.string.restore)
                     }
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(if (zh) "取消" else "Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -498,7 +501,7 @@ private fun AboutDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "关于 HavenX" else "About HavenX") },
+        title = { Text(stringResource(R.string.about_havenx)) },
         text = {
             Column {
                 Text(
@@ -507,7 +510,7 @@ private fun AboutDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (zh) "面向 Android 的开源远程连接客户端" else "Open source remote client for Android",
+                    text = stringResource(R.string.open_source_remote_client_for),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -528,7 +531,7 @@ private fun AboutDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "关闭" else "Close")
+                Text(stringResource(R.string.close))
             }
         },
         dismissButton = {
@@ -548,33 +551,26 @@ private fun LanguageDialog(
     val zh = Locale.current.language == "zh"
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "语言" else "Language") },
+        title = { Text(stringResource(R.string.language)) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 UserPreferencesRepository.LanguageMode.entries.forEach { mode ->
                     val label = when (mode) {
-                        UserPreferencesRepository.LanguageMode.SYSTEM -> if (zh) "跟随系统" else "System default"
+                        UserPreferencesRepository.LanguageMode.SYSTEM -> stringResource(R.string.system_default)
                         UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
                         UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
                     }
-                    ListItem(
-                        headlineContent = { Text(label) },
-                        leadingContent = {
-                            RadioButton(
-                                selected = mode == currentLanguage,
-                                onClick = null,
-                            )
-                        },
-                        modifier = Modifier.clickable(role = Role.RadioButton) {
-                            onSelect(mode)
-                        },
+                    SelectableDialogRow(
+                        selected = mode == currentLanguage,
+                        onClick = { onSelect(mode) },
+                        headline = { Text(label) },
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -589,28 +585,21 @@ private fun ThemeDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "主题" else "Theme") },
+        title = { Text(stringResource(R.string.theme)) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 UserPreferencesRepository.ThemeMode.entries.forEach { mode ->
-                    ListItem(
-                        headlineContent = { Text(themeModeLabel(mode, zh)) },
-                        leadingContent = {
-                            RadioButton(
-                                selected = mode == currentTheme,
-                                onClick = null,
-                            )
-                        },
-                        modifier = Modifier.clickable(role = Role.RadioButton) {
-                            onSelect(mode)
-                        },
+                    SelectableDialogRow(
+                        selected = mode == currentTheme,
+                        onClick = { onSelect(mode) },
+                        headline = { Text(themeModeLabel(mode, zh)) },
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -625,12 +614,14 @@ private fun ColorSchemeDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "终端配色方案" else "Terminal color scheme") },
+        title = { Text(stringResource(R.string.terminal_color_scheme)) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 UserPreferencesRepository.TerminalColorScheme.entries.forEach { scheme ->
-                    ListItem(
-                        headlineContent = {
+                    SelectableDialogRow(
+                        selected = scheme == currentScheme,
+                        onClick = { onSelect(scheme) },
+                        headline = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
@@ -654,22 +645,13 @@ private fun ColorSchemeDialog(
                                 Text(colorSchemeLabel(scheme, zh))
                             }
                         },
-                        leadingContent = {
-                            RadioButton(
-                                selected = scheme == currentScheme,
-                                onClick = null,
-                            )
-                        },
-                        modifier = Modifier.clickable(role = Role.RadioButton) {
-                            onSelect(scheme)
-                        },
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -688,12 +670,17 @@ private fun SessionManagerDialog(
     var overrideText by remember(commandOverride) { mutableStateOf(commandOverride ?: "") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "会话持久化" else "Session persistence") },
+        title = { Text(stringResource(R.string.session_persistence)) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 UserPreferencesRepository.SessionManager.entries.forEach { manager ->
-                    ListItem(
-                        headlineContent = {
+                    SelectableDialogRow(
+                        selected = manager == current,
+                        onClick = { onSelect(manager) },
+                        headline = {
                             if (manager.url != null) {
                                 Text(
                                     text = sessionManagerLabel(manager, zh),
@@ -709,18 +696,9 @@ private fun SessionManagerDialog(
                                 Text(sessionManagerLabel(manager, zh))
                             }
                         },
-                        supportingContent = if (!manager.supportsScrollback) {
-                            { Text(if (zh) "不支持触摸回滚" else "No touch scrollback") }
+                        supporting = if (!manager.supportsScrollback) {
+                            { Text(stringResource(R.string.no_touch_scrollback)) }
                         } else null,
-                        leadingContent = {
-                            RadioButton(
-                                selected = manager == current,
-                                onClick = null,
-                            )
-                        },
-                        modifier = Modifier.clickable(role = Role.RadioButton) {
-                            onSelect(manager)
-                        },
                     )
                 }
 
@@ -730,7 +708,7 @@ private fun SessionManagerDialog(
                     OutlinedTextField(
                         value = overrideText,
                         onValueChange = { overrideText = it },
-                        label = { Text(if (zh) "自定义命令" else "Custom command") },
+                        label = { Text(stringResource(R.string.custom_command)) },
                         placeholder = { Text(defaultCommand, maxLines = 1) },
                         supportingText = {
                             Text(
@@ -750,7 +728,7 @@ private fun SessionManagerDialog(
                                 onCommandOverrideChange(overrideText.ifBlank { null })
                             },
                         ) {
-                            Text(if (zh) "保存命令" else "Save command")
+                            Text(stringResource(R.string.save_command))
                         }
                     }
                 }
@@ -758,7 +736,7 @@ private fun SessionManagerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "关闭" else "Close")
+                Text(stringResource(R.string.close))
             }
         },
     )
@@ -776,14 +754,14 @@ private fun FontSizeDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "终端字体大小" else "Terminal font size") },
+        title = { Text(stringResource(R.string.terminal_font_size)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = if (zh) "示例文本" else "Sample text",
+                    text = stringResource(R.string.sample_text),
                     fontFamily = FontFamily.Monospace,
                     fontSize = displaySize.sp,
                     modifier = Modifier.padding(vertical = 16.dp),
@@ -805,15 +783,48 @@ private fun FontSizeDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(displaySize) }) {
-                Text(if (zh) "确定" else "OK")
+                Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
+}
+
+@Composable
+private fun SelectableDialogRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    headline: @Composable () -> Unit,
+    supporting: (@Composable () -> Unit)? = null,
+) {
+    val selectedBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    val rowShape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(rowShape)
+            .background(if (selected) selectedBg else Color.Transparent)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            headline()
+            supporting?.let {
+                Spacer(modifier = Modifier.height(2.dp))
+                it()
+            }
+        }
+    }
 }
 
 @Composable
@@ -858,38 +869,42 @@ private fun SettingsItem(
     )
 }
 
+@Composable
 private fun themeModeLabel(mode: UserPreferencesRepository.ThemeMode, zh: Boolean): String =
     when (mode) {
-        UserPreferencesRepository.ThemeMode.SYSTEM -> if (zh) "跟随系统" else "System default"
-        UserPreferencesRepository.ThemeMode.LIGHT -> if (zh) "浅色" else "Light"
-        UserPreferencesRepository.ThemeMode.DARK -> if (zh) "深色" else "Dark"
+        UserPreferencesRepository.ThemeMode.SYSTEM -> stringResource(R.string.system_default)
+        UserPreferencesRepository.ThemeMode.LIGHT -> stringResource(R.string.light)
+        UserPreferencesRepository.ThemeMode.DARK -> stringResource(R.string.dark)
     }
 
+@Composable
 private fun lockTimeoutLabel(timeout: UserPreferencesRepository.LockTimeout, zh: Boolean): String =
     when (timeout) {
-        UserPreferencesRepository.LockTimeout.IMMEDIATE -> if (zh) "立即" else "Immediately"
-        UserPreferencesRepository.LockTimeout.THIRTY_SECONDS -> if (zh) "30 秒" else "30 seconds"
-        UserPreferencesRepository.LockTimeout.ONE_MINUTE -> if (zh) "1 分钟" else "1 minute"
-        UserPreferencesRepository.LockTimeout.FIVE_MINUTES -> if (zh) "5 分钟" else "5 minutes"
-        UserPreferencesRepository.LockTimeout.NEVER -> if (zh) "从不" else "Never"
+        UserPreferencesRepository.LockTimeout.IMMEDIATE -> stringResource(R.string.immediately)
+        UserPreferencesRepository.LockTimeout.THIRTY_SECONDS -> stringResource(R.string.str_30_seconds)
+        UserPreferencesRepository.LockTimeout.ONE_MINUTE -> stringResource(R.string.str_1_minute)
+        UserPreferencesRepository.LockTimeout.FIVE_MINUTES -> stringResource(R.string.str_5_minutes)
+        UserPreferencesRepository.LockTimeout.NEVER -> stringResource(R.string.never)
     }
 
+@Composable
 private fun sessionManagerLabel(
     manager: UserPreferencesRepository.SessionManager,
     zh: Boolean,
 ): String = when (manager) {
-    UserPreferencesRepository.SessionManager.NONE -> if (zh) "无" else "None"
+    UserPreferencesRepository.SessionManager.NONE -> stringResource(R.string.none)
     else -> manager.label
 }
 
+@Composable
 private fun colorSchemeLabel(
     scheme: UserPreferencesRepository.TerminalColorScheme,
     zh: Boolean,
 ): String = when (scheme) {
     UserPreferencesRepository.TerminalColorScheme.HAVEN -> "Haven"
-    UserPreferencesRepository.TerminalColorScheme.CLASSIC_GREEN -> if (zh) "经典绿色" else "Classic Green"
-    UserPreferencesRepository.TerminalColorScheme.LIGHT -> if (zh) "浅色" else "Light"
-    UserPreferencesRepository.TerminalColorScheme.SOLARIZED_DARK -> if (zh) "Solarized 深色" else "Solarized Dark"
+    UserPreferencesRepository.TerminalColorScheme.CLASSIC_GREEN -> stringResource(R.string.classic_green)
+    UserPreferencesRepository.TerminalColorScheme.LIGHT -> stringResource(R.string.light)
+    UserPreferencesRepository.TerminalColorScheme.SOLARIZED_DARK -> stringResource(R.string.solarized_dark)
     UserPreferencesRepository.TerminalColorScheme.DRACULA -> "Dracula"
     UserPreferencesRepository.TerminalColorScheme.MONOKAI -> "Monokai"
 }
@@ -962,11 +977,15 @@ private fun ToolbarSimpleEditor(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "键盘工具栏" else "Keyboard toolbar") },
+        title = { Text(stringResource(R.string.keyboard_toolbar)) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .requiredHeight(250.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 Text(
-                    text = if (zh) "为每个按键分配到第 1 行、第 2 行或关闭" else "Assign each key to Row 1, Row 2, or Off",
+                    text = stringResource(R.string.assign_each_key_to_row),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -974,7 +993,7 @@ private fun ToolbarSimpleEditor(
 
                 if (hasCustomKeys) {
                     Text(
-                        text = if (zh) "自定义按键会被保留。使用“编辑 JSON”可进行完整控制。" else "Custom keys are preserved. Use Edit JSON for full control.",
+                        text = stringResource(R.string.custom_keys_are_preserved_use),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(bottom = 4.dp),
@@ -982,7 +1001,7 @@ private fun ToolbarSimpleEditor(
                 }
 
                 Text(
-                    if (zh) "功能键" else "Function keys",
+                    stringResource(R.string.function_keys),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
@@ -999,7 +1018,7 @@ private fun ToolbarSimpleEditor(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    if (zh) "符号" else "Symbols",
+                    stringResource(R.string.symbols),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -1027,7 +1046,7 @@ private fun ToolbarSimpleEditor(
                     .map { ToolbarItem.BuiltIn(it) } + customRow2
                 onSave(ToolbarLayout(listOf(newRow1, newRow2)))
             }) {
-                Text(if (zh) "保存" else "Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
@@ -1041,13 +1060,13 @@ private fun ToolbarSimpleEditor(
                         }
                     }
                     }) {
-                    Text(if (zh) "重置" else "Reset")
+                    Text(stringResource(R.string.reset))
                 }
                 TextButton(onClick = onAdvancedMode) {
-                    Text(if (zh) "编辑 JSON" else "Edit JSON")
+                    Text(stringResource(R.string.edit_json))
                 }
                 TextButton(onClick = onDismiss) {
-                    Text(if (zh) "取消" else "Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         },
@@ -1067,9 +1086,13 @@ private fun ToolbarJsonEditor(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "编辑工具栏 JSON" else "Edit toolbar JSON") },
+        title = { Text(stringResource(R.string.edit_toolbar_json)) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .height(300.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 Text(
                     text = if (zh) {
                         "字符串 = 内置按键 ID，对象 = 自定义按键 {\"label\": \"...\", \"send\": \"...\"}"
@@ -1121,7 +1144,7 @@ private fun ToolbarJsonEditor(
                     onSave(text)
                 }
             }) {
-                Text(if (zh) "保存" else "Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
@@ -1130,13 +1153,13 @@ private fun ToolbarJsonEditor(
                     text = ToolbarLayout.DEFAULT.toJson()
                     error = null
                 }) {
-                    Text(if (zh) "重置" else "Reset")
+                    Text(stringResource(R.string.reset))
                 }
                 TextButton(onClick = onSimpleMode) {
-                    Text(if (zh) "简易模式" else "Simple")
+                    Text(stringResource(R.string.simple))
                 }
                 TextButton(onClick = onDismiss) {
-                    Text(if (zh) "取消" else "Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         },
@@ -1170,7 +1193,7 @@ private fun ToolbarKeyRow(
                         when (option) {
                             KeyAssignment.ROW1 -> "R1"
                             KeyAssignment.ROW2 -> "R2"
-                            KeyAssignment.OFF -> if (zh) "关" else "Off"
+                            KeyAssignment.OFF -> stringResource(R.string.off)
                         },
                         fontSize = 11.sp,
                     )

@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -209,7 +210,7 @@ private fun VncPlaceholder(error: String?, zh: Boolean) {
         Text("VNC", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
         Text(
-            if (zh) "请在“连接”页面添加连接" else "Add a connection on the Connections tab",
+            stringResource(R.string.add_a_connection_on_the),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -499,7 +500,7 @@ private fun VncViewer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Button(onClick = onDisconnect) {
-                    Text(if (zh) "断开连接" else "Disconnect")
+                    Text(stringResource(R.string.disconnect))
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -517,7 +518,7 @@ private fun VncViewer(
                     Icon(
                         if (keyboardVisible) Icons.Default.KeyboardHide
                         else Icons.Default.Keyboard,
-                        contentDescription = if (zh) "切换键盘" else "Toggle keyboard",
+                        contentDescription = stringResource(R.string.toggle_keyboard),
                     )
                 }
 
@@ -530,14 +531,14 @@ private fun VncViewer(
                         panX = 0f
                         panY = 0f
                     }) {
-                        Text(if (zh) "重置缩放" else "Reset Zoom")
+                        Text(stringResource(R.string.reset_zoom))
                     }
                     Spacer(Modifier.width(8.dp))
                 }
 
                 // Fullscreen button
                 IconButton(onClick = onToggleFullscreen) {
-                    Icon(Icons.Default.Fullscreen, contentDescription = if (zh) "全屏" else "Fullscreen")
+                    Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.fullscreen))
                 }
             }
         }
@@ -571,7 +572,7 @@ private fun VncViewer(
             ) {
                 Icon(
                     Icons.Default.Menu,
-                    contentDescription = if (zh) "会话菜单" else "Session menu",
+                    contentDescription = stringResource(R.string.session_menu),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier.padding(8.dp).size(20.dp),
                 )
@@ -598,7 +599,7 @@ private fun VncViewer(
                         overlayVisible = false
                         onDisconnect()
                     }) {
-                        Icon(Icons.Default.Close, contentDescription = if (zh) "断开连接" else "Disconnect")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.disconnect))
                     }
                     IconButton(onClick = {
                         keyboardVisible = !keyboardVisible
@@ -612,7 +613,7 @@ private fun VncViewer(
                         Icon(
                             if (keyboardVisible) Icons.Default.KeyboardHide
                             else Icons.Default.Keyboard,
-                            contentDescription = if (zh) "切换键盘" else "Toggle keyboard",
+                            contentDescription = stringResource(R.string.toggle_keyboard),
                         )
                     }
                     if (zoom != 1f || panX != 0f || panY != 0f) {
@@ -623,7 +624,7 @@ private fun VncViewer(
                         }) {
                             Icon(
                                 Icons.Default.FullscreenExit,
-                                contentDescription = if (zh) "重置缩放" else "Reset zoom",
+                                contentDescription = stringResource(R.string.reset_zoom_1),
                             )
                         }
                     }
@@ -633,7 +634,7 @@ private fun VncViewer(
                     }) {
                         Icon(
                             Icons.Default.FullscreenExit,
-                            contentDescription = if (zh) "退出全屏" else "Exit fullscreen",
+                            contentDescription = stringResource(R.string.exit_fullscreen),
                         )
                     }
                 }

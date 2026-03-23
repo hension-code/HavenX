@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add_a_connection_on_the">Add a connection on the Connections tab</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="toggle_keyboard">Toggle keyboard</string>
+    <string name="reset_zoom">Reset Zoom</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="session_menu">Session menu</string>
+    <string name="reset_zoom_1">Reset zoom</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+</resources>

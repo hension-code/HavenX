@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add_key">添加密钥</string>
+    <string name="no_ssh_keys">暂无 SSH 密钥</string>
+    <string name="tap_to_generate_or_import">点击 + 生成或导入密钥</string>
+    <string name="copy_public_key">复制公钥</string>
+    <string name="export_private_key">导出私钥</string>
+    <string name="delete">删除</string>
+    <string name="clipboard_is_empty">剪贴板为空</string>
+    <string name="add_ssh_key">添加 SSH 密钥</string>
+    <string name="generate_new_key">生成新密钥</string>
+    <string name="ed25519_rsa_or_ecdsa">Ed25519、RSA 或 ECDSA</string>
+    <string name="import_from_file">从文件导入</string>
+    <string name="pem_or_openssh_format">PEM 或 OpenSSH 格式</string>
+    <string name="paste_from_clipboard">从剪贴板粘贴</string>
+    <string name="paste_a_pem_or_openssh">粘贴 PEM 或 OpenSSH 私钥</string>
+    <string name="cancel">取消</string>
+    <string name="generate_ssh_key">生成 SSH 密钥</string>
+    <string name="label">名称</string>
+    <string name="e_g_my_server">例如：my-server</string>
+    <string name="key_type">密钥类型</string>
+    <string name="generate">生成</string>
+    <string name="encrypted_key">加密密钥</string>
+    <string name="this_key_is_protected_with">该密钥受口令保护。</string>
+    <string name="passphrase">口令</string>
+    <string name="unlock">解锁</string>
+    <string name="import_ssh_key">导入 SSH 密钥</string>
+    <string name="str_import">导入</string>
+</resources>

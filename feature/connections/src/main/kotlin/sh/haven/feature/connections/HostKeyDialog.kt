@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.intl.Locale
@@ -24,16 +25,16 @@ fun NewHostKeyDialog(
 ) {
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text(if (zh) "验证主机密钥" else "Verify Host Key") },
+        title = { Text(stringResource(R.string.verify_host_key)) },
         text = {
             Column {
                 val hostDisplay = if (entry.port == 22) entry.hostname
                     else "${entry.hostname}:${entry.port}"
-                Text(if (zh) "首次连接到 $hostDisplay。" else "Connecting to $hostDisplay for the first time.")
+                Text(stringResource(R.string.connecting_to_hostdisplay_for_the, hostDisplay))
                 Spacer(Modifier.height(12.dp))
-                Text("${if (zh) "密钥类型" else "Key type"}: ${entry.keyType}")
+                Text("${stringResource(R.string.key_type)}: ${entry.keyType}")
                 Spacer(Modifier.height(8.dp))
-                Text(if (zh) "指纹：" else "Fingerprint:")
+                Text(stringResource(R.string.fingerprint))
                 Spacer(Modifier.height(4.dp))
                 Text(
                     entry.fingerprint(),
@@ -54,12 +55,12 @@ fun NewHostKeyDialog(
         },
         confirmButton = {
             TextButton(onClick = onTrust) {
-                Text(if (zh) "信任" else "Trust")
+                Text(stringResource(R.string.trust))
             }
         },
         dismissButton = {
             TextButton(onClick = onCancel) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -77,7 +78,7 @@ fun KeyChangedDialog(
         onDismissRequest = onDisconnect,
         title = {
             Text(
-                if (zh) "主机密钥已更改" else "Host Key Changed",
+                stringResource(R.string.host_key_changed),
                 color = MaterialTheme.colorScheme.error,
             )
         },
@@ -96,14 +97,14 @@ fun KeyChangedDialog(
                     color = MaterialTheme.colorScheme.error,
                 )
                 Spacer(Modifier.height(12.dp))
-                Text(if (zh) "旧指纹：" else "Old fingerprint:", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.old_fingerprint), style = MaterialTheme.typography.bodySmall)
                 Text(
                     oldFingerprint,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(if (zh) "新指纹：" else "New fingerprint:", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.new_fingerprint), style = MaterialTheme.typography.bodySmall)
                 Text(
                     entry.fingerprint(),
                     style = MaterialTheme.typography.bodySmall,
@@ -113,12 +114,12 @@ fun KeyChangedDialog(
         },
         confirmButton = {
             TextButton(onClick = onAccept) {
-                Text(if (zh) "接受新密钥" else "Accept New Key")
+                Text(stringResource(R.string.accept_new_key))
             }
         },
         dismissButton = {
             TextButton(onClick = onDisconnect) {
-                Text(if (zh) "断开连接" else "Disconnect")
+                Text(stringResource(R.string.disconnect))
             }
         },
     )

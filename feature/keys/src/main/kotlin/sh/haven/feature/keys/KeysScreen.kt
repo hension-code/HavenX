@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -130,7 +131,7 @@ fun KeysScreen(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(Icons.Filled.Add, contentDescription = if (zh) "添加密钥" else "Add key")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_key))
                 }
             }
         },
@@ -150,13 +151,13 @@ fun KeysScreen(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    if (zh) "暂无 SSH 密钥" else "No SSH keys",
+                    stringResource(R.string.no_ssh_keys),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
                 )
                 Text(
-                    if (zh) "点击 + 生成或导入密钥" else "Tap + to generate or import a key",
+                    stringResource(R.string.tap_to_generate_or_import),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
@@ -217,7 +218,7 @@ fun KeysScreen(
                             onDismissRequest = { contextMenuKeyId = null },
                         ) {
                             DropdownMenuItem(
-                                text = { Text(if (zh) "复制公钥" else "Copy public key") },
+                                text = { Text(stringResource(R.string.copy_public_key)) },
                                 onClick = {
                                     copyPublicKey(context, sshKey)
                                     contextMenuKeyId = null
@@ -228,7 +229,7 @@ fun KeysScreen(
                             )
                             if (!sshKey.keyType.startsWith("sk-")) {
                                 DropdownMenuItem(
-                                    text = { Text(if (zh) "导出私钥" else "Export private key") },
+                                    text = { Text(stringResource(R.string.export_private_key)) },
                                     onClick = {
                                         contextMenuKeyId = null
                                         viewModel.requestExport(sshKey.id)
@@ -240,7 +241,7 @@ fun KeysScreen(
                             }
                             DropdownMenuItem(
                                 text = {
-                                    Text(if (zh) "删除" else "Delete", color = MaterialTheme.colorScheme.error)
+                                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                                 },
                                 onClick = {
                                     viewModel.deleteKey(sshKey.id)
@@ -261,6 +262,8 @@ fun KeysScreen(
         }
     }
 
+    val clipboardEmptyError = stringResource(R.string.clipboard_is_empty)
+
     if (showAddKeyDialog) {
         AddKeyChooser(
             zh = zh,
@@ -277,7 +280,7 @@ fun KeysScreen(
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
                 if (text.isNullOrBlank()) {
-                    viewModel.showError(if (zh) "剪贴板为空" else "Clipboard is empty")
+                    viewModel.showError(clipboardEmptyError)
                 } else {
                     viewModel.startImport(text.toByteArray())
                 }
@@ -326,29 +329,29 @@ private fun AddKeyChooser(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "添加 SSH 密钥" else "Add SSH Key") },
+        title = { Text(stringResource(R.string.add_ssh_key)) },
         text = {
             Column {
                 ListItem(
                     modifier = Modifier.clickable { onGenerate() },
-                    headlineContent = { Text(if (zh) "生成新密钥" else "Generate new key") },
-                    supportingContent = { Text(if (zh) "Ed25519、RSA 或 ECDSA" else "Ed25519, RSA, or ECDSA") },
+                    headlineContent = { Text(stringResource(R.string.generate_new_key)) },
+                    supportingContent = { Text(stringResource(R.string.ed25519_rsa_or_ecdsa)) },
                     leadingContent = {
                         Icon(Icons.Filled.Add, contentDescription = null)
                     },
                 )
                 ListItem(
                     modifier = Modifier.clickable { onImport() },
-                    headlineContent = { Text(if (zh) "从文件导入" else "Import from file") },
-                    supportingContent = { Text(if (zh) "PEM 或 OpenSSH 格式" else "PEM or OpenSSH format") },
+                    headlineContent = { Text(stringResource(R.string.import_from_file)) },
+                    supportingContent = { Text(stringResource(R.string.pem_or_openssh_format)) },
                     leadingContent = {
                         Icon(Icons.Filled.FileUpload, contentDescription = null)
                     },
                 )
                 ListItem(
                     modifier = Modifier.clickable { onPaste() },
-                    headlineContent = { Text(if (zh) "从剪贴板粘贴" else "Paste from clipboard") },
-                    supportingContent = { Text(if (zh) "粘贴 PEM 或 OpenSSH 私钥" else "Paste a PEM or OpenSSH private key") },
+                    headlineContent = { Text(stringResource(R.string.paste_from_clipboard)) },
+                    supportingContent = { Text(stringResource(R.string.paste_a_pem_or_openssh)) },
                     leadingContent = {
                         Icon(Icons.Filled.ContentPaste, contentDescription = null)
                     },
@@ -358,7 +361,7 @@ private fun AddKeyChooser(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -377,14 +380,14 @@ private fun GenerateKeyDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "生成 SSH 密钥" else "Generate SSH Key") },
+        title = { Text(stringResource(R.string.generate_ssh_key)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text(if (zh) "名称" else "Label") },
-                    placeholder = { Text(if (zh) "例如：my-server" else "e.g. my-server") },
+                    label = { Text(stringResource(R.string.label)) },
+                    placeholder = { Text(stringResource(R.string.e_g_my_server)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -394,7 +397,7 @@ private fun GenerateKeyDialog(
                         value = selectedType.displayName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text(if (zh) "密钥类型" else "Key type") },
+                        label = { Text(stringResource(R.string.key_type)) },
                         modifier = Modifier
                             .fillMaxWidth(),
                     )
@@ -425,12 +428,12 @@ private fun GenerateKeyDialog(
             TextButton(
                 onClick = { onGenerate(label.ifBlank { selectedType.displayName }, selectedType) },
             ) {
-                Text(if (zh) "生成" else "Generate")
+                Text(stringResource(R.string.generate))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -446,17 +449,17 @@ private fun PassphraseDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "加密密钥" else "Encrypted Key") },
+        title = { Text(stringResource(R.string.encrypted_key)) },
         text = {
             Column {
                 Text(
-                    if (zh) "该密钥受口令保护。" else "This key is protected with a passphrase.",
+                    stringResource(R.string.this_key_is_protected_with),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it },
-                    label = { Text(if (zh) "口令" else "Passphrase") },
+                    label = { Text(stringResource(R.string.passphrase)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier
@@ -470,12 +473,12 @@ private fun PassphraseDialog(
                 onClick = { onConfirm(passphrase) },
                 enabled = passphrase.isNotEmpty(),
             ) {
-                Text(if (zh) "解锁" else "Unlock")
+                Text(stringResource(R.string.unlock))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -493,14 +496,14 @@ private fun ImportLabelDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "导入 SSH 密钥" else "Import SSH Key") },
+        title = { Text(stringResource(R.string.import_ssh_key)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text(if (zh) "名称" else "Label") },
-                    placeholder = { Text(if (zh) "例如：my-server" else "e.g. my-server") },
+                    label = { Text(stringResource(R.string.label)) },
+                    placeholder = { Text(stringResource(R.string.e_g_my_server)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -521,12 +524,12 @@ private fun ImportLabelDialog(
             TextButton(
                 onClick = { onConfirm(label.ifBlank { keyType }) },
             ) {
-                Text(if (zh) "导入" else "Import")
+                Text(stringResource(R.string.str_import))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )

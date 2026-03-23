@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add_key">Add key</string>
+    <string name="no_ssh_keys">No SSH keys</string>
+    <string name="tap_to_generate_or_import">Tap + to generate or import a key</string>
+    <string name="copy_public_key">Copy public key</string>
+    <string name="export_private_key">Export private key</string>
+    <string name="delete">Delete</string>
+    <string name="clipboard_is_empty">Clipboard is empty</string>
+    <string name="add_ssh_key">Add SSH Key</string>
+    <string name="generate_new_key">Generate new key</string>
+    <string name="ed25519_rsa_or_ecdsa">Ed25519, RSA, or ECDSA</string>
+    <string name="import_from_file">Import from file</string>
+    <string name="pem_or_openssh_format">PEM or OpenSSH format</string>
+    <string name="paste_from_clipboard">Paste from clipboard</string>
+    <string name="paste_a_pem_or_openssh">Paste a PEM or OpenSSH private key</string>
+    <string name="cancel">Cancel</string>
+    <string name="generate_ssh_key">Generate SSH Key</string>
+    <string name="label">Label</string>
+    <string name="e_g_my_server">e.g. my-server</string>
+    <string name="key_type">Key type</string>
+    <string name="generate">Generate</string>
+    <string name="encrypted_key">Encrypted Key</string>
+    <string name="this_key_is_protected_with">This key is protected with a passphrase.</string>
+    <string name="passphrase">Passphrase</string>
+    <string name="unlock">Unlock</string>
+    <string name="import_ssh_key">Import SSH Key</string>
+    <string name="str_import">Import</string>
+</resources>

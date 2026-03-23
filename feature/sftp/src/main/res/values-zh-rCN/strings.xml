@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloaded_dl_filename">已下载 ${dl.fileName}</string>
+    <string name="open">打开</string>
+    <string name="no_app_found_to_open">未找到可打开该文件的应用</string>
+    <string name="no_app_found_to_preview">未找到可预览该媒体的应用</string>
+    <string name="back">后退</string>
+    <string name="forward">前进</string>
+    <string name="up">上级目录</string>
+    <string name="refresh">刷新</string>
+    <string name="hide_hidden_files">隐藏隐藏文件</string>
+    <string name="show_hidden_files">显示隐藏文件</string>
+    <string name="sort">排序</string>
+    <string name="favorite_folders">收藏目录</string>
+    <string name="go">跳转</string>
+    <string name="cancel">取消编辑</string>
+    <string name="edit_path">编辑路径</string>
+    <string name="upload_file">上传文件</string>
+    <string name="empty_directory">空目录</string>
+    <string name="path_copied">路径已复制</string>
+    <string name="directory">文件夹</string>
+    <string name="favorite">已收藏</string>
+    <string name="download">下载</string>
+    <string name="remove_favorite">取消收藏目录</string>
+    <string name="add_favorite">收藏目录</string>
+    <string name="copy_path">复制路径</string>
+    <string name="delete">删除</string>
+    <string name="no_favorites_yet">暂无收藏目录</string>
+    <string name="root">根目录</string>
+    <string name="name_a_z">名称 A-Z</string>
+    <string name="name_z_a">名称 Z-A</string>
+    <string name="size_smallest">大小（小-&amp;gt;大）</string>
+    <string name="size_largest">大小（大-&amp;gt;小）</string>
+    <string name="date_oldest">日期（最早）</string>
+    <string name="date_newest">日期（最新）</string>
+    <string name="sftp_file_browser">SFTP 文件浏览器</string>
+    <string name="connect_to_a_server_to">连接到服务器后可浏览文件</string>
+</resources>

@@ -8,6 +8,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +22,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -72,6 +77,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -80,7 +86,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -99,8 +104,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -154,12 +166,17 @@ fun SftpScreen(
         }
     }
 
+    val downloadMessage = stringResource(R.string.downloaded_dl_filename)
+    val downloadActionLabel = stringResource(R.string.open)
+    val noAppMessage = stringResource(R.string.no_app_found_to_open)
+
     LaunchedEffect(lastDownload) {
         val dl = lastDownload ?: return@LaunchedEffect
         viewModel.dismissMessage() // clear the plain message so it doesn't double-show
+        
         val result = snackbarHostState.showSnackbar(
-            message = if (zh) "已下载 ${dl.fileName}" else "Downloaded ${dl.fileName}",
-            actionLabel = if (zh) "打开" else "Open",
+            message = downloadMessage,
+            actionLabel = downloadActionLabel,
             duration = androidx.compose.material3.SnackbarDuration.Long,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -171,14 +188,17 @@ fun SftpScreen(
                 }
                 context.startActivity(intent)
             } catch (e: Exception) {
-                snackbarHostState.showSnackbar(if (zh) "未找到可打开该文件的应用" else "No app found to open this file")
+                snackbarHostState.showSnackbar(noAppMessage)
             }
         }
         viewModel.clearLastDownload()
     }
 
+    val noPreviewAppMessage = stringResource(R.string.no_app_found_to_preview)
+
     LaunchedEffect(lastPreview) {
         val preview = lastPreview ?: return@LaunchedEffect
+        
         try {
             val intent = when (preview.mediaType) {
                 MediaTypeResolver.MediaType.IMAGE -> Intent().setClassName(
@@ -204,7 +224,7 @@ fun SftpScreen(
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            snackbarHostState.showSnackbar(if (zh) "未找到可预览该媒体的应用" else "No app found to preview this media")
+            snackbarHostState.showSnackbar(noPreviewAppMessage)
         } finally {
             viewModel.clearLastPreview()
         }
@@ -327,30 +347,30 @@ fun SftpScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = { viewModel.goBack() }, enabled = canInteract && canGoBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, if (zh) "后退" else "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
                         }
                         IconButton(onClick = { viewModel.goForward() }, enabled = canInteract && canGoForward) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, if (zh) "前进" else "Forward")
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.forward))
                         }
                         IconButton(onClick = { viewModel.navigateUp() }, enabled = canInteract && currentPath != "/") {
-                            Icon(Icons.Filled.ArrowUpward, if (zh) "上级目录" else "Up")
+                            Icon(Icons.Filled.ArrowUpward, stringResource(R.string.up))
                         }
                         IconButton(onClick = { viewModel.refresh() }, enabled = canInteract) {
-                            Icon(Icons.Filled.Refresh, if (zh) "刷新" else "Refresh")
+                            Icon(Icons.Filled.Refresh, stringResource(R.string.refresh))
                         }
                         IconButton(onClick = { viewModel.toggleShowHidden() }) {
                             Icon(
                                 if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                                 contentDescription = if (showHidden) {
-                                    if (zh) "隐藏隐藏文件" else "Hide hidden files"
+                                    stringResource(R.string.hide_hidden_files)
                                 } else {
-                                    if (zh) "显示隐藏文件" else "Show hidden files"
+                                    stringResource(R.string.show_hidden_files)
                                 },
                             )
                         }
                         Box {
                             IconButton(onClick = { showSortMenu = true }, enabled = canInteract) {
-                                Icon(Icons.AutoMirrored.Filled.Sort, if (zh) "排序" else "Sort")
+                                Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.sort))
                             }
                             SortDropdown(
                                 expanded = showSortMenu,
@@ -365,7 +385,7 @@ fun SftpScreen(
                         }
                         Box {
                             IconButton(onClick = { showFavoritesMenu = true }, enabled = canInteract) {
-                                Icon(Icons.Filled.StarBorder, if (zh) "收藏目录" else "Favorite folders")
+                                Icon(Icons.Filled.StarBorder, stringResource(R.string.favorite_folders))
                             }
                             FavoritesDropdown(
                                 expanded = showFavoritesMenu,
@@ -420,7 +440,7 @@ fun SftpScreen(
                             },
                             enabled = activeProfileId != null,
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, if (zh) "跳转" else "Go")
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.go))
                         }
                         IconButton(
                             onClick = {
@@ -428,7 +448,7 @@ fun SftpScreen(
                                 pathEditMode = false
                             },
                         ) {
-                            Icon(Icons.Filled.Close, if (zh) "取消编辑" else "Cancel")
+                            Icon(Icons.Filled.Close, stringResource(R.string.cancel))
                         }
                     } else {
                         BreadcrumbPathBar(
@@ -450,7 +470,7 @@ fun SftpScreen(
                             },
                             enabled = activeProfileId != null,
                         ) {
-                            Icon(Icons.Filled.Edit, if (zh) "编辑路径" else "Edit path")
+                            Icon(Icons.Filled.Edit, stringResource(R.string.edit_path))
                         }
                     }
                     }
@@ -461,7 +481,7 @@ fun SftpScreen(
         floatingActionButton = {
             if (activeProfileId != null) {
                 FloatingActionButton(onClick = { uploadLauncher.launch(arrayOf("*/*")) }) {
-                    Icon(Icons.Filled.Upload, if (zh) "上传文件" else "Upload file")
+                    Icon(Icons.Filled.Upload, stringResource(R.string.upload_file))
                 }
             }
         },
@@ -542,7 +562,7 @@ fun SftpScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            if (zh) "空目录" else "Empty directory",
+                            stringResource(R.string.empty_directory),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -550,6 +570,7 @@ fun SftpScreen(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(entries, key = { it.path }) { entry ->
+                            val pathCopiedMsg = stringResource(R.string.path_copied)
                             FileListItem(
                                 entry = entry,
                                 onTap = {
@@ -568,7 +589,7 @@ fun SftpScreen(
                                 onCopyPath = {
                                     clipboardManager.setText(AnnotatedString(entry.path))
                                     scope.launch {
-                                        snackbarHostState.showSnackbar(if (zh) "路径已复制" else "Path copied")
+                                        snackbarHostState.showSnackbar(pathCopiedMsg)
                                     }
                                 },
                                 zh = zh,
@@ -596,16 +617,18 @@ private fun FileListItem(
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+    var pressOffset by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    Box {
+    Box(modifier = Modifier.fillMaxWidth()) {
         val fileVisual = remember(entry.name, entry.isDirectory) { resolveFileVisual(entry) }
         ListItem(
             headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
                 val sizeText = if (entry.isDirectory) {
-                    if (zh) "文件夹" else "Directory"
+                    stringResource(R.string.directory)
                 } else {
                     Formatter.formatFileSize(context, entry.size)
                 }
@@ -621,62 +644,132 @@ private fun FileListItem(
             },
             trailingContent = {
                 if (entry.isDirectory && isFavoriteDirectory) {
-                    Icon(Icons.Filled.Star, contentDescription = if (zh) "已收藏" else "Favorite")
+                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.favorite))
                 }
             },
-            modifier = Modifier.combinedClickable(
-                onClick = {
-                    if (entry.isDirectory) {
-                        onTap()
-                    } else if (isMediaPreviewSupported(entry.name)) {
-                        onPreview()
+            modifier = Modifier.pointerInput(entry.name) {
+                detectTapGestures(
+                    onTap = {
+                        if (entry.isDirectory) {
+                            onTap()
+                        } else if (isMediaPreviewSupported(entry.name)) {
+                            onPreview()
+                        }
+                    },
+                    onLongPress = { offset ->
+                        pressOffset = androidx.compose.ui.unit.DpOffset(
+                            x = with(density) { offset.x.toDp() },
+                            y = with(density) { offset.y.toDp() }
+                        )
+                        showMenu = true
                     }
-                },
-                onLongClick = { showMenu = true },
-            ),
+                )
+            },
         )
 
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false },
-        ) {
-            if (!entry.isDirectory) {
-                DropdownMenuItem(
-                    text = { Text(if (zh) "下载" else "Download") },
-                    leadingIcon = { Icon(Icons.Filled.Download, null) },
-                    onClick = { showMenu = false; onDownload() },
-                )
-            } else {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (isFavoriteDirectory) {
-                                if (zh) "取消收藏目录" else "Remove favorite"
-                            } else {
-                                if (zh) "收藏目录" else "Add favorite"
-                            },
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            if (isFavoriteDirectory) Icons.Filled.Star else Icons.Filled.StarBorder,
-                            null,
-                        )
-                    },
-                    onClick = { showMenu = false; onToggleFavorite() },
-                )
+        if (showMenu) {
+            val positionProvider = remember {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val touchX = anchorBounds.left + with(density) { pressOffset.x.roundToPx() }
+                        val touchY = anchorBounds.top + with(density) { pressOffset.y.roundToPx() }
+                        
+                        // If touched on the left half, popup appears entirely to the right of the finger
+                        // If touched on the right half, popup appears entirely to the left of the finger
+                        val isLeftHalf = touchX < windowSize.width / 2
+                        val targetX = if (isLeftHalf) touchX else touchX - popupContentSize.width
+                        
+                        val yOffset = with(density) { 24.dp.roundToPx() }
+                        val targetY = touchY + yOffset
+                        
+                        val x = targetX.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                        val y = targetY.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                        return IntOffset(x, y)
+                    }
+                }
             }
-            DropdownMenuItem(
-                text = { Text(if (zh) "复制路径" else "Copy path") },
-                leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
-                onClick = { showMenu = false; onCopyPath() },
-            )
-            DropdownMenuItem(
-                text = { Text(if (zh) "删除" else "Delete") },
-                leadingIcon = { Icon(Icons.Filled.Delete, null) },
-                onClick = { showMenu = false; onDelete() },
-            )
+            Popup(
+                popupPositionProvider = positionProvider,
+                onDismissRequest = { showMenu = false },
+                properties = PopupProperties(
+                    focusable = true,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true,
+                ),
+            ) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .widthIn(max = 340.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .width(androidx.compose.foundation.layout.IntrinsicSize.Max)
+                            .padding(vertical = 8.dp),
+                    ) {
+                        if (!entry.isDirectory) {
+                            PopupMenuRow(
+                                text = stringResource(R.string.download),
+                                icon = { Icon(Icons.Filled.Download, null) },
+                                onClick = { showMenu = false; onDownload() },
+                            )
+                        } else {
+                            PopupMenuRow(
+                                text = if (isFavoriteDirectory) {
+                                    stringResource(R.string.remove_favorite)
+                                } else {
+                                    stringResource(R.string.add_favorite)
+                                },
+                                icon = {
+                                    Icon(
+                                        if (isFavoriteDirectory) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                        null,
+                                    )
+                                },
+                                onClick = { showMenu = false; onToggleFavorite() },
+                            )
+                        }
+                        PopupMenuRow(
+                            text = stringResource(R.string.copy_path),
+                            icon = { Icon(Icons.Filled.ContentCopy, null) },
+                            onClick = { showMenu = false; onCopyPath() },
+                        )
+                        PopupMenuRow(
+                            text = stringResource(R.string.delete),
+                            icon = { Icon(Icons.Filled.Delete, null) },
+                            onClick = { showMenu = false; onDelete() },
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun PopupMenuRow(
+    text: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(text)
     }
 }
 
@@ -773,7 +866,7 @@ private fun FavoritesDropdown(
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (favorites.isEmpty()) {
             DropdownMenuItem(
-                text = { Text(if (zh) "暂无收藏目录" else "No favorites yet") },
+                text = { Text(stringResource(R.string.no_favorites_yet)) },
                 onClick = onDismiss,
             )
             return@DropdownMenu
@@ -820,7 +913,7 @@ private fun BreadcrumbPathBar(
             if (index == 0) {
                 Icon(
                     imageVector = Icons.Filled.Home,
-                    contentDescription = if (zh) "根目录" else "Root",
+                    contentDescription = stringResource(R.string.root),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(18.dp)
@@ -870,12 +963,12 @@ private fun SortDropdown(
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         SortMode.entries.forEach { mode ->
             val label = when (mode) {
-                SortMode.NAME_ASC -> if (zh) "名称 A-Z" else "Name A-Z"
-                SortMode.NAME_DESC -> if (zh) "名称 Z-A" else "Name Z-A"
-                SortMode.SIZE_ASC -> if (zh) "大小（小->大）" else "Size (smallest)"
-                SortMode.SIZE_DESC -> if (zh) "大小（大->小）" else "Size (largest)"
-                SortMode.DATE_ASC -> if (zh) "日期（最早）" else "Date (oldest)"
-                SortMode.DATE_DESC -> if (zh) "日期（最新）" else "Date (newest)"
+                SortMode.NAME_ASC -> stringResource(R.string.name_a_z)
+                SortMode.NAME_DESC -> stringResource(R.string.name_z_a)
+                SortMode.SIZE_ASC -> stringResource(R.string.size_smallest)
+                SortMode.SIZE_DESC -> stringResource(R.string.size_largest)
+                SortMode.DATE_ASC -> stringResource(R.string.date_oldest)
+                SortMode.DATE_DESC -> stringResource(R.string.date_newest)
             }
             DropdownMenuItem(
                 text = { Text(label) },
@@ -905,13 +998,13 @@ private fun EmptyState(zh: Boolean) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            if (zh) "SFTP 文件浏览器" else "SFTP File Browser",
+            stringResource(R.string.sftp_file_browser),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            if (zh) "连接到服务器后可浏览文件" else "Connect to a server to browse files",
+            stringResource(R.string.connect_to_a_server_to),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

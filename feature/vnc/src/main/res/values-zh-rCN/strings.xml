@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add_a_connection_on_the">请在“连接”页面添加连接</string>
+    <string name="disconnect">断开连接</string>
+    <string name="toggle_keyboard">切换键盘</string>
+    <string name="reset_zoom">重置缩放</string>
+    <string name="fullscreen">全屏</string>
+    <string name="session_menu">会话菜单</string>
+    <string name="reset_zoom_1">重置缩放</string>
+    <string name="exit_fullscreen">退出全屏</string>
+</resources>

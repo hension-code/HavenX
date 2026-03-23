@@ -40,6 +40,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -253,7 +254,7 @@ fun TerminalScreen(
                                 if (reconnecting) {
                                     Icon(
                                         Icons.Filled.Autorenew,
-                                        contentDescription = if (zh) "重连中" else "Reconnecting",
+                                        contentDescription = stringResource(R.string.reconnecting),
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.error,
                                     )
@@ -268,7 +269,7 @@ fun TerminalScreen(
                                     ) {
                                         Icon(
                                             Icons.Filled.Add,
-                                            contentDescription = if (zh) "克隆标签页" else "Clone tab",
+                                            contentDescription = stringResource(R.string.clone_tab),
                                             modifier = Modifier.size(14.dp),
                                         )
                                     }
@@ -279,7 +280,7 @@ fun TerminalScreen(
                                 ) {
                                     Icon(
                                         Icons.Filled.Close,
-                                        contentDescription = if (zh) "关闭标签页" else "Close tab",
+                                        contentDescription = stringResource(R.string.close_tab),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 }
@@ -460,7 +461,7 @@ private fun EmptyTerminalState(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (zh) "连接到服务器以开始会话。" else "Connect to a server to start a session.",
+            text = stringResource(R.string.connect_to_a_server_to),
             fontFamily = FontFamily.Monospace,
             fontSize = fontSize.sp,
             color = foregroundColor,
@@ -498,7 +499,7 @@ private fun NewTabSessionPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "$managerLabel 会话" else "$managerLabel sessions") },
+        title = { Text(stringResource(R.string.managerlabel_sessions, managerLabel)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 if (error != null) {
@@ -517,7 +518,7 @@ private fun NewTabSessionPickerDialog(
                                     IconButton(onClick = { renamingSession = name }) {
                                         Icon(
                                             Icons.Filled.DriveFileRenameOutline,
-                                            contentDescription = if (zh) "重命名会话" else "Rename session",
+                                            contentDescription = stringResource(R.string.rename_session),
                                         )
                                     }
                                 }
@@ -525,7 +526,7 @@ private fun NewTabSessionPickerDialog(
                                     IconButton(onClick = { onKill(name) }) {
                                         Icon(
                                             Icons.Filled.Delete,
-                                            contentDescription = if (zh) "结束会话" else "Kill session",
+                                            contentDescription = stringResource(R.string.kill_session),
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -539,7 +540,7 @@ private fun NewTabSessionPickerDialog(
                 ListItem(
                     headlineContent = {
                         Text(
-                            if (zh) "新建会话" else "New session",
+                            stringResource(R.string.new_session),
                             color = MaterialTheme.colorScheme.primary,
                         )
                     },
@@ -556,7 +557,7 @@ private fun NewTabSessionPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -870,18 +871,18 @@ private fun VncSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "VNC 桌面" else "VNC Desktop") },
+        title = { Text(stringResource(R.string.vnc_desktop)) },
         text = {
             Column {
                 Text(
-                    if (zh) "连接到 $host" else "Connect to $host",
+                    stringResource(R.string.connect_to_host, host),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.size(12.dp))
                 OutlinedTextField(
                     value = port,
                     onValueChange = { port = it },
-                    label = { Text(if (zh) "端口" else "Port") },
+                    label = { Text(stringResource(R.string.port)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -889,7 +890,7 @@ private fun VncSettingsDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(if (zh) "密码" else "Password") },
+                    label = { Text(stringResource(R.string.password)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -899,14 +900,14 @@ private fun VncSettingsDialog(
                         checked = sshForward,
                         onCheckedChange = { sshForward = it },
                     )
-                    Text(if (zh) "通过 SSH 隧道" else "Tunnel through SSH")
+                    Text(stringResource(R.string.tunnel_through_ssh))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(
                         checked = save,
                         onCheckedChange = { save = it },
                     )
-                    Text(if (zh) "保存到此连接" else "Save for this connection")
+                    Text(stringResource(R.string.save_for_this_connection))
                 }
             }
         },
@@ -917,12 +918,12 @@ private fun VncSettingsDialog(
                     onConnect(p, password.ifEmpty { null }, sshForward, save)
                 },
             ) {
-                Text(if (zh) "连接" else "Connect")
+                Text(stringResource(R.string.connect))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -939,12 +940,12 @@ private fun RenameSessionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (zh) "重命名会话" else "Rename Session") },
+        title = { Text(stringResource(R.string.rename_session_1)) },
         text = {
             OutlinedTextField(
                 value = label,
                 onValueChange = { label = it },
-                label = { Text(if (zh) "名称" else "Name") },
+                label = { Text(stringResource(R.string.name)) },
                 singleLine = true,
             )
         },
@@ -953,12 +954,12 @@ private fun RenameSessionDialog(
                 onClick = { onRename(label) },
                 enabled = label.isNotBlank() && label != currentLabel,
             ) {
-                Text(if (zh) "重命名" else "Rename")
+                Text(stringResource(R.string.rename))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (zh) "取消" else "Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="paste">Paste</string>
+    <string name="open">Open</string>
+    <string name="no_url_detected">No URL detected</string>
+    <string name="start">Start</string>
+    <string name="end">End</string>
+    <string name="up">Up</string>
+    <string name="down">Down</string>
+    <string name="left">Left</string>
+    <string name="right">Right</string>
+    <string name="cancel">Cancel</string>
+    <string name="reconnecting">Reconnecting</string>
+    <string name="clone_tab">Clone tab</string>
+    <string name="close_tab">Close tab</string>
+    <string name="connect_to_a_server_to">Connect to a server to start a session.</string>
+    <string name="managerlabel_sessions">%1$s sessions</string>
+    <string name="rename_session">Rename session</string>
+    <string name="kill_session">Kill session</string>
+    <string name="new_session">New session</string>
+    <string name="vnc_desktop">VNC Desktop</string>
+    <string name="connect_to_host">Connect to %1$s</string>
+    <string name="port">Port</string>
+    <string name="password">Password</string>
+    <string name="tunnel_through_ssh">Tunnel through SSH</string>
+    <string name="save_for_this_connection">Save for this connection</string>
+    <string name="connect">Connect</string>
+    <string name="rename_session_1">Rename Session</string>
+    <string name="name">Name</string>
+    <string name="rename">Rename</string>
+</resources>

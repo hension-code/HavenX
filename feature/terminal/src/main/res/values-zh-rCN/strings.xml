@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="copy">复制</string>
+    <string name="copied">已复制</string>
+    <string name="paste">粘贴</string>
+    <string name="open">打开</string>
+    <string name="no_url_detected">未检测到链接</string>
+    <string name="start">起点</string>
+    <string name="end">终点</string>
+    <string name="up">上</string>
+    <string name="down">下</string>
+    <string name="left">左</string>
+    <string name="right">右</string>
+    <string name="cancel">取消</string>
+    <string name="reconnecting">重连中</string>
+    <string name="clone_tab">克隆标签页</string>
+    <string name="close_tab">关闭标签页</string>
+    <string name="connect_to_a_server_to">连接到服务器以开始会话。</string>
+    <string name="managerlabel_sessions">%1$s 会话</string>
+    <string name="rename_session">重命名会话</string>
+    <string name="kill_session">结束会话</string>
+    <string name="new_session">新建会话</string>
+    <string name="vnc_desktop">VNC 桌面</string>
+    <string name="connect_to_host">连接到 %1$s</string>
+    <string name="port">端口</string>
+    <string name="password">密码</string>
+    <string name="tunnel_through_ssh">通过 SSH 隧道</string>
+    <string name="save_for_this_connection">保存到此连接</string>
+    <string name="connect">连接</string>
+    <string name="rename_session_1">重命名会话</string>
+    <string name="name">名称</string>
+    <string name="rename">重命名</string>
+</resources>

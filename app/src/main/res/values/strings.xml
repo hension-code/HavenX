@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HavenX</string>
-    <string name="nav_connections">Connections</string>
+    <string name="nav_connections">Connect</string>
     <string name="nav_terminal">Terminal</string>
     <string name="nav_desktop">Desktop</string>
     <string name="nav_sftp">Files</string>
