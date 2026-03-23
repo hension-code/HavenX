@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -981,7 +982,7 @@ private fun ToolbarSimpleEditor(
         text = {
             Column(
                 modifier = Modifier
-                    .requiredHeight(250.dp)
+                    .height(400.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(
@@ -1034,23 +1035,7 @@ private fun ToolbarSimpleEditor(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                // Preserve custom keys in their original rows
-                val customRow1 = layout.row1.filterIsInstance<ToolbarItem.Custom>()
-                val customRow2 = layout.row2.filterIsInstance<ToolbarItem.Custom>()
-                val newRow1 = ToolbarKey.entries
-                    .filter { assignments[it] == KeyAssignment.ROW1 }
-                    .map { ToolbarItem.BuiltIn(it) } + customRow1
-                val newRow2 = ToolbarKey.entries
-                    .filter { assignments[it] == KeyAssignment.ROW2 }
-                    .map { ToolbarItem.BuiltIn(it) } + customRow2
-                onSave(ToolbarLayout(listOf(newRow1, newRow2)))
-            }) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            Row {
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 TextButton(onClick = {
                     assignments = ToolbarKey.entries.associateWith { key ->
                         when (key) {
@@ -1059,7 +1044,7 @@ private fun ToolbarSimpleEditor(
                             else -> KeyAssignment.OFF
                         }
                     }
-                    }) {
+                }) {
                     Text(stringResource(R.string.reset))
                 }
                 TextButton(onClick = onAdvancedMode) {
@@ -1067,6 +1052,20 @@ private fun ToolbarSimpleEditor(
                 }
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.cancel))
+                }
+                TextButton(onClick = {
+                    // Preserve custom keys in their original rows
+                    val customRow1 = layout.row1.filterIsInstance<ToolbarItem.Custom>()
+                    val customRow2 = layout.row2.filterIsInstance<ToolbarItem.Custom>()
+                    val newRow1 = ToolbarKey.entries
+                        .filter { assignments[it] == KeyAssignment.ROW1 }
+                        .map { ToolbarItem.BuiltIn(it) } + customRow1
+                    val newRow2 = ToolbarKey.entries
+                        .filter { assignments[it] == KeyAssignment.ROW2 }
+                        .map { ToolbarItem.BuiltIn(it) } + customRow2
+                    onSave(ToolbarLayout(listOf(newRow1, newRow2)))
+                }) {
+                    Text(stringResource(R.string.save))
                 }
             }
         },
