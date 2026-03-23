@@ -44,8 +44,12 @@ internal class ImeInputView(
 ) : View(context) {
 
     init {
-        isFocusable = true
-        isFocusableInTouchMode = true
+        // Do NOT set isFocusable/isFocusableInTouchMode here.
+        // Setting them on creation causes Android to auto-pop the keyboard
+        // when the View is added to the hierarchy. We enable focusability
+        // only when showIme() is explicitly called.
+        isFocusable = false
+        isFocusableInTouchMode = false
     }
 
     var isComposeModeActive: Boolean = false
@@ -62,6 +66,8 @@ internal class ImeInputView(
      */
     @Suppress("DEPRECATION")
     fun showIme() {
+        isFocusable = true
+        isFocusableInTouchMode = true
         if (requestFocus()) {
             inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_FORCED)
         }
@@ -72,6 +78,8 @@ internal class ImeInputView(
      */
     fun hideIme() {
         inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
+        isFocusable = false
+        isFocusableInTouchMode = false
     }
 
     override fun onDetachedFromWindow() {
