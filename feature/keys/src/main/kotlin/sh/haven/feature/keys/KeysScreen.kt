@@ -339,6 +339,7 @@ private fun AddKeyChooser(
                     leadingContent = {
                         Icon(Icons.Filled.Add, contentDescription = null)
                     },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 )
                 ListItem(
                     modifier = Modifier.clickable { onImport() },
@@ -347,6 +348,7 @@ private fun AddKeyChooser(
                     leadingContent = {
                         Icon(Icons.Filled.FileUpload, contentDescription = null)
                     },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 )
                 ListItem(
                     modifier = Modifier.clickable { onPaste() },
@@ -355,6 +357,7 @@ private fun AddKeyChooser(
                     leadingContent = {
                         Icon(Icons.Filled.ContentPaste, contentDescription = null)
                     },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 )
             }
         },
