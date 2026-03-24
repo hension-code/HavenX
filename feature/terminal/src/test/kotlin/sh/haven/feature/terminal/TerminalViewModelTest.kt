@@ -32,7 +32,7 @@ class TerminalViewModelTest {
         etSessionManager = mockk<EtSessionManager>(relaxed = true) {
             every { sessions } returns MutableStateFlow(emptyMap())
         }
-        viewModel = TerminalViewModel(sessionManager, reticulumSessionManager, moshSessionManager, etSessionManager, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
+        viewModel = TerminalViewModel(sessionManager, reticulumSessionManager, moshSessionManager, etSessionManager, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
     }
 
     @Test
