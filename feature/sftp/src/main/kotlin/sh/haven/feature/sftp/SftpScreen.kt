@@ -174,13 +174,14 @@ fun SftpScreen(
 
     val downloadActionLabel = stringResource(R.string.open)
     val noAppMessage = stringResource(R.string.no_app_found_to_open)
+    val downloadedTemplate = stringResource(R.string.downloaded_dl_filename)
 
     LaunchedEffect(lastDownload) {
         val dl = lastDownload ?: return@LaunchedEffect
         viewModel.dismissMessage() // clear the plain message so it doesn't double-show
         
         val result = snackbarHostState.showSnackbar(
-            message = context.getString(R.string.downloaded_dl_filename, dl.fileName),
+            message = String.format(downloadedTemplate, dl.fileName),
             actionLabel = downloadActionLabel,
             duration = androidx.compose.material3.SnackbarDuration.Long,
         )
