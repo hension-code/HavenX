@@ -170,6 +170,46 @@ class SftpTransferManager @Inject constructor(
         }
     }
 
+    suspend fun performDirectUpload(
+        sourceUri: Uri,
+        destPath: String,
+        profileId: String,
+        isSmb: Boolean,
+        totalBytes: Long,
+        onProgress: (Long) -> Boolean
+    ) {
+        withContext(Dispatchers.IO) {
+            val inputStream = context.contentResolver.openInputStream(sourceUri)
+                ?: throw IllegalStateException("Cannot open input stream")
+            inputStream.use { input ->
+                if (isSmb) {
+                    val client = smbSessionManager.getClientForProfile(profileId)
+                        ?: throw IllegalStateException("SMB not connected")
+                    client.upload(input, destPath, totalBytes) { transferred, _ ->
+                        onProgress(transferred)
+                    }
+                } else {
+                    val channel = openDedicatedSftpChannel(profileId)
+                        ?: throw IllegalStateException("Not connected")
+                    try {
+                        val monitor = object : SftpProgressMonitor {
+                            private var transferred = 0L
+                            override fun init(op: Int, src: String, dest: String, max: Long) {}
+                            override fun count(bytes: Long): Boolean {
+                                transferred += bytes
+                                return onProgress(transferred)
+                            }
+                            override fun end() {}
+                        }
+                        channel.put(input, destPath, monitor)
+                    } finally {
+                        if (channel.isConnected) channel.disconnect()
+                    }
+                }
+            }
+        }
+    }
+
     private fun updateTask(id: String, update: (TransferTask) -> TransferTask) {
         _transfers.value = _transfers.value.map { if (it.id == id) update(it) else it }
     }

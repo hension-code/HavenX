@@ -8,4 +8,8 @@
     <string name="nav_keys">Keys</string>
     <string name="nav_settings">Settings</string>
     <string name="app_name_debug">HavenX (Debug)</string>
+    <string name="toast_failed_load_file">Failed to load file</string>
+    <string name="toast_saved_uploading">Saved and uploaded</string>
+    <string name="toast_failed_save">Failed to save: %1$s</string>
+    <string name="toast_cannot_upload_disconnected">Cannot upload: disconnected</string>
 </resources>

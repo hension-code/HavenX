@@ -215,6 +215,10 @@ fun SftpScreen(
                     context.packageName,
                     "com.hension.havenx.PlayerPreviewActivity",
                 )
+                MediaTypeResolver.MediaType.TEXT -> Intent().setClassName(
+                    context.packageName,
+                    "com.hension.havenx.TextEditorActivity",
+                )
                 MediaTypeResolver.MediaType.UNSUPPORTED -> Intent(Intent.ACTION_VIEW).apply {
                     val uri = preview.uri ?: throw IllegalStateException("Missing preview uri")
                     setDataAndType(uri, preview.mimeType)
@@ -225,6 +229,8 @@ fun SftpScreen(
                     putExtra("FILE_PATH", preview.filePath)
                     putExtra("REMOTE_PATH", preview.remotePath)
                     putExtra("STREAM_URL", preview.streamUrl)
+                    putExtra("PROFILE_ID", preview.profileId)
+                    putExtra("IS_SMB", preview.isSmb)
                 }
             }
             context.startActivity(intent)
@@ -1065,12 +1071,7 @@ private fun FavoritesDropdown(
 }
 
 private fun isMediaPreviewSupported(name: String): Boolean {
-    val ext = name.substringAfterLast('.', "").lowercase()
-    if (ext.isBlank()) return false
-    val image = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "svg")
-    val video = setOf("mp4", "m4v", "webm", "mkv", "mov", "avi", "flv", "ts")
-    val audio = setOf("mp3", "m4a", "aac", "wav", "ogg", "oga", "flac")
-    return ext in image || ext in video || ext in audio
+    return MediaTypeResolver.resolve(name) != MediaTypeResolver.MediaType.UNSUPPORTED
 }
 
 @Composable

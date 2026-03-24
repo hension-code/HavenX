@@ -8,4 +8,8 @@
     <string name="nav_keys">密钥</string>
     <string name="nav_settings">设置</string>
     <string name="app_name_debug">HavenX（调试）</string>
+    <string name="toast_failed_load_file">加载文件失败</string>
+    <string name="toast_saved_uploading">已保存并上传完成</string>
+    <string name="toast_failed_save">保存失败：%1$s</string>
+    <string name="toast_cannot_upload_disconnected">无法上传：连接已断开</string>
 </resources>

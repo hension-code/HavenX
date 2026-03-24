@@ -44,6 +44,12 @@
             android:exported="false"
             android:supportsPictureInPicture="true" />
 
+        <activity
+            android:name=".TextEditorActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name="sh.haven.core.ssh.SshConnectionService"
             android:exported="false"

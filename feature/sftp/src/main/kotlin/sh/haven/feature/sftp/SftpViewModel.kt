@@ -105,6 +105,8 @@ class SftpViewModel @Inject constructor(
         val streamUrl: String?,
         val mimeType: String,
         val mediaType: MediaTypeResolver.MediaType,
+        val profileId: String,
+        val isSmb: Boolean,
     )
     private val _lastPreview = MutableStateFlow<PreviewResult?>(null)
     val lastPreview: StateFlow<PreviewResult?> = _lastPreview.asStateFlow()
@@ -605,6 +607,8 @@ class SftpViewModel @Inject constructor(
                         streamUrl = streamUrl,
                         mimeType = mimeType,
                         mediaType = mediaType,
+                        profileId = profileId,
+                        isSmb = isSmbProfile,
                     )
                 } else {
                     val cacheFile = withContext(Dispatchers.IO) {
@@ -623,6 +627,8 @@ class SftpViewModel @Inject constructor(
                         streamUrl = null,
                         mimeType = mimeType,
                         mediaType = mediaType,
+                        profileId = profileId,
+                        isSmb = _isSmbProfile.value,
                     )
                 }
             } catch (e: Exception) {
