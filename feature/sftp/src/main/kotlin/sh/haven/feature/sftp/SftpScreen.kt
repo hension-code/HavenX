@@ -2,6 +2,7 @@ package sh.haven.feature.sftp
 
 import android.text.format.Formatter
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -330,6 +331,15 @@ fun SftpScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    BackHandler(
+        enabled = isActive && activeProfileId != null && (canGoBack || currentPath != "/"),
+    ) {
+        when {
+            canGoBack -> viewModel.goBack()
+            currentPath != "/" -> viewModel.navigateUp()
+        }
     }
 
     Scaffold(
