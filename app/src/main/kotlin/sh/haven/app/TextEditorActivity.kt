@@ -54,20 +54,11 @@ class CursorTrackingEditText @JvmOverloads constructor(
         onCursorMoved?.invoke(l.getLineTop(line), l.getLineBottom(line))
     }
 
-    fun scrollToCursor() {
+    fun forceScroll() {
         val l = layout ?: return
         val safeOffset = selectionStart.coerceIn(0, text?.length ?: 0)
         val line = l.getLineForOffset(safeOffset)
-        val lineTop = l.getLineTop(line)
-        val lineBottom = l.getLineBottom(line)
-        val margin = (lineBottom - lineTop) * 2
-        val rect = android.graphics.Rect(
-            0,
-            (paddingTop + lineTop - margin).coerceAtLeast(0),
-            width,
-            paddingTop + lineBottom + margin
-        )
-        requestRectangleOnScreen(rect, false)
+        onCursorMoved?.invoke(l.getLineTop(line), l.getLineBottom(line))
     }
 }
 
@@ -106,11 +97,14 @@ class TextEditorActivity : ComponentActivity() {
                     val editTextRef = remember { mutableStateOf<CursorTrackingEditText?>(null) }
                     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
+                    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+                    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
                     val imeVisible = WindowInsets.isImeVisible
                     LaunchedEffect(imeVisible) {
                         if (imeVisible) {
-                            delay(300)
-                            editTextRef.value?.scrollToCursor()
+                            delay(350)
+                            editTextRef.value?.forceScroll()
                         }
                     }
 
@@ -127,6 +121,8 @@ class TextEditorActivity : ComponentActivity() {
                                 actions = {
                                     IconButton(
                                         onClick = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
                                             scope.launch {
                                                 val et = editTextRef.value ?: return@launch
                                                 if (profileId != null) {
@@ -147,8 +143,10 @@ class TextEditorActivity : ComponentActivity() {
                                                             uploadProgress = if (total > 0) transferred.toFloat() / total else 1f
                                                             true
                                                         }
+                                                        isUploading = false
                                                         snackbarHostState.showSnackbar(getString(R.string.toast_saved_uploading))
                                                     } catch (e: Exception) {
+                                                        isUploading = false
                                                         snackbarHostState.showSnackbar(getString(R.string.toast_failed_save, e.message))
                                                     } finally {
                                                         isUploading = false
@@ -211,18 +209,30 @@ class TextEditorActivity : ComponentActivity() {
                                         )
 
                                         onCursorMoved = { lineTop, lineBottom ->
-                                            // requestRectangleOnScreen takes a rect in the View's
-                                            // own local coordinate space and walks up the entire
-                                            // View hierarchy, asking each scrollable parent to
-                                            // bring it into view. No manual offset math needed.
+                                            // lineTop/lineBottom are in EditText-local coordinates.
+                                            // Offset by EditText.top (its position inside ScrollView)
+                                            // and its own paddingTop.
+                                            val etTop = top
+                                            val absoluteTop = etTop + paddingTop + lineTop
+                                            val absoluteBottom = etTop + paddingTop + lineBottom
+
+                                            val svHeight = scrollView.height
+                                            val currentScroll = scrollView.scrollY
+
+                                            // Breathing room = 2 line-heights above and below
                                             val margin = (lineBottom - lineTop) * 2
-                                            val rect = android.graphics.Rect(
-                                                0,
-                                                (paddingTop + lineTop - margin).coerceAtLeast(0),
-                                                width,
-                                                paddingTop + lineBottom + margin,
-                                            )
-                                            requestRectangleOnScreen(rect, false)
+
+                                            val targetScroll: Int? = when {
+                                                absoluteTop - margin < currentScroll ->
+                                                    (absoluteTop - margin).coerceAtLeast(0)
+                                                absoluteBottom + margin > currentScroll + svHeight ->
+                                                    absoluteBottom + margin - svHeight
+                                                else -> null  // already visible, skip
+                                            }
+
+                                            if (targetScroll != null) {
+                                                scrollView.smoothScrollTo(0, targetScroll)
+                                            }
                                         }
 
                                         editTextRef.value = this
