@@ -15,8 +15,8 @@ android {
         applicationId = "com.hension.havenx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 84
-        versionName = "2.6.7"
+        versionCode = 85
+        versionName = "2.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime)
+    implementation(libs.lifecycle.process)
     implementation(libs.biometric)
     implementation(libs.navigation.compose)
     implementation("io.coil-kt:coil:2.6.0")

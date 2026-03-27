@@ -13,11 +13,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.core.os.LocaleListCompat
 import dagger.hilt.android.AndroidEntryPoint
@@ -87,12 +87,12 @@ class MainActivity : AppCompatActivity() {
                     .collectAsState(initial = false)
                 val lockTimeout by preferencesRepository.lockTimeout
                     .collectAsState(initial = sh.haven.core.data.preferences.UserPreferencesRepository.LockTimeout.IMMEDIATE)
-                var unlocked by remember { mutableStateOf(false) }
-                var backgroundedAt by remember { mutableStateOf(0L) }
+                var unlocked by rememberSaveable { mutableStateOf(false) }
+                var backgroundedAt by rememberSaveable { mutableStateOf(0L) }
 
                 // Re-lock when app goes to background, respecting timeout
-                val lifecycleOwner = LocalLifecycleOwner.current
-                DisposableEffect(lifecycleOwner) {
+                val processLifecycleOwner = ProcessLifecycleOwner.get()
+                DisposableEffect(processLifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_STOP) {
                             backgroundedAt = System.currentTimeMillis()
@@ -104,8 +104,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                    processLifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { processLifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
                 if (biometricEnabled && !unlocked) {
