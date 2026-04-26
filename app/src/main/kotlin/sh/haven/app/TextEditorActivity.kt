@@ -1,6 +1,9 @@
 package com.hension.havenx
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
@@ -14,6 +17,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,9 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.text.KeyboardActions
@@ -61,6 +68,31 @@ class CursorTrackingEditText @JvmOverloads constructor(
 
     var onCursorMoved: ((lineTop: Int, lineBottom: Int) -> Unit)? = null
     private val searchHighlightSpans = mutableListOf<BackgroundColorSpan>()
+    private val lineNumberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.RIGHT
+    }
+    private val lineNumberDividerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val density = resources.displayMetrics.density
+    private val gutterStartPadding = (8 * density).toInt()
+    private val gutterEndPadding = (10 * density).toInt()
+    private val gutterDividerWidth = (1 * density).coerceAtLeast(1f)
+    private val clipBounds = Rect()
+    private var basePaddingLeft = (16 * density).toInt()
+    private var basePaddingTop = (12 * density).toInt()
+    private var basePaddingRight = (16 * density).toInt()
+    private var basePaddingBottom = (120 * density).toInt()
+    private var lineNumberGutterWidth = (56 * density).toInt()
+
+    init {
+        lineNumberPaint.color = 0x66000000
+        lineNumberDividerPaint.color = 0x1F000000
+        lineNumberDividerPaint.strokeWidth = gutterDividerWidth
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        drawLineNumbers(canvas)
+        super.onDraw(canvas)
+    }
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
@@ -68,6 +100,20 @@ class CursorTrackingEditText @JvmOverloads constructor(
         val safeOffset = selStart.coerceIn(0, text?.length ?: 0)
         val line = l.getLineForOffset(safeOffset)
         onCursorMoved?.invoke(l.getLineTop(line), l.getLineBottom(line))
+    }
+
+    fun setEditorPadding(left: Int, top: Int, right: Int, bottom: Int) {
+        basePaddingLeft = left
+        basePaddingTop = top
+        basePaddingRight = right
+        basePaddingBottom = bottom
+        updateLineNumberGutter()
+    }
+
+    fun setEditorColors(lineNumberColor: Int, dividerColor: Int) {
+        lineNumberPaint.color = lineNumberColor
+        lineNumberDividerPaint.color = dividerColor
+        invalidate()
     }
 
     fun forceScroll() {
@@ -108,6 +154,75 @@ class CursorTrackingEditText @JvmOverloads constructor(
         val editable = text ?: return
         searchHighlightSpans.forEach { editable.removeSpan(it) }
         searchHighlightSpans.clear()
+    }
+
+    private fun updateLineNumberGutter() {
+        lineNumberPaint.textSize = textSize
+        lineNumberPaint.typeface = typeface
+        val numberWidth = lineNumberPaint.measureText("9999").toInt()
+        lineNumberGutterWidth = maxOf(
+            (56 * density).toInt(),
+            gutterStartPadding + numberWidth + gutterEndPadding,
+        )
+        val left = lineNumberGutterWidth + basePaddingLeft
+        if (
+            paddingLeft == left &&
+            paddingTop == basePaddingTop &&
+            paddingRight == basePaddingRight &&
+            paddingBottom == basePaddingBottom
+        ) {
+            return
+        }
+        super.setPadding(
+            left,
+            basePaddingTop,
+            basePaddingRight,
+            basePaddingBottom,
+        )
+    }
+
+    private fun drawLineNumbers(canvas: Canvas) {
+        val l = layout ?: return
+        val editable = text ?: return
+        lineNumberPaint.textSize = textSize
+        lineNumberPaint.typeface = typeface
+
+        val dividerX = lineNumberGutterWidth - gutterDividerWidth / 2f
+        canvas.getClipBounds(clipBounds)
+        canvas.drawLine(
+            dividerX,
+            clipBounds.top.toFloat(),
+            dividerX,
+            clipBounds.bottom.toFloat(),
+            lineNumberDividerPaint,
+        )
+
+        val numberRight = lineNumberGutterWidth - gutterEndPadding.toFloat()
+        val textTop = totalPaddingTop
+        val firstVisibleLine = l.getLineForVertical((clipBounds.top - textTop).coerceAtLeast(0))
+        val lastVisibleLine = l.getLineForVertical((clipBounds.bottom - textTop).coerceAtLeast(0))
+        var textOffset = l.getLineStart(firstVisibleLine).coerceAtLeast(0)
+        var logicalLine = 1
+        for (i in 0 until textOffset.coerceAtMost(editable.length)) {
+            if (editable[i] == '\n') logicalLine += 1
+        }
+        for (visualLine in firstVisibleLine..lastVisibleLine) {
+            val lineStart = l.getLineStart(visualLine)
+            while (textOffset < lineStart && textOffset < editable.length) {
+                if (editable[textOffset] == '\n') logicalLine += 1
+                textOffset += 1
+            }
+            val isLogicalLineStart = lineStart == 0 ||
+                (lineStart - 1 in 0 until editable.length && editable[lineStart - 1] == '\n')
+            if (isLogicalLineStart) {
+                canvas.drawText(
+                    logicalLine.toString(),
+                    numberRight,
+                    textTop + l.getLineBaseline(visualLine).toFloat(),
+                    lineNumberPaint,
+                )
+            }
+        }
     }
 }
 
@@ -158,6 +273,11 @@ class TextEditorActivity : ComponentActivity() {
 
                     val editTextRef = remember { mutableStateOf<CursorTrackingEditText?>(null) }
                     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+                    val editorBackgroundColor = if (isSystemInDarkTheme()) {
+                        Color(0xFF27231F)
+                    } else {
+                        Color(0xFFFAF7F0)
+                    }
                     val searchMatchColor = MaterialTheme.colorScheme.tertiaryContainer
                         .copy(alpha = 0.75f)
                         .toArgb()
@@ -259,7 +379,13 @@ class TextEditorActivity : ComponentActivity() {
                         topBar = {
                             Column {
                                 TopAppBar(
-                                    title = { Text(fileName) },
+                                    title = {
+                                        Text(
+                                            text = fileName,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
                                     navigationIcon = {
                                         IconButton(onClick = { finish() }) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -429,6 +555,7 @@ class TextEditorActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                                 .imePadding()
+                                .background(editorBackgroundColor)
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -441,6 +568,7 @@ class TextEditorActivity : ComponentActivity() {
                                     // can close over it without a lateinit var.
                                     val scrollView = NestedScrollView(ctx).apply {
                                         isFillViewport = true
+                                        setBackgroundColor(editorBackgroundColor.toArgb())
                                     }
 
                                     CursorTrackingEditText(ctx).apply {
@@ -450,9 +578,13 @@ class TextEditorActivity : ComponentActivity() {
                                         setHintTextColor(onSurfaceColor.copy(alpha = 0.4f).toArgb())
                                         background = null
                                         val dp = resources.displayMetrics.density
-                                        setPadding(
+                                        setEditorPadding(
                                             (16 * dp).toInt(), (12 * dp).toInt(),
                                             (16 * dp).toInt(), (120 * dp).toInt(),
+                                        )
+                                        setEditorColors(
+                                            lineNumberColor = onSurfaceColor.copy(alpha = 0.46f).toArgb(),
+                                            dividerColor = onSurfaceColor.copy(alpha = 0.14f).toArgb(),
                                         )
                                         isSingleLine = false
                                         gravity = android.view.Gravity.TOP or android.view.Gravity.START
@@ -537,9 +669,14 @@ class TextEditorActivity : ComponentActivity() {
                                     scrollView
                                 },
                                 update = { scrollView ->
+                                    scrollView.setBackgroundColor(editorBackgroundColor.toArgb())
                                     val et = (scrollView as NestedScrollView)
                                         .getChildAt(0) as? CursorTrackingEditText
                                     et?.setTextColor(onSurfaceColor.toArgb())
+                                    et?.setEditorColors(
+                                        lineNumberColor = onSurfaceColor.copy(alpha = 0.46f).toArgb(),
+                                        dividerColor = onSurfaceColor.copy(alpha = 0.14f).toArgb(),
+                                    )
                                 }
                             )
 
