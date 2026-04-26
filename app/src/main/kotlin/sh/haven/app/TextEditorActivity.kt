@@ -3,23 +3,38 @@ package com.hension.havenx
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
+import android.text.Spannable
+import android.text.TextWatcher
+import android.text.style.BackgroundColorSpan
 import android.util.AttributeSet
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.core.widget.NestedScrollView
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +60,7 @@ class CursorTrackingEditText @JvmOverloads constructor(
 ) : EditText(context, attrs) {
 
     var onCursorMoved: ((lineTop: Int, lineBottom: Int) -> Unit)? = null
+    private val searchHighlightSpans = mutableListOf<BackgroundColorSpan>()
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
@@ -60,6 +76,52 @@ class CursorTrackingEditText @JvmOverloads constructor(
         val line = l.getLineForOffset(safeOffset)
         onCursorMoved?.invoke(l.getLineTop(line), l.getLineBottom(line))
     }
+
+    fun scrollOffsetIntoView(offset: Int) {
+        val l = layout ?: return
+        val safeOffset = offset.coerceIn(0, text?.length ?: 0)
+        val line = l.getLineForOffset(safeOffset)
+        onCursorMoved?.invoke(l.getLineTop(line), l.getLineBottom(line))
+    }
+
+    fun setSearchHighlights(
+        ranges: List<IntRange>,
+        currentIndex: Int,
+        matchColor: Int,
+        currentMatchColor: Int,
+    ) {
+        val editable = text ?: return
+        clearSearchHighlights()
+        ranges.forEachIndexed { index, range ->
+            val start = range.first.coerceIn(0, editable.length)
+            val end = (range.last + 1).coerceIn(start, editable.length)
+            if (start == end) return@forEachIndexed
+            val span = BackgroundColorSpan(
+                if (index == currentIndex) currentMatchColor else matchColor
+            )
+            editable.setSpan(span, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            searchHighlightSpans += span
+        }
+    }
+
+    fun clearSearchHighlights() {
+        val editable = text ?: return
+        searchHighlightSpans.forEach { editable.removeSpan(it) }
+        searchHighlightSpans.clear()
+    }
+}
+
+private fun findTextMatches(text: String, query: String): List<IntRange> {
+    if (query.isEmpty()) return emptyList()
+    val results = mutableListOf<IntRange>()
+    var startIndex = 0
+    while (startIndex <= text.length - query.length) {
+        val matchIndex = text.indexOf(query, startIndex, ignoreCase = true)
+        if (matchIndex < 0) break
+        results += matchIndex until (matchIndex + query.length)
+        startIndex = matchIndex + query.length.coerceAtLeast(1)
+    }
+    return results
 }
 
 @AndroidEntryPoint
@@ -96,76 +158,270 @@ class TextEditorActivity : ComponentActivity() {
 
                     val editTextRef = remember { mutableStateOf<CursorTrackingEditText?>(null) }
                     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+                    val searchMatchColor = MaterialTheme.colorScheme.tertiaryContainer
+                        .copy(alpha = 0.75f)
+                        .toArgb()
+                    val currentSearchMatchColor = MaterialTheme.colorScheme.primary
+                        .copy(alpha = 0.35f)
+                        .toArgb()
+                    val searchFocusRequester = remember { FocusRequester() }
+                    var searchActive by remember { mutableStateOf(false) }
+                    var searchQuery by remember { mutableStateOf("") }
+                    var searchMatches by remember { mutableStateOf<List<IntRange>>(emptyList()) }
+                    var currentSearchIndex by remember { mutableIntStateOf(-1) }
+                    var textVersion by remember { mutableIntStateOf(0) }
 
                     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
+                    fun applySearchState(ranges: List<IntRange>, index: Int) {
+                        val et = editTextRef.value ?: return
+                        et.setSearchHighlights(
+                            ranges = ranges,
+                            currentIndex = index,
+                            matchColor = searchMatchColor,
+                            currentMatchColor = currentSearchMatchColor,
+                        )
+                        if (index in ranges.indices) {
+                            et.post { et.scrollOffsetIntoView(ranges[index].first) }
+                        }
+                    }
+
+                    fun refreshTextSearch(preferredIndex: Int = currentSearchIndex) {
+                        val et = editTextRef.value
+                        if (!searchActive || searchQuery.isEmpty() || et == null) {
+                            searchMatches = emptyList()
+                            currentSearchIndex = -1
+                            et?.clearSearchHighlights()
+                            return
+                        }
+                        val ranges = findTextMatches(et.text?.toString().orEmpty(), searchQuery)
+                        val nextIndex = if (ranges.isEmpty()) {
+                            -1
+                        } else if (preferredIndex in ranges.indices) {
+                            preferredIndex
+                        } else {
+                            0
+                        }
+                        searchMatches = ranges
+                        currentSearchIndex = nextIndex
+                        applySearchState(ranges, nextIndex)
+                    }
+
+                    fun moveTextSearch(delta: Int) {
+                        if (searchMatches.isEmpty()) return
+                        val nextIndex = if (currentSearchIndex in searchMatches.indices) {
+                            (currentSearchIndex + delta + searchMatches.size) % searchMatches.size
+                        } else {
+                            0
+                        }
+                        currentSearchIndex = nextIndex
+                        applySearchState(searchMatches, nextIndex)
+                    }
+
+                    fun exitTextSearch() {
+                        searchActive = false
+                        searchQuery = ""
+                        searchMatches = emptyList()
+                        currentSearchIndex = -1
+                        editTextRef.value?.clearSearchHighlights()
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
+                    }
+
+                    BackHandler(enabled = searchActive) {
+                        exitTextSearch()
+                    }
+
                     val imeVisible = WindowInsets.isImeVisible
-                    LaunchedEffect(imeVisible) {
-                        if (imeVisible) {
+                    LaunchedEffect(imeVisible, searchActive) {
+                        if (imeVisible && !searchActive) {
                             delay(350)
                             editTextRef.value?.forceScroll()
                         }
+                    }
+                    LaunchedEffect(searchActive) {
+                        if (searchActive) {
+                            delay(100)
+                            searchFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
+                    }
+                    LaunchedEffect(searchActive, searchQuery, textVersion) {
+                        refreshTextSearch()
+                    }
+                    DisposableEffect(Unit) {
+                        onDispose { editTextRef.value?.clearSearchHighlights() }
                     }
 
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
-                            TopAppBar(
-                                title = { Text(fileName) },
-                                navigationIcon = {
-                                    IconButton(onClick = { finish() }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                    }
-                                },
-                                actions = {
-                                    IconButton(
-                                        onClick = {
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
-                                            scope.launch {
-                                                val et = editTextRef.value ?: return@launch
-                                                if (profileId != null) {
-                                                    isUploading = true
-                                                    uploadProgress = 0f
-                                                    try {
-                                                        val currentText = et.text.toString()
-                                                        val file = File(filePath)
-                                                        withContext(Dispatchers.IO) { file.writeText(currentText) }
-                                                        transferManager.performDirectUpload(
-                                                            sourceUri = Uri.fromFile(file),
-                                                            destPath = remotePath,
-                                                            profileId = profileId,
-                                                            isSmb = isSmb,
-                                                            totalBytes = file.length()
-                                                        ) { transferred ->
-                                                            val total = file.length()
-                                                            uploadProgress = if (total > 0) transferred.toFloat() / total else 1f
-                                                            true
+                            Column {
+                                TopAppBar(
+                                    title = { Text(fileName) },
+                                    navigationIcon = {
+                                        IconButton(onClick = { finish() }) {
+                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                        }
+                                    },
+                                    actions = {
+                                        IconButton(
+                                            onClick = {
+                                                if (searchActive) {
+                                                    exitTextSearch()
+                                                } else {
+                                                    searchActive = true
+                                                }
+                                            },
+                                        ) {
+                                            Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search_text))
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                keyboardController?.hide()
+                                                focusManager.clearFocus()
+                                                scope.launch {
+                                                    val et = editTextRef.value ?: return@launch
+                                                    if (profileId != null) {
+                                                        isUploading = true
+                                                        uploadProgress = 0f
+                                                        try {
+                                                            val currentText = et.text.toString()
+                                                            val file = File(filePath)
+                                                            withContext(Dispatchers.IO) { file.writeText(currentText) }
+                                                            transferManager.performDirectUpload(
+                                                                sourceUri = Uri.fromFile(file),
+                                                                destPath = remotePath,
+                                                                profileId = profileId,
+                                                                isSmb = isSmb,
+                                                                totalBytes = file.length()
+                                                            ) { transferred ->
+                                                                val total = file.length()
+                                                                uploadProgress = if (total > 0) transferred.toFloat() / total else 1f
+                                                                true
+                                                            }
+                                                            isUploading = false
+                                                            snackbarHostState.showSnackbar(getString(R.string.toast_saved_uploading))
+                                                        } catch (e: Exception) {
+                                                            isUploading = false
+                                                            snackbarHostState.showSnackbar(getString(R.string.toast_failed_save, e.message))
+                                                        } finally {
+                                                            isUploading = false
                                                         }
-                                                        isUploading = false
-                                                        snackbarHostState.showSnackbar(getString(R.string.toast_saved_uploading))
-                                                    } catch (e: Exception) {
-                                                        isUploading = false
-                                                        snackbarHostState.showSnackbar(getString(R.string.toast_failed_save, e.message))
-                                                    } finally {
-                                                        isUploading = false
+                                                    } else {
+                                                        snackbarHostState.showSnackbar(getString(R.string.toast_cannot_upload_disconnected))
+                                                    }
+                                                }
+                                            },
+                                            enabled = !isUploading
+                                        ) {
+                                            if (isUploading) {
+                                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                            } else {
+                                                Icon(Icons.Filled.Save, contentDescription = "Save")
+                                            }
+                                        }
+                                    }
+                                )
+                                if (searchActive) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                                        tonalElevation = 3.dp,
+                                        shadowElevation = 2.dp,
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 6.dp),
+                                        ) {
+                                            OutlinedTextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .focusRequester(searchFocusRequester),
+                                                singleLine = true,
+                                                placeholder = { Text(stringResource(R.string.search_in_file)) },
+                                                leadingIcon = {
+                                                    Icon(Icons.Filled.Search, contentDescription = null)
+                                                },
+                                                trailingIcon = if (searchQuery.isNotEmpty()) {
+                                                    {
+                                                        IconButton(onClick = { searchQuery = "" }) {
+                                                            Icon(
+                                                                Icons.Filled.Close,
+                                                                contentDescription = stringResource(R.string.clear_search),
+                                                            )
+                                                        }
                                                     }
                                                 } else {
-                                                    snackbarHostState.showSnackbar(getString(R.string.toast_cannot_upload_disconnected))
+                                                    null
+                                                },
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                                ),
+                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                                keyboardActions = KeyboardActions(onSearch = {
+                                                    keyboardController?.hide()
+                                                    focusManager.clearFocus()
+                                                }),
+                                            )
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 2.dp),
+                                                horizontalArrangement = Arrangement.End,
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(
+                                                    text = if (searchQuery.isEmpty()) {
+                                                        ""
+                                                    } else if (searchMatches.isEmpty()) {
+                                                        stringResource(R.string.no_text_matches)
+                                                    } else {
+                                                        "${currentSearchIndex + 1}/${searchMatches.size}"
+                                                    },
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 8.dp)
+                                                        .widthIn(min = 44.dp),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                                IconButton(
+                                                    onClick = { moveTextSearch(-1) },
+                                                    enabled = searchMatches.isNotEmpty(),
+                                                ) {
+                                                    Icon(
+                                                        Icons.Filled.KeyboardArrowUp,
+                                                        contentDescription = stringResource(R.string.previous_match),
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { moveTextSearch(1) },
+                                                    enabled = searchMatches.isNotEmpty(),
+                                                ) {
+                                                    Icon(
+                                                        Icons.Filled.KeyboardArrowDown,
+                                                        contentDescription = stringResource(R.string.next_match),
+                                                    )
+                                                }
+                                                IconButton(onClick = { exitTextSearch() }) {
+                                                    Icon(
+                                                        Icons.Filled.Close,
+                                                        contentDescription = stringResource(R.string.close_search),
+                                                    )
                                                 }
                                             }
-                                        },
-                                        enabled = !isUploading
-                                    ) {
-                                        if (isUploading) {
-                                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                                        } else {
-                                            Icon(Icons.Filled.Save, contentDescription = "Save")
                                         }
                                     }
                                 }
-                            )
+                            }
                         }
                     ) { innerPadding ->
                         Box(
@@ -207,6 +463,25 @@ class TextEditorActivity : ComponentActivity() {
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                             android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
                                         )
+                                        addTextChangedListener(object : TextWatcher {
+                                            override fun beforeTextChanged(
+                                                s: CharSequence?,
+                                                start: Int,
+                                                count: Int,
+                                                after: Int,
+                                            ) = Unit
+
+                                            override fun onTextChanged(
+                                                s: CharSequence?,
+                                                start: Int,
+                                                before: Int,
+                                                count: Int,
+                                            ) = Unit
+
+                                            override fun afterTextChanged(s: Editable?) {
+                                                textVersion += 1
+                                            }
+                                        })
 
                                         onCursorMoved = { lineTop, lineBottom ->
                                             // lineTop/lineBottom are in EditText-local coordinates.

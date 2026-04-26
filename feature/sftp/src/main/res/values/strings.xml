@@ -12,11 +12,14 @@
     <string name="show_hidden_files">Show hidden files</string>
     <string name="sort">Sort</string>
     <string name="favorite_folders">Favorite folders</string>
+    <string name="search_files_folders">Search files and folders</string>
+    <string name="search_current_directory">Search current folder and subfolders</string>
     <string name="go">Go</string>
     <string name="cancel">Cancel</string>
     <string name="edit_path">Edit path</string>
     <string name="upload_file">Upload file</string>
     <string name="empty_directory">Empty directory</string>
+    <string name="no_search_results">No matching files or folders</string>
     <string name="path_copied">Path copied</string>
     <string name="directory">Directory</string>
     <string name="favorite">Favorite</string>

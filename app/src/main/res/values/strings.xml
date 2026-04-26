@@ -12,4 +12,11 @@
     <string name="toast_saved_uploading">Saved and uploaded</string>
     <string name="toast_failed_save">Failed to save: %1$s</string>
     <string name="toast_cannot_upload_disconnected">Cannot upload: disconnected</string>
+    <string name="search_text">Search text</string>
+    <string name="search_in_file">Search in file</string>
+    <string name="clear_search">Clear search</string>
+    <string name="close_search">Close search</string>
+    <string name="previous_match">Previous match</string>
+    <string name="next_match">Next match</string>
+    <string name="no_text_matches">No matches</string>
 </resources>

@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Visibility
@@ -123,6 +124,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -144,6 +146,8 @@ fun SftpScreen(
     val activeProfileId by viewModel.activeProfileId.collectAsState()
     val currentPath by viewModel.currentPath.collectAsState()
     val entries by viewModel.entries.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
+    val searchLoading by viewModel.searchLoading.collectAsState()
     val sortMode by viewModel.sortMode.collectAsState()
     val showHidden by viewModel.showHidden.collectAsState()
     val favoriteDirectories by viewModel.favoriteDirectories.collectAsState()
@@ -283,8 +287,49 @@ fun SftpScreen(
     var imeVisibleWhilePathEditing by remember { mutableStateOf(false) }
     val pathFocusRequester = remember { FocusRequester() }
     var requestPathFocus by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    var requestSearchFocus by remember { mutableStateOf(false) }
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val isSearching = searchActive && searchQuery.trim().isNotEmpty()
+    val visibleEntries = if (isSearching) searchResults else entries
+    fun exitSearch() {
+        searchActive = false
+        searchQuery = ""
+        requestSearchFocus = false
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+        viewModel.clearSearch()
+    }
+    LaunchedEffect(searchActive, searchQuery, currentPath, activeProfileId, showHidden) {
+        if (!searchActive) {
+            viewModel.clearSearch()
+            return@LaunchedEffect
+        }
+        val query = searchQuery.trim()
+        if (query.isEmpty()) {
+            viewModel.clearSearchResults()
+            return@LaunchedEffect
+        }
+        delay(300L)
+        viewModel.searchCurrentDirectory(query)
+    }
     LaunchedEffect(currentPath, pathEditMode) {
         if (!pathEditMode) pathInput = TextFieldValue(currentPath)
+    }
+    LaunchedEffect(currentPath, activeProfileId) {
+        searchActive = false
+        searchQuery = ""
+        requestSearchFocus = false
+        viewModel.clearSearch()
+    }
+    LaunchedEffect(searchActive) {
+        if (searchActive) {
+            requestSearchFocus = isActive
+        } else {
+            requestSearchFocus = false
+            viewModel.clearSearch()
+        }
     }
     LaunchedEffect(pathEditMode) {
         if (!pathEditMode) {
@@ -334,9 +379,10 @@ fun SftpScreen(
     }
 
     BackHandler(
-        enabled = isActive && activeProfileId != null && (canGoBack || currentPath != "/"),
+        enabled = isActive && activeProfileId != null && (searchActive || canGoBack || currentPath != "/"),
     ) {
         when {
+            searchActive -> exitSearch()
             canGoBack -> viewModel.goBack()
             currentPath != "/" -> viewModel.navigateUp()
         }
@@ -463,75 +509,127 @@ fun SftpScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                    if (pathEditMode) {
-                        OutlinedTextField(
-                            value = pathInput,
-                            onValueChange = { pathInput = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(pathFocusRequester)
-                                .onGloballyPositioned {
-                                    if (isActive && pathEditMode && requestPathFocus) {
-                                        pathFocusRequester.requestFocus()
-                                        requestPathFocus = false
+                        if (pathEditMode) {
+                            OutlinedTextField(
+                                value = pathInput,
+                                onValueChange = { pathInput = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(pathFocusRequester)
+                                    .onGloballyPositioned {
+                                        if (isActive && pathEditMode && requestPathFocus) {
+                                            pathFocusRequester.requestFocus()
+                                            requestPathFocus = false
+                                        }
                                     }
-                                }
-                                .onFocusChanged { state ->
-                                    if (state.isFocused) {
-                                        pathEditorEverFocused = true
-                                    } else if (pathEditMode && pathEditorEverFocused) {
+                                    .onFocusChanged { state ->
+                                        if (state.isFocused) {
+                                            pathEditorEverFocused = true
+                                        } else if (pathEditMode && pathEditorEverFocused) {
+                                            pathEditMode = false
+                                        }
+                                    },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                                keyboardActions = KeyboardActions(onGo = {
+                                    viewModel.navigateToInput(pathInput.text)
+                                    focusManager.clearFocus()
+                                    pathEditMode = false
+                                }),
+                            )
+                            IconButton(
+                                onClick = {
+                                    viewModel.navigateToInput(pathInput.text)
+                                    focusManager.clearFocus()
+                                    pathEditMode = false
+                                },
+                                enabled = activeProfileId != null,
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.go))
+                            }
+                            IconButton(
+                                onClick = {
+                                    focusManager.clearFocus(force = true)
+                                    pathEditMode = false
+                                },
+                            ) {
+                                Icon(Icons.Filled.Close, stringResource(R.string.cancel))
+                            }
+                        } else {
+                            BreadcrumbPathBar(
+                                path = currentPath,
+                                zh = zh,
+                                onSegmentClick = { segmentPath -> viewModel.navigateTo(segmentPath) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = {
+                                    val editPath = ensureEditablePath(currentPath)
+                                    pathInput = TextFieldValue(
+                                        text = editPath,
+                                        selection = TextRange(editPath.length),
+                                    )
+                                    pathEditorEverFocused = false
+                                    requestPathFocus = isActive
+                                    pathEditMode = true
+                                },
+                                enabled = activeProfileId != null,
+                            ) {
+                                Icon(Icons.Filled.Edit, stringResource(R.string.edit_path))
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (searchActive) {
+                                        exitSearch()
+                                    } else {
                                         pathEditMode = false
+                                        searchActive = true
+                                        requestSearchFocus = isActive
+                                    }
+                                },
+                                enabled = activeProfileId != null,
+                            ) {
+                                Icon(Icons.Filled.Search, stringResource(R.string.search_files_folders))
+                            }
+                        }
+                    }
+                    if (searchActive) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .focusRequester(searchFocusRequester)
+                                .onGloballyPositioned {
+                                    if (isActive && searchActive && requestSearchFocus) {
+                                        searchFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                        requestSearchFocus = false
                                     }
                                 },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                            keyboardActions = KeyboardActions(onGo = {
-                                viewModel.navigateToInput(pathInput.text)
+                            placeholder = { Text(stringResource(R.string.search_current_directory)) },
+                            leadingIcon = {
+                                IconButton(onClick = { exitSearch() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cancel))
+                                }
+                            },
+                            trailingIcon = if (searchQuery.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Filled.Close, stringResource(R.string.cancel_button))
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
                                 focusManager.clearFocus()
-                                pathEditMode = false
+                                keyboardController?.hide()
                             }),
                         )
-                        IconButton(
-                            onClick = {
-                                viewModel.navigateToInput(pathInput.text)
-                                focusManager.clearFocus()
-                                pathEditMode = false
-                            },
-                            enabled = activeProfileId != null,
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.go))
-                        }
-                        IconButton(
-                            onClick = {
-                                focusManager.clearFocus(force = true)
-                                pathEditMode = false
-                            },
-                        ) {
-                            Icon(Icons.Filled.Close, stringResource(R.string.cancel))
-                        }
-                    } else {
-                        BreadcrumbPathBar(
-                            path = currentPath,
-                            zh = zh,
-                            onSegmentClick = { segmentPath -> viewModel.navigateTo(segmentPath) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = {
-                                val editPath = ensureEditablePath(currentPath)
-                                pathInput = TextFieldValue(
-                                    text = editPath,
-                                    selection = TextRange(editPath.length),
-                                )
-                                pathEditorEverFocused = false
-                                requestPathFocus = isActive
-                                pathEditMode = true
-                            },
-                            enabled = activeProfileId != null,
-                        ) {
-                            Icon(Icons.Filled.Edit, stringResource(R.string.edit_path))
-                        }
-                    }
                     }
                 }
             }
@@ -590,6 +688,8 @@ fun SftpScreen(
                 } else {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
+            } else if (searchLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
             if (connectedProfiles.isEmpty()) {
@@ -615,13 +715,17 @@ fun SftpScreen(
                 }
 
                 // File list
-                if (entries.isEmpty() && !loading) {
+                if (visibleEntries.isEmpty() && !loading && !searchLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            stringResource(R.string.empty_directory),
+                            if (!isSearching) {
+                                stringResource(R.string.empty_directory)
+                            } else {
+                                stringResource(R.string.no_search_results)
+                            },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -657,7 +761,7 @@ fun SftpScreen(
                     }
 
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(entries, key = { it.path }) { entry ->
+                        items(visibleEntries, key = { it.path }) { entry ->
                             val pathCopiedMsg = stringResource(R.string.path_copied)
                             FileListItem(
                                 entry = entry,
@@ -675,6 +779,7 @@ fun SftpScreen(
                                 },
                                 onDelete = { entryToDelete = entry },
                                 onPreview = { viewModel.previewMedia(entry) },
+                                showPath = isSearching,
                                 isFavoriteDirectory = favoriteDirectories.contains(entry.path),
                                 onToggleFavorite = {
                                     val wasFav = favoriteDirectories.contains(entry.path)
@@ -713,6 +818,7 @@ private fun FileListItem(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onPreview: () -> Unit,
+    showPath: Boolean,
     isFavoriteDirectory: Boolean,
     onToggleFavorite: () -> Unit,
     onCopyPath: () -> Unit,
@@ -736,7 +842,13 @@ private fun FileListItem(
                     Formatter.formatFileSize(context, entry.size)
                 }
                 val dateText = dateFormat.format(Date(entry.modifiedTime * 1000))
-                Text("$sizeText  $dateText")
+                val parentPath = entry.path.substringBeforeLast('/', "/")
+                val details = if (showPath) {
+                    "$sizeText  $dateText\n$parentPath"
+                } else {
+                    "$sizeText  $dateText"
+                }
+                Text(details, maxLines = if (showPath) 2 else 1, overflow = TextOverflow.Ellipsis)
             },
             leadingContent = {
                 Icon(

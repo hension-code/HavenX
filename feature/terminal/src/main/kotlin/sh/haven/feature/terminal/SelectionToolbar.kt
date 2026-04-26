@@ -139,20 +139,19 @@ internal fun expandSelectionToWord(
         val row = range.javaClass.getMethod("getStartRow").invoke(range) as Int
         val col = range.javaClass.getMethod("getStartCol").invoke(range) as Int
 
-        // Get line text at selection row
         val lines = getSnapshotLines(emulator) ?: return
         if (row < 0 || row >= lines.size) return
-        val text = getLineText(lines[row])
-        if (col < 0 || col >= text.length) return
+        val cells = getLineCells(lines[row]) ?: return
+        if (col < 0 || col >= cells.size) return
 
         // Don't expand if long-pressed on whitespace
-        if (text[col].isWhitespace()) return
+        if (isCellWhitespace(cells[col])) return
 
         // Expand to contiguous non-whitespace (selects full tokens: paths, URLs, etc.)
         var startCol = col
-        while (startCol > 0 && !text[startCol - 1].isWhitespace()) startCol--
+        while (startCol > 0 && !isCellWhitespace(cells[startCol - 1])) startCol--
         var endCol = col
-        while (endCol < text.length - 1 && !text[endCol + 1].isWhitespace()) endCol++
+        while (endCol < cells.size - 1 && !isCellWhitespace(cells[endCol + 1])) endCol++
 
         // Update selection anchors if expanded
         if (startCol != col || endCol != col) {
@@ -192,6 +191,18 @@ internal fun updateSelectionEndAbsolute(
     }
 }
 
+internal fun updateSelectionEndFromTerminalColumn(
+    controller: SelectionController,
+    emulator: org.connectbot.terminal.TerminalEmulator,
+    row: Int,
+    terminalCol: Int,
+) {
+    val lines = getSnapshotLines(emulator) ?: return
+    if (row < 0 || row >= lines.size) return
+    val cells = getLineCells(lines[row]) ?: return
+    updateSelectionEndAbsolute(controller, row, terminalColumnToCellIndex(cells, terminalCol))
+}
+
 /**
  * Extract snapshot lines from the terminal emulator via reflection.
  * Returns null if reflection fails.
@@ -216,6 +227,47 @@ private fun getLineText(line: Any): String {
     return try {
         line.javaClass.getMethod("getText").invoke(line) as String
     } catch (e: Exception) { "" }
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun getLineCells(line: Any): List<Any>? {
+    return try {
+        line.javaClass.getMethod("getCells").invoke(line) as List<Any>
+    } catch (e: Exception) {
+        Log.d(TAG, "getLineCells: ${e.message}")
+        null
+    }
+}
+
+private fun isCellWhitespace(cell: Any): Boolean {
+    return try {
+        val ch = cell.javaClass.getMethod("getChar").invoke(cell) as Char
+        ch == '\u0000' || ch.isWhitespace()
+    } catch (e: Exception) {
+        Log.d(TAG, "isCellWhitespace: ${e.message}")
+        true
+    }
+}
+
+private fun terminalColumnToCellIndex(cells: List<Any>, terminalCol: Int): Int {
+    if (cells.isEmpty()) return 0
+    val target = terminalCol.coerceAtLeast(0)
+    var col = 0
+    cells.forEachIndexed { index, cell ->
+        val width = getCellWidth(cell).coerceAtLeast(1)
+        if (target < col + width) return index
+        col += width
+    }
+    return cells.lastIndex
+}
+
+private fun getCellWidth(cell: Any): Int {
+    return try {
+        cell.javaClass.getMethod("getWidth").invoke(cell) as Int
+    } catch (e: Exception) {
+        Log.d(TAG, "getCellWidth: ${e.message}")
+        1
+    }
 }
 
 /** Get terminal column count via reflection on emulator.dimensions. */

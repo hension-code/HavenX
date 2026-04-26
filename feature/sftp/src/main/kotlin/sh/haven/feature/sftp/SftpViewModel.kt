@@ -35,6 +35,14 @@ import java.io.OutputStream
 import javax.inject.Inject
 
 private const val TAG = "SftpViewModel"
+private const val SEARCH_MAX_DIRECTORY_DEPTH = 2
+
+private data class SearchIndexKey(
+    val profileId: String,
+    val rootPath: String,
+    val isSmb: Boolean,
+    val showHidden: Boolean,
+)
 
 // Models have been moved to SftpModels.kt
 
@@ -64,6 +72,12 @@ class SftpViewModel @Inject constructor(
     private val _allEntries = MutableStateFlow<List<SftpEntry>>(emptyList())
     private val _entries = MutableStateFlow<List<SftpEntry>>(emptyList())
     val entries: StateFlow<List<SftpEntry>> = _entries.asStateFlow()
+
+    private val _searchResults = MutableStateFlow<List<SftpEntry>>(emptyList())
+    val searchResults: StateFlow<List<SftpEntry>> = _searchResults.asStateFlow()
+
+    private val _searchLoading = MutableStateFlow(false)
+    val searchLoading: StateFlow<Boolean> = _searchLoading.asStateFlow()
 
     private val _sortMode = MutableStateFlow(SortMode.NAME_ASC)
     val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
@@ -116,6 +130,11 @@ class SftpViewModel @Inject constructor(
     private var activeSmbClient: SmbClient? = null
     private val previewReadLock = Any()
     private var favoritesJob: Job? = null
+    private var searchJob: Job? = null
+    private var searchJobKey: SearchIndexKey? = null
+    private var searchIndexKey: SearchIndexKey? = null
+    private var searchIndexEntries: List<SftpEntry> = emptyList()
+    private var pendingSearchQuery = ""
 
     /** Tracks which active profile is SMB (vs SFTP). */
     private val _isSmbProfile = MutableStateFlow(false)
@@ -204,6 +223,7 @@ class SftpViewModel @Inject constructor(
                 sftpChannel = null
                 activeSmbClient = null
                 _favoriteDirectories.value = emptySet()
+                clearSearch()
                 return@launch
             }
 
@@ -237,6 +257,7 @@ class SftpViewModel @Inject constructor(
 
         if (isSmb) {
             if (profileId == _activeProfileId.value && activeSmbClient?.isConnected == true) return
+            clearSearch()
             _activeProfileId.value = profileId
             sftpChannel = null
             activeSmbClient = null
@@ -247,6 +268,7 @@ class SftpViewModel @Inject constructor(
             openSmbAndList(profileId)
         } else {
             if (profileId == _activeProfileId.value && sftpChannel?.isConnected == true) return
+            clearSearch()
             _activeProfileId.value = profileId
             sftpChannel = null
             activeSmbClient = null
@@ -263,6 +285,7 @@ class SftpViewModel @Inject constructor(
         val normalized = normalizePath(path)
         val current = _currentPath.value
         if (normalized == current) return
+        clearSearch()
         backHistory.addLast(current)
         if (backHistory.size > 100) backHistory.removeFirst()
         forwardHistory.clear()
@@ -305,6 +328,7 @@ class SftpViewModel @Inject constructor(
     fun goBack() {
         val profileId = _activeProfileId.value ?: return
         if (backHistory.isEmpty()) return
+        clearSearch()
         val current = _currentPath.value
         val target = backHistory.removeLast()
         forwardHistory.addLast(current)
@@ -317,6 +341,7 @@ class SftpViewModel @Inject constructor(
     fun goForward() {
         val profileId = _activeProfileId.value ?: return
         if (forwardHistory.isEmpty()) return
+        clearSearch()
         val current = _currentPath.value
         val target = forwardHistory.removeLast()
         backHistory.addLast(current)
@@ -336,6 +361,7 @@ class SftpViewModel @Inject constructor(
     fun setSortMode(mode: SortMode) {
         _sortMode.value = mode
         _allEntries.value = sortEntries(_allEntries.value, mode)
+        _searchResults.value = sortEntries(_searchResults.value, mode)
         applyFilter()
         // Persist the choice
         viewModelScope.launch {
@@ -371,6 +397,106 @@ class SftpViewModel @Inject constructor(
     private fun applyFilter() {
         val all = _allEntries.value
         _entries.value = if (_showHidden.value) all else all.filter { !it.name.startsWith(".") }
+    }
+
+    fun clearSearch() {
+        searchJob?.cancel()
+        searchJob = null
+        searchJobKey = null
+        searchIndexKey = null
+        searchIndexEntries = emptyList()
+        pendingSearchQuery = ""
+        _searchLoading.value = false
+        _searchResults.value = emptyList()
+    }
+
+    fun clearSearchResults() {
+        pendingSearchQuery = ""
+        _searchLoading.value = false
+        _searchResults.value = emptyList()
+    }
+
+    fun searchCurrentDirectory(query: String) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isEmpty()) {
+            clearSearchResults()
+            return
+        }
+        val profileId = _activeProfileId.value ?: return
+        val key = SearchIndexKey(
+            profileId = profileId,
+            rootPath = normalizePath(_currentPath.value),
+            isSmb = _isSmbProfile.value,
+            showHidden = _showHidden.value,
+        )
+        pendingSearchQuery = normalizedQuery
+
+        if (searchIndexKey == key) {
+            publishSearchResults(normalizedQuery)
+            return
+        }
+        if (searchJob?.isActive == true && searchJobKey == key) {
+            _searchLoading.value = true
+            return
+        }
+
+        searchJob?.cancel()
+        searchJobKey = key
+        searchJob = viewModelScope.launch {
+            try {
+                _searchLoading.value = true
+                val indexedEntries = withContext(Dispatchers.IO) {
+                    if (key.isSmb) {
+                        val client = activeSmbClient ?: throw IllegalStateException("SMB not connected")
+                        buildSmbSearchIndex(client, key.rootPath, key.showHidden)
+                    } else {
+                        val remoteFindEntries = getSshClientForProfile(profileId)
+                            ?.buildRemoteFindSearchIndex(key.rootPath, key.showHidden)
+                        if (remoteFindEntries != null) {
+                            return@withContext remoteFindEntries
+                        }
+                        val channel = openDedicatedSftpChannel(profileId)
+                            ?: getOrOpenChannel(profileId)
+                            ?: throw IllegalStateException("Not connected")
+                        val shouldClose = channel !== sftpChannel
+                        try {
+                            buildSftpSearchIndex(channel, key.rootPath, key.showHidden)
+                        } finally {
+                            if (shouldClose && channel.isConnected) channel.disconnect()
+                        }
+                    }
+                }
+                searchIndexKey = key
+                searchIndexEntries = indexedEntries.distinctBy { it.path }
+                publishSearchResults(pendingSearchQuery)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Search failed", e)
+                _error.value = "Search failed: ${e.message}"
+                _searchResults.value = emptyList()
+            } finally {
+                if (searchJobKey == key) {
+                    searchJob = null
+                    searchJobKey = null
+                    _searchLoading.value = false
+                }
+            }
+        }
+    }
+
+    private fun publishSearchResults(query: String) {
+        val normalizedQuery = query.trim()
+        _searchResults.value = if (normalizedQuery.isEmpty()) {
+            emptyList()
+        } else {
+            sortEntries(
+                searchIndexEntries.filter { entry ->
+                    entry.name.contains(normalizedQuery, ignoreCase = true)
+                },
+                _sortMode.value,
+            )
+        }
     }
 
     fun refresh() {
@@ -454,11 +580,7 @@ class SftpViewModel @Inject constructor(
                         client.delete(entry.path, entry.isDirectory)
                     } else {
                         val channel = getOrOpenChannel(profileId) ?: throw IllegalStateException("Not connected")
-                        if (entry.isDirectory) {
-                            channel.rmdir(entry.path)
-                        } else {
-                            channel.rm(entry.path)
-                        }
+                        deleteSftpEntry(channel, entry.path, entry.isDirectory)
                     }
                 }
                 _message.value = "Deleted ${entry.name}"
@@ -470,6 +592,32 @@ class SftpViewModel @Inject constructor(
                 _loading.value = false
             }
         }
+    }
+
+    private fun deleteSftpEntry(channel: ChannelSftp, path: String, isDirectory: Boolean) {
+        if (!isDirectory) {
+            channel.rm(path)
+            return
+        }
+
+        val children = mutableListOf<ChannelSftp.LsEntry>()
+        channel.ls(path) { lsEntry ->
+            val name = lsEntry.filename
+            if (name != "." && name != "..") {
+                children += lsEntry
+            }
+            ChannelSftp.LsEntrySelector.CONTINUE
+        }
+
+        children.forEach { child ->
+            val childPath = path.trimEnd('/') + "/" + child.filename
+            if (child.attrs.isDir) {
+                deleteSftpEntry(channel, childPath, isDirectory = true)
+            } else {
+                channel.rm(childPath)
+            }
+        }
+        channel.rmdir(path)
     }
 
     private fun clearHistory() {
@@ -509,6 +657,10 @@ class SftpViewModel @Inject constructor(
             }
         }
         return if (stack.isEmpty()) "/" else "/" + stack.joinToString("/")
+    }
+
+    private fun shellQuote(value: String): String {
+        return "'" + value.replace("'", "'\"'\"'") + "'"
     }
 
     private fun pathExistsSftp(profileId: String, path: String): Boolean {
@@ -776,6 +928,96 @@ class SftpViewModel @Inject constructor(
         applyFilter()
     }
 
+    private suspend fun SshClient.buildRemoteFindSearchIndex(
+        rootPath: String,
+        showHidden: Boolean,
+    ): List<SftpEntry>? {
+        val maxDepth = SEARCH_MAX_DIRECTORY_DEPTH + 1
+        val hiddenFilter = if (showHidden) "" else "\\( -name '.*' -prune \\) -o "
+        val printFormat = "%y\\t%s\\t%T@\\t%M\\t%p\\0"
+        val command = "find ${shellQuote(rootPath)} -mindepth 1 -maxdepth $maxDepth " +
+            "$hiddenFilter-printf ${shellQuote(printFormat)}"
+        val result = try {
+            execCommand(command)
+        } catch (e: Exception) {
+            Log.d(TAG, "Remote find search index unavailable", e)
+            return null
+        }
+        val entries = parseRemoteFindEntries(result.stdout)
+        if (result.exitStatus != 0 && entries.isEmpty()) {
+            Log.d(TAG, "Remote find search index failed: ${result.stderr.take(200)}")
+            return null
+        }
+        return entries
+    }
+
+    private fun parseRemoteFindEntries(stdout: String): List<SftpEntry> {
+        if (stdout.isEmpty()) return emptyList()
+        return stdout.split('\u0000').mapNotNull { record ->
+            if (record.isEmpty()) return@mapNotNull null
+            val parts = record.split('\t', limit = 5)
+            if (parts.size != 5) return@mapNotNull null
+            val path = normalizePath(parts[4])
+            val name = path.trimEnd('/').substringAfterLast('/')
+            if (name.isEmpty()) return@mapNotNull null
+            SftpEntry(
+                name = name,
+                path = path,
+                isDirectory = parts[0].firstOrNull() == 'd',
+                size = parts[1].toLongOrNull() ?: 0L,
+                modifiedTime = parts[2].substringBefore('.').toLongOrNull() ?: 0L,
+                permissions = parts[3],
+            )
+        }
+    }
+
+    private fun buildSftpSearchIndex(
+        channel: ChannelSftp,
+        rootPath: String,
+        showHidden: Boolean,
+    ): List<SftpEntry> {
+        val results = mutableListOf<SftpEntry>()
+        val visited = mutableSetOf<String>()
+
+        fun visit(path: String, depth: Int) {
+            val normalizedPath = normalizePath(path)
+            if (!visited.add(normalizedPath)) return
+
+            val children = mutableListOf<ChannelSftp.LsEntry>()
+            try {
+                channel.ls(normalizedPath) { lsEntry ->
+                    val name = lsEntry.filename
+                    if (name != "." && name != ".." && (showHidden || !name.startsWith("."))) {
+                        children += lsEntry
+                    }
+                    ChannelSftp.LsEntrySelector.CONTINUE
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Skipping unreadable SFTP directory $normalizedPath", e)
+                return
+            }
+
+            children.forEach { child ->
+                val attrs = child.attrs
+                val entry = SftpEntry(
+                    name = child.filename,
+                    path = normalizedPath.trimEnd('/') + "/" + child.filename,
+                    isDirectory = attrs.isDir,
+                    size = attrs.size,
+                    modifiedTime = attrs.mTime.toLong(),
+                    permissions = attrs.permissionsString ?: "",
+                )
+                results += entry
+                if (entry.isDirectory && !attrs.isLink && depth < SEARCH_MAX_DIRECTORY_DEPTH) {
+                    visit(entry.path, depth + 1)
+                }
+            }
+        }
+
+        visit(rootPath, depth = 0)
+        return results
+    }
+
     private fun getOrOpenChannel(profileId: String): ChannelSftp? {
         sftpChannel?.let { if (it.isConnected) return it }
         // Try SSH session first, then mosh/ET bootstrap SSH client
@@ -785,6 +1027,14 @@ class SftpViewModel @Inject constructor(
             ?: return null
         sftpChannel = channel
         return channel
+    }
+
+    private fun getSshClientForProfile(profileId: String): SshClient? {
+        val sshSession = sessionManager.getSessionsForProfile(profileId)
+            .firstOrNull { it.status == sh.haven.core.ssh.SshSessionManager.SessionState.Status.CONNECTED }
+        if (sshSession != null) return sshSession.client
+        return (moshSessionManager.getSshClientForProfile(profileId) as? SshClient)
+            ?: (etSessionManager.getSshClientForProfile(profileId) as? SshClient)
     }
 
     private fun openDedicatedSftpChannel(profileId: String): ChannelSftp? {
@@ -886,6 +1136,46 @@ class SftpViewModel @Inject constructor(
         }
         _allEntries.value = sortEntries(results, _sortMode.value)
         applyFilter()
+    }
+
+    private fun buildSmbSearchIndex(
+        client: SmbClient,
+        rootPath: String,
+        showHidden: Boolean,
+    ): List<SftpEntry> {
+        val results = mutableListOf<SftpEntry>()
+        val visited = mutableSetOf<String>()
+
+        fun visit(path: String, depth: Int) {
+            val normalizedPath = normalizePath(path)
+            if (!visited.add(normalizedPath)) return
+
+            val children = try {
+                client.listDirectory(normalizedPath)
+            } catch (e: Exception) {
+                Log.d(TAG, "Skipping unreadable SMB directory $normalizedPath", e)
+                return
+            }
+
+            children.forEach { child ->
+                if (!showHidden && child.name.startsWith(".")) return@forEach
+                val entry = SftpEntry(
+                    name = child.name,
+                    path = child.path,
+                    isDirectory = child.isDirectory,
+                    size = child.size,
+                    modifiedTime = child.modifiedTime,
+                    permissions = child.permissions,
+                )
+                results += entry
+                if (entry.isDirectory && depth < SEARCH_MAX_DIRECTORY_DEPTH) {
+                    visit(entry.path, depth + 1)
+                }
+            }
+        }
+
+        visit(rootPath, depth = 0)
+        return results
     }
 
     private fun sortEntries(entries: List<SftpEntry>, mode: SortMode): List<SftpEntry> {

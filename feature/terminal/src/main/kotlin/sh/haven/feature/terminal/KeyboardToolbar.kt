@@ -279,7 +279,7 @@ private fun AlignedToolbarContent(
         Column {
             KeyRow {
                 for (key in NAV_GRID_TOP) {
-                    if (key != null && key in presentNavKeys) {
+                    if (key in presentNavKeys) {
                         NavBuiltInKey(key, onSendBytes, shiftActive, onShiftUsed)
                     } else {
                         NavCell {}
@@ -288,7 +288,7 @@ private fun AlignedToolbarContent(
             }
             KeyRow {
                 for (key in NAV_GRID_BOTTOM) {
-                    if (key != null && key in presentNavKeys) {
+                    if (key in presentNavKeys) {
                         NavBuiltInKey(key, onSendBytes, shiftActive, onShiftUsed)
                     } else {
                         NavCell {}

@@ -1,5 +1,6 @@
 package com.hension.havenx
 
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -9,8 +10,12 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import sh.haven.feature.sftp.MediaTypeResolver
@@ -19,8 +24,12 @@ import java.util.Locale
 
 class PlayerPreviewActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
+    private var playerView: PlayerView? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private var trackingSeek = false
+    private var fullscreen = false
+    private var initialRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    private var videoSize: VideoSize? = null
 
     private val progressUpdater = object : Runnable {
         override fun run() {
@@ -31,6 +40,7 @@ class PlayerPreviewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initialRequestedOrientation = requestedOrientation
         setContentView(R.layout.activity_player_preview)
 
         val filePath = intent.getStringExtra("FILE_PATH")
@@ -42,7 +52,7 @@ class PlayerPreviewActivity : AppCompatActivity() {
         supportActionBar?.title = remotePath.substringAfterLast('/')
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        val playerView = findViewById<PlayerView>(R.id.playerView)
+        val playerView = findViewById<PlayerView>(R.id.playerView).also { this.playerView = it }
         val audioPanel = findViewById<View>(R.id.audioPanel)
         val audioBackgroundGradient = findViewById<View>(R.id.audioBackgroundGradient)
         val titleText = findViewById<TextView>(R.id.audioTitle)
@@ -50,6 +60,12 @@ class PlayerPreviewActivity : AppCompatActivity() {
         val audioSeekBar = findViewById<SeekBar>(R.id.audioSeekBar)
         val audioPosition = findViewById<TextView>(R.id.audioPosition)
         val audioDuration = findViewById<TextView>(R.id.audioDuration)
+
+        if (mediaType == MediaTypeResolver.MediaType.VIDEO) {
+            playerView.setFullscreenButtonClickListener { isFullscreen ->
+                setFullscreenMode(isFullscreen)
+            }
+        }
 
         if (mediaType == MediaTypeResolver.MediaType.AUDIO) {
             playerView.useController = false
@@ -84,6 +100,13 @@ class PlayerPreviewActivity : AppCompatActivity() {
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     syncPlayPauseButton(audioPlayPause, isPlaying)
+                }
+
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    this@PlayerPreviewActivity.videoSize = videoSize
+                    if (fullscreen) {
+                        requestedOrientation = fullscreenOrientationFor(videoSize)
+                    }
                 }
             })
         }
@@ -152,14 +175,30 @@ class PlayerPreviewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (fullscreen) {
+            setFullscreenMode(false)
+        }
         uiHandler.removeCallbacks(progressUpdater)
         player?.release()
         player = null
     }
 
     override fun onSupportNavigateUp(): Boolean {
+        if (fullscreen) {
+            exitFullscreen()
+            return true
+        }
         finish()
         return true
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (fullscreen) {
+            exitFullscreen()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     private fun updateAudioProgress() {
@@ -204,5 +243,58 @@ class PlayerPreviewActivity : AppCompatActivity() {
             if (isPlaying) android.R.drawable.ic_media_pause
             else android.R.drawable.ic_media_play,
         )
+    }
+
+    private fun setFullscreenMode(enabled: Boolean) {
+        fullscreen = enabled
+        if (enabled) {
+            supportActionBar?.hide()
+            requestedOrientation = fullscreenOrientationFor(videoSize)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            supportActionBar?.show()
+            requestedOrientation = initialRequestedOrientation
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            WindowInsetsControllerCompat(window, window.decorView)
+                .show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    private fun fullscreenOrientationFor(size: VideoSize?): Int {
+        if (size == null || size.width <= 0 || size.height <= 0) {
+            return ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        }
+        val rotated = size.unappliedRotationDegrees % 180 != 0
+        val displayWidth = if (rotated) {
+            size.height.toFloat()
+        } else {
+            size.width * size.pixelWidthHeightRatio
+        }
+        val displayHeight = if (rotated) {
+            size.width * size.pixelWidthHeightRatio
+        } else {
+            size.height.toFloat()
+        }
+        return when {
+            displayHeight > displayWidth -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            displayWidth > displayHeight -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        }
+    }
+
+    private fun exitFullscreen() {
+        val controls = playerView
+        val toggled = controls?.findViewById<View>(androidx.media3.ui.R.id.exo_fullscreen)
+            ?.performClick() == true ||
+            controls?.findViewById<View>(androidx.media3.ui.R.id.exo_minimal_fullscreen)
+                ?.performClick() == true
+        if (!toggled) {
+            setFullscreenMode(false)
+        }
     }
 }

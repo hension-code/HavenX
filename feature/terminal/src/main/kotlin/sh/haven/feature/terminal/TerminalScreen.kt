@@ -713,7 +713,7 @@ private fun sgrMouseWheel(scrollUp: Boolean, col: Int, row: Int): ByteArray {
 }
 
 /** Gesture kind — once classified per touch, locked for the touch lifetime. */
-private enum class GestureKind { UNDECIDED, TAB_SWIPE, SCROLL, SELECTION }
+private enum class GestureKind { UNDECIDED, HORIZONTAL_BLOCK, SCROLL, SELECTION }
 
 /** Fraction of terminal height at top/bottom that triggers edge-scroll during selection drag. */
 private const val EDGE_SCROLL_ZONE = 0.12f
@@ -728,11 +728,11 @@ private const val EDGE_SCROLL_INTERVAL_MS = 150L
  * composable's internal gesture handler.
  *
  * Gesture classification is mutually exclusive — once a touch is classified
- * as tab-swipe, scroll, or selection-extend, it stays that way until the
+ * as horizontal-block, scroll, or selection-extend, it stays that way until the
  * finger lifts:
  *
  * - Hold still (undecided): passes through to Terminal for long-press detection
- * - Horizontal drag (TAB_SWIPE): passes through for page swiping / tab navigation
+ * - Horizontal drag (HORIZONTAL_BLOCK): consumed to avoid accidental page switching
  * - Vertical drag (SCROLL): consumed, emits SGR mouse wheel sequences (mouse mode)
  * - Selection active (SELECTION): consumed, extends selection like a highlighter;
  *   dragging near top/bottom edge auto-scrolls the terminal slowly
@@ -774,12 +774,10 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
                 val change = event.changes.firstOrNull() ?: break
                 if (!change.pressed) break
 
-                // Selection always takes priority — the Terminal's long-press
-                // detector runs on a later PointerEventPass, so isSelectionActive()
-                // may lag our Initial pass by one event.  Checking every event and
-                // allowing override of TAB_SWIPE/SCROLL prevents both gestures from
-                // firing simultaneously.
-                if (isSelectionActive() && kind != GestureKind.SELECTION) {
+                // Selection only takes priority before a drag is classified.
+                // This keeps long-press-to-select behavior while preventing
+                // scrolling drags from being hijacked by late selection activation.
+                if (isSelectionActive() && kind == GestureKind.UNDECIDED) {
                     kind = GestureKind.SELECTION
                 }
 
@@ -792,7 +790,7 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
 
                     if (absDx > touchSlop || absDy > touchSlop) {
                         wasDrag = true
-                        kind = if (absDx > absDy) GestureKind.TAB_SWIPE
+                        kind = if (absDx > absDy) GestureKind.HORIZONTAL_BLOCK
                                else GestureKind.SCROLL
                         if (kind == GestureKind.SCROLL && mouseMode) {
                             accumulatedY = dy
@@ -805,10 +803,10 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
                         if (inCooldown) change.consume()
                     }
 
-                    GestureKind.TAB_SWIPE -> {
-                        // Don't consume, don't break — events pass through to
-                        // the pager naturally.  Staying in the loop lets us
-                        // detect late selection activation and override.
+                    GestureKind.HORIZONTAL_BLOCK -> {
+                        // Consume horizontal drags so terminal-area swipes do
+                        // not switch pages/tabs accidentally.
+                        change.consume()
                     }
 
                     GestureKind.SCROLL -> {
@@ -845,7 +843,7 @@ private suspend fun PointerInputScope.terminalGestureInterceptor(
                             .toInt().coerceIn(0, dims.columns - 1)
                         val row = ((change.position.y / size.height) * dims.rows)
                             .toInt().coerceIn(0, dims.rows - 1)
-                        updateSelectionEndAbsolute(ctrl, row, col)
+                        updateSelectionEndFromTerminalColumn(ctrl, activeTab.emulator, row, col)
 
                         // Edge-scroll: when finger is near top/bottom and mouse
                         // mode is active, emit slow scroll events so the user

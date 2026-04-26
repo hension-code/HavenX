@@ -779,6 +779,8 @@ fun TerminalWithAccessibility(
                                 val (touchingStart, touchingEnd) = isTouchingHandle(
                                     down.position,
                                     range,
+                                    screenState.getVisibleLine(range.startRow),
+                                    screenState.getVisibleLine(range.endRow),
                                     baseCharWidth,
                                     baseCharHeight
                                 )
@@ -789,12 +791,14 @@ fun TerminalWithAccessibility(
                                     magnifierPosition = down.position
 
                                     drag(down.id) { change ->
-                                        val newCol =
-                                            (change.position.x / baseCharWidth).toInt()
-                                                .coerceIn(0, screenState.snapshot.cols - 1)
                                         val newRow =
                                             (change.position.y / baseCharHeight).toInt()
                                                 .coerceIn(0, screenState.snapshot.rows - 1)
+                                        val newCol = cellIndexAtX(
+                                            line = screenState.getVisibleLine(newRow),
+                                            x = change.position.x,
+                                            charWidth = baseCharWidth,
+                                        )
 
                                         if (touchingStart) {
                                             selectionManager.updateSelectionStart(
@@ -822,22 +826,27 @@ fun TerminalWithAccessibility(
                         // 2. Start long press detection for selection
                         // Only start selection if no selection is already active
                         var longPressDetected = false
+                        var movedBeyondTouchSlop = false
                         var gestureEnded = false
                         val longPressJob = launch {
                             delay(viewConfiguration.longPressTimeoutMillis)
                             // Only trigger long press if gesture is still undetermined AND still in progress
                             if (gestureType == GestureType.Undetermined &&
                                 selectionManager.mode == SelectionMode.NONE &&
+                                !movedBeyondTouchSlop &&
                                 !gestureEnded
                             ) {
                                 longPressDetected = true
                                 gestureType = GestureType.Selection
 
                                 // Start selection
-                                val col = (down.position.x / baseCharWidth).toInt()
-                                    .coerceIn(0, screenState.snapshot.cols - 1)
                                 val row = (down.position.y / baseCharHeight).toInt()
                                     .coerceIn(0, screenState.snapshot.rows - 1)
+                                val col = cellIndexAtX(
+                                    line = screenState.getVisibleLine(row),
+                                    x = down.position.x,
+                                    charWidth = baseCharWidth,
+                                )
                                 selectionManager.startSelection(
                                     row,
                                     col,
@@ -918,7 +927,9 @@ fun TerminalWithAccessibility(
 
                             // Determine gesture if still undetermined
                             if (gestureType == GestureType.Undetermined && !longPressDetected) {
-                                if (dragAmount.getDistanceSquared() > touchSlopSquared) {
+                                val totalDrag = change.position - down.position
+                                if (totalDrag.getDistanceSquared() > touchSlopSquared) {
+                                    movedBeyondTouchSlop = true
                                     longPressJob.cancel()
                                     gestureType = GestureType.Scroll
                                     // Clear any active selection when scrolling starts
@@ -932,12 +943,14 @@ fun TerminalWithAccessibility(
                             when (gestureType) {
                                 GestureType.Selection -> {
                                     if (selectionManager.isSelecting) {
-                                        val dragCol =
-                                            (change.position.x / baseCharWidth).toInt()
-                                                .coerceIn(0, screenState.snapshot.cols - 1)
                                         val dragRow =
                                             (change.position.y / baseCharHeight).toInt()
                                                 .coerceIn(0, screenState.snapshot.rows - 1)
+                                        val dragCol = cellIndexAtX(
+                                            line = screenState.getVisibleLine(dragRow),
+                                            x = change.position.x,
+                                            charWidth = baseCharWidth,
+                                        )
                                         selectionManager.updateSelection(
                                             dragRow,
                                             dragCol
@@ -1109,6 +1122,7 @@ fun TerminalWithAccessibility(
                         // Start handle
                         val startPosition = range.getStartPosition()
                         drawSelectionHandle(
+                            line = screenState.getVisibleLine(startPosition.first),
                             row = startPosition.first,
                             col = startPosition.second,
                             charWidth = baseCharWidth,
@@ -1119,6 +1133,7 @@ fun TerminalWithAccessibility(
                         // End handle
                         val endPosition = range.getEndPosition()
                         drawSelectionHandle(
+                            line = screenState.getVisibleLine(endPosition.first),
                             row = endPosition.first,
                             col = endPosition.second,
                             charWidth = baseCharWidth,
@@ -1172,7 +1187,11 @@ fun TerminalWithAccessibility(
             if (range != null) {
                 // Position copy button above the selection
                 val endPosition = range.getEndPosition()
-                val buttonX = endPosition.second * baseCharWidth
+                val buttonX = cellVisualX(
+                    line = screenState.getVisibleLine(endPosition.first),
+                    index = endPosition.second,
+                    charWidth = baseCharWidth,
+                )
                 val buttonY = endPosition.first * baseCharHeight - with(density) { COPY_BUTTON_OFFSET.toPx() }
 
                 Box(
@@ -1412,16 +1431,20 @@ private fun DrawScope.drawCurlyUnderline(
 private fun isTouchingHandle(
     touchPos: Offset,
     range: SelectionRange,
+    startLine: TerminalLine,
+    endLine: TerminalLine,
     charWidth: Float,
     charHeight: Float,
     hitRadius: Float = HANDLE_HIT_RADIUS
 ): Pair<Boolean, Boolean> {
+    val startX = cellVisualX(startLine, range.startCol, charWidth)
+    val endX = cellVisualX(endLine, range.endCol, charWidth)
     val startPos = Offset(
-        range.startCol * charWidth + charWidth / 2,
+        startX + charWidth / 2,
         range.startRow * charHeight
     )
     val endPos = Offset(
-        range.endCol * charWidth + charWidth / 2,
+        endX + charWidth / 2,
         range.endRow * charHeight + charHeight
     )
 
@@ -1432,6 +1455,37 @@ private fun isTouchingHandle(
         distToStart < hitRadius,
         distToEnd < hitRadius
     )
+}
+
+private fun cellIndexAtX(
+    line: TerminalLine,
+    x: Float,
+    charWidth: Float,
+): Int {
+    if (line.cells.isEmpty()) return 0
+
+    var currentX = 0f
+    line.cells.forEachIndexed { index, cell ->
+        val nextX = currentX + charWidth * cell.width.coerceAtLeast(1)
+        if (x < nextX) return index
+        currentX = nextX
+    }
+    return line.cells.lastIndex
+}
+
+private fun cellVisualX(
+    line: TerminalLine,
+    index: Int,
+    charWidth: Float,
+): Float {
+    if (line.cells.isEmpty()) return 0f
+
+    var x = 0f
+    val lastBefore = index.coerceIn(0, line.cells.lastIndex)
+    for (i in 0 until lastBefore) {
+        x += charWidth * line.cells[i].width.coerceAtLeast(1)
+    }
+    return x
 }
 
 /**
@@ -1524,6 +1578,7 @@ private fun MagnifyingGlass(
  * Draw a selection handle (teardrop shape).
  */
 private fun DrawScope.drawSelectionHandle(
+    line: TerminalLine,
     row: Int,
     col: Int,
     charWidth: Float,
@@ -1534,7 +1589,7 @@ private fun DrawScope.drawSelectionHandle(
     val handleWidthPx = SELECTION_HANDLE_WIDTH.toPx()
 
     // Position handle at the character position
-    val charX = col * charWidth
+    val charX = cellVisualX(line, col, charWidth)
     val charY = row * charHeight
 
     // Center the handle horizontally on the character

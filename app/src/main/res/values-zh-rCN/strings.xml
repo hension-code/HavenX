@@ -12,4 +12,11 @@
     <string name="toast_saved_uploading">已保存并上传完成</string>
     <string name="toast_failed_save">保存失败：%1$s</string>
     <string name="toast_cannot_upload_disconnected">无法上传：连接已断开</string>
+    <string name="search_text">搜索文本</string>
+    <string name="search_in_file">在文件中搜索</string>
+    <string name="clear_search">清空搜索</string>
+    <string name="close_search">关闭搜索</string>
+    <string name="previous_match">上一个匹配</string>
+    <string name="next_match">下一个匹配</string>
+    <string name="no_text_matches">无匹配</string>
 </resources>

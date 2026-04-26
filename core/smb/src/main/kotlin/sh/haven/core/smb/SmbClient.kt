@@ -172,7 +172,7 @@ class SmbClient : Closeable {
         val diskShare = share ?: throw IllegalStateException("Not connected")
         val smbPath = toSmbPath(path)
         if (isDirectory) {
-            diskShare.rmdir(smbPath, false)
+            diskShare.rmdir(smbPath, true)
         } else {
             diskShare.rm(smbPath)
         }

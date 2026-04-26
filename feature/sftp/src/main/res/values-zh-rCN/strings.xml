@@ -12,11 +12,14 @@
     <string name="show_hidden_files">显示隐藏文件</string>
     <string name="sort">排序</string>
     <string name="favorite_folders">收藏目录</string>
+    <string name="search_files_folders">搜索文件和文件夹</string>
+    <string name="search_current_directory">搜索当前目录及子目录</string>
     <string name="go">跳转</string>
     <string name="cancel">取消编辑</string>
     <string name="edit_path">编辑路径</string>
     <string name="upload_file">上传文件</string>
     <string name="empty_directory">空目录</string>
+    <string name="no_search_results">没有匹配的文件或文件夹</string>
     <string name="path_copied">路径已复制</string>
     <string name="directory">文件夹</string>
     <string name="favorite">已收藏</string>
