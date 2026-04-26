@@ -4,6 +4,10 @@ on:
   push:
     tags: [ 'v*' ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -15,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -62,9 +67,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      - name: Get tag message
+        id: tag_info
+        shell: bash
+        run: |
+          for tag in $(git tag -l '${{ github.ref_name }}'); do
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            echo "$(git tag -l --format='%(contents)' "$tag")" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.tag_info.outputs.body }}
           generate_release_notes: true
           files: |
             app/build/outputs/apk/*/release/*.apk
