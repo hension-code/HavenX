@@ -161,6 +161,7 @@ chaquopy {
         version = "3.13"
 
         pip {
+            options("--no-scripts")
             install("rns")
             install("rnsh")
         }
