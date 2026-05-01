@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,8 +24,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DesktopWindows
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.connectbot.terminal.SelectionController
+import sh.haven.core.data.preferences.TerminalComboKey
+import sh.haven.core.data.preferences.TerminalComboKeys
 import sh.haven.core.data.preferences.ToolbarItem
 import sh.haven.core.data.preferences.ToolbarKey
 import kotlinx.coroutines.delay
@@ -109,6 +114,8 @@ fun KeyboardToolbar(
     onToggleAlt: () -> Unit = {},
     onVncTap: (() -> Unit)? = null,
     onSnippetsTap: (() -> Unit)? = null,
+    comboKeys: List<TerminalComboKey> = TerminalComboKeys.PRESETS,
+    onComboKeySelected: (TerminalComboKey) -> Unit = {},
     selectionController: SelectionController? = null,
     selectionActive: Boolean = false,
     hyperlinkUri: String? = null,
@@ -143,6 +150,8 @@ fun KeyboardToolbar(
                         onShiftUsed = { shiftActive = false },
                         onVncTap = onVncTap,
                         onSnippetsTap = onSnippetsTap,
+                        comboKeys = comboKeys,
+                        onComboKeySelected = onComboKeySelected,
                     )
                 }
                 SelectionToolbarContent(
@@ -169,6 +178,8 @@ fun KeyboardToolbar(
                 onShiftUsed = { shiftActive = false },
                 onVncTap = onVncTap,
                 onSnippetsTap = onSnippetsTap,
+                comboKeys = comboKeys,
+                onComboKeySelected = onComboKeySelected,
             )
         } else {
             // Single-row fallback
@@ -190,6 +201,8 @@ fun KeyboardToolbar(
                             onShiftUsed = { shiftActive = false },
                             onVncTap = onVncTap,
                             onSnippetsTap = onSnippetsTap,
+                            comboKeys = comboKeys,
+                            onComboKeySelected = onComboKeySelected,
                         )
                     }
                 }
@@ -220,6 +233,8 @@ private fun AlignedToolbarContent(
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)?,
     onSnippetsTap: (() -> Unit)?,
+    comboKeys: List<TerminalComboKey>,
+    onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
     // Split each row into: left (non-nav), right (non-nav after nav keys)
     val (row1Left, row1Right) = splitAroundNav(layout.row1)
@@ -236,9 +251,11 @@ private fun AlignedToolbarContent(
     if (presentNavKeys.isEmpty()) {
         Column {
             ToolbarRow(layout.row1, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap)
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap,
+                comboKeys, onComboKeySelected)
             ToolbarRow(layout.row2, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap)
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap,
+                comboKeys, onComboKeySelected)
         }
         return
     }
@@ -254,7 +271,8 @@ private fun AlignedToolbarContent(
             KeyRow(Modifier.fillMaxWidth()) {
                 for (item in row1Left) {
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
-                        shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                        shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
+                        comboKeys, onComboKeySelected)
                     if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
                         ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
                     }
@@ -267,7 +285,8 @@ private fun AlignedToolbarContent(
                 }
                 for (item in row2Left) {
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
-                        shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                        shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
+                        comboKeys, onComboKeySelected)
                     if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
                         ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
                     }
@@ -304,7 +323,8 @@ private fun AlignedToolbarContent(
                     KeyRow {
                         for (item in row1Right) {
                             RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
-                                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
+                                comboKeys, onComboKeySelected)
                             if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
                                 ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
                             }
@@ -316,7 +336,8 @@ private fun AlignedToolbarContent(
                 KeyRow {
                     for (item in row2Right) {
                         RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
-                            shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                            shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
+                            comboKeys, onComboKeySelected)
                         if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
                             ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
                         }
@@ -387,6 +408,8 @@ private fun RenderItem(
     onToggleAlt: () -> Unit,
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
+    comboKeys: List<TerminalComboKey>,
+    onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
     when (item) {
         is ToolbarItem.BuiltIn -> BuiltInKey(
@@ -402,6 +425,8 @@ private fun RenderItem(
             onToggleAlt = onToggleAlt,
             onToggleShift = onToggleShift,
             onShiftUsed = onShiftUsed,
+            comboKeys = comboKeys,
+            onComboKeySelected = onComboKeySelected,
         )
         is ToolbarItem.Custom -> {
             SymbolButton(item.label) {
@@ -438,6 +463,8 @@ private fun ToolbarRow(
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)? = null,
     onSnippetsTap: (() -> Unit)? = null,
+    comboKeys: List<TerminalComboKey>,
+    onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -447,7 +474,8 @@ private fun ToolbarRow(
     ) {
         for (item in items) {
             RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed)
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
+                comboKeys, onComboKeySelected)
             if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onVncTap != null) {
                 ToolbarIconButton(Icons.Filled.DesktopWindows, "VNC Desktop", onVncTap)
             }
@@ -472,19 +500,18 @@ private fun BuiltInKey(
     onToggleAlt: () -> Unit,
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
+    comboKeys: List<TerminalComboKey>,
+    onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
     when (key) {
         ToolbarKey.KEYBOARD -> {
-            ToolbarIconButton(Icons.Filled.Keyboard, "Toggle keyboard") {
-                val window = (view.context as? Activity)?.window ?: return@ToolbarIconButton
-                val controller = WindowCompat.getInsetsController(window, view)
-                if (imeVisible) {
-                    controller.hide(WindowInsetsCompat.Type.ime())
-                } else {
-                    focusRequester.requestFocus()
-                    controller.show(WindowInsetsCompat.Type.ime())
-                }
-            }
+            ComboKeyDropdown(
+                comboKeys = comboKeys,
+                focusRequester = focusRequester,
+                imeVisible = imeVisible,
+                view = view,
+                onSelect = onComboKeySelected,
+            )
         }
         ToolbarKey.ESC_KEY -> ToolbarTextButton("Esc") { onSendBytes(KEY_ESC) }
         ToolbarKey.TAB_KEY -> ToolbarTextButton("Tab") {
@@ -546,6 +573,69 @@ private fun sendChar(
         onSendBytes(byteArrayOf(0x1b) + byte)
     } else {
         onSendBytes(byte)
+    }
+}
+
+@Composable
+private fun ComboKeyDropdown(
+    comboKeys: List<TerminalComboKey>,
+    focusRequester: FocusRequester,
+    imeVisible: Boolean,
+    view: android.view.View,
+    onSelect: (TerminalComboKey) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var keepImeOpen by remember { mutableStateOf(false) }
+
+    fun showImeIfNeeded() {
+        if (!keepImeOpen) return
+        view.post {
+            focusRequester.requestFocus()
+            val window = (view.context as? Activity)?.window ?: return@post
+            WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.ime())
+        }
+    }
+
+    Box {
+        FilledTonalButton(
+            onClick = {
+                keepImeOpen = imeVisible
+                focusRequester.requestFocus()
+                expanded = true
+                showImeIfNeeded()
+            },
+            modifier = Modifier
+                .padding(horizontal = 1.dp)
+                .height(32.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        ) {
+            Text(stringResource(R.string.combo_keys), fontSize = 11.sp, lineHeight = 11.sp)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                showImeIfNeeded()
+            },
+            modifier = Modifier.heightIn(max = 240.dp),
+            properties = PopupProperties(focusable = false),
+        ) {
+            comboKeys.forEach { comboKey ->
+                val displayLabel = if (comboKey.label == comboKey.keys) {
+                    comboKey.label
+                } else {
+                    "${comboKey.label}  ${comboKey.keys}"
+                }
+                DropdownMenuItem(
+                    text = { Text(displayLabel) },
+                    onClick = {
+                        expanded = false
+                        onSelect(comboKey)
+                        showImeIfNeeded()
+                    },
+                )
+            }
+        }
     }
 }
 

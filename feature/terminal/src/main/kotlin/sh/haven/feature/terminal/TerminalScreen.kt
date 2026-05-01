@@ -110,6 +110,7 @@ fun TerminalScreen(
     val altActive by viewModel.altActive.collectAsState()
     val colorScheme by viewModel.terminalColorScheme.collectAsState()
     val terminalFont by viewModel.terminalFont.collectAsState()
+    val comboKeys by viewModel.comboKeys.collectAsState()
     val navigateToConnections by viewModel.navigateToConnections.collectAsState()
     val newTabSessionPicker by viewModel.newTabSessionPicker.collectAsState()
     val newTabLoading by viewModel.newTabLoading.collectAsState()
@@ -441,6 +442,10 @@ fun TerminalScreen(
                         altActive = altActive,
                         bracketPasteMode = isBracketPaste,
                         layout = toolbarLayout,
+                        comboKeys = comboKeys,
+                        onComboKeySelected = { comboKey ->
+                            activeTab.sendInput(comboKey.send.toByteArray())
+                        },
                         onToggleCtrl = viewModel::toggleCtrl,
                         onToggleAlt = viewModel::toggleAlt,
                         onVncTap = if (activeTab.transportType == "SSH") {{

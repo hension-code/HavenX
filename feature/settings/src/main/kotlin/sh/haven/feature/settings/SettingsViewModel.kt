@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import sh.haven.core.data.backup.BackupService
+import sh.haven.core.data.preferences.TerminalComboKey
 import sh.haven.core.data.preferences.ToolbarLayout
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.security.BiometricAuthenticator
@@ -159,6 +160,14 @@ class SettingsViewModel @Inject constructor(
             ToolbarLayout.DEFAULT.toJson(),
         )
 
+    val comboKeys: StateFlow<List<TerminalComboKey>> =
+        preferencesRepository.terminalComboKeys
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                sh.haven.core.data.preferences.TerminalComboKeys.PRESETS,
+            )
+
     fun setBiometricEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setBiometricEnabled(enabled)
@@ -210,6 +219,12 @@ class SettingsViewModel @Inject constructor(
     fun setToolbarLayoutJson(json: String) {
         viewModelScope.launch {
             preferencesRepository.setToolbarLayoutJson(json)
+        }
+    }
+
+    fun setComboKeys(keys: List<TerminalComboKey>) {
+        viewModelScope.launch {
+            preferencesRepository.setTerminalComboKeys(keys)
         }
     }
 

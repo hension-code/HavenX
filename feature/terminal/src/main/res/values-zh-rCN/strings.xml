@@ -30,6 +30,7 @@
     <string name="rename_session_1">重命名会话</string>
     <string name="name">名称</string>
     <string name="rename">重命名</string>
+    <string name="combo_keys">组合键</string>
     <string name="snippets">⚡ 预设</string>
     <string name="presets_snippets">预设指令 (Snippets)</string>
     <string name="add_snippet">添加预设指令</string>

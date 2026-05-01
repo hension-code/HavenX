@@ -10,6 +10,8 @@
     <string name="terminal_color_scheme">Terminal color scheme</string>
     <string name="keyboard_toolbar">Keyboard toolbar</string>
     <string name="configure_toolbar_keys_and_layout">Configure toolbar keys and layout</string>
+    <string name="combo_keys">Combo keys</string>
+    <string name="configure_terminal_combo_keys">Configure terminal control-key shortcuts</string>
     <string name="theme">Theme</string>
     <string name="language">Language</string>
     <string name="system_default">System default</string>
@@ -55,4 +57,17 @@
     <string name="edit_toolbar_json">Edit toolbar JSON</string>
     <string name="simple">Simple</string>
     <string name="off">Off</string>
+    <string name="preset_combo_keys">Preset combo keys</string>
+    <string name="custom_combo_keys">Custom combo keys</string>
+    <string name="no_custom_combo_keys">No custom combo keys yet</string>
+    <string name="add_combo_key">Add combo key</string>
+    <string name="edit_combo_key">Edit combo key</string>
+    <string name="combo_key_label">Label</string>
+    <string name="combo_key_sequence">Key sequence</string>
+    <string name="combo_key_sequence_hint">Supports Ctrl+C, Alt+B, Esc, Tab, Enter, Backspace, and Space.</string>
+    <string name="combo_key_already_exists">This combo key already exists.</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
 </resources>

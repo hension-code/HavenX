@@ -30,6 +30,7 @@ class UserPreferencesRepository @Inject constructor(
     private val toolbarRow1Key = stringPreferencesKey("toolbar_row1") // legacy
     private val toolbarRow2Key = stringPreferencesKey("toolbar_row2") // legacy
     private val toolbarLayoutKey = stringPreferencesKey("toolbar_layout")
+    private val terminalComboKeysKey = stringPreferencesKey("terminal_combo_keys")
     private val sessionCommandOverrideKey = stringPreferencesKey("session_command_override")
     private val sftpSortModeKey = stringPreferencesKey("sftp_sort_mode")
     private val sftpShowHiddenKey = booleanPreferencesKey("sftp_show_hidden")
@@ -171,6 +172,17 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(toolbarRow1Key)
             prefs.remove(toolbarRow2Key)
             prefs.remove(toolbarRowsKey)
+        }
+    }
+
+    val terminalComboKeys: Flow<List<TerminalComboKey>> = dataStore.data.map { prefs ->
+        val json = prefs[terminalComboKeysKey]
+        if (json == null) TerminalComboKeys.PRESETS else TerminalComboKeys.fromJson(json)
+    }
+
+    suspend fun setTerminalComboKeys(keys: List<TerminalComboKey>) {
+        dataStore.edit { prefs ->
+            prefs[terminalComboKeysKey] = TerminalComboKeys.toJson(keys)
         }
     }
 

@@ -3,10 +3,10 @@ package sh.haven.core.data.preferences
 /**
  * Every key that can appear on the keyboard toolbar.
  * [id] is persisted in preferences; [label] is shown in the config dialog and on buttons.
- * [isModifier] keys render as toggle buttons; [isAction] keys are functional (Esc, Tab, Keyboard).
+ * [isModifier] keys render as toggle buttons; [isAction] keys are functional (Esc, Tab, Combo).
  */
 enum class ToolbarKey(val id: String, val label: String, val isModifier: Boolean = false, val isAction: Boolean = false) {
-    KEYBOARD("keyboard", "Keyboard", isAction = true),
+    KEYBOARD("keyboard", "Combo", isAction = true),
     ESC_KEY("esc", "Esc", isAction = true),
     TAB_KEY("tab", "Tab", isAction = true),
     SHIFT("shift", "Shift", isModifier = true),

@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,12 +40,16 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -67,7 +72,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
+import kotlin.math.roundToInt
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.intl.Locale
@@ -77,10 +87,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import sh.haven.core.data.preferences.TerminalComboKey
+import sh.haven.core.data.preferences.TerminalComboKeys
 import sh.haven.core.data.preferences.ToolbarItem
 import sh.haven.core.data.preferences.ToolbarKey
 import sh.haven.core.data.preferences.ToolbarLayout
 import sh.haven.core.data.preferences.UserPreferencesRepository
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +110,7 @@ fun SettingsScreen(
     val terminalFont by viewModel.terminalFont.collectAsState()
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
     val toolbarLayoutJson by viewModel.toolbarLayoutJson.collectAsState()
+    val comboKeys by viewModel.comboKeys.collectAsState()
     val backupStatus by viewModel.backupStatus.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
@@ -106,6 +120,7 @@ fun SettingsScreen(
     var showColorSchemeDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showToolbarConfigDialog by remember { mutableStateOf(false) }
+    var showComboKeysDialog by remember { mutableStateOf(false) }
     var showBackupPasswordDialog by remember { mutableStateOf<BackupAction?>(null) }
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -201,6 +216,12 @@ fun SettingsScreen(
             title = stringResource(R.string.keyboard_toolbar),
             subtitle = stringResource(R.string.configure_toolbar_keys_and_layout),
             onClick = { showToolbarConfigDialog = true },
+        )
+        SettingsItem(
+            icon = Icons.Filled.KeyboardAlt,
+            title = stringResource(R.string.combo_keys),
+            subtitle = stringResource(R.string.configure_terminal_combo_keys),
+            onClick = { showComboKeysDialog = true },
         )
         SettingsItem(
             icon = Icons.Filled.ColorLens,
@@ -422,6 +443,14 @@ fun SettingsScreen(
                 viewModel.setToolbarLayoutJson(json)
                 showToolbarConfigDialog = false
             },
+        )
+    }
+
+    if (showComboKeysDialog) {
+        ComboKeysDialog(
+            comboKeys = comboKeys,
+            onDismiss = { showComboKeysDialog = false },
+            onSave = viewModel::setComboKeys,
         )
     }
 
@@ -1154,6 +1183,329 @@ private fun colorSchemeLabel(
 
 /** Assignment for a key in the toolbar config dialog. */
 private enum class KeyAssignment { ROW1, ROW2, OFF }
+
+@Composable
+private fun ComboKeysDialog(
+    comboKeys: List<TerminalComboKey>,
+    onDismiss: () -> Unit,
+    onSave: (List<TerminalComboKey>) -> Unit,
+) {
+    var orderedKeys by remember(comboKeys) { mutableStateOf(comboKeys) }
+    var editingKey by remember { mutableStateOf<TerminalComboKey?>(null) }
+    var showEditor by remember { mutableStateOf(false) }
+
+    // Long-press drag reorder state
+    var draggedItemId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    var autoScrollOffset by remember { mutableStateOf(0f) }
+    var itemHeights by remember { mutableStateOf(mapOf<String, Float>()) }
+    var containerHeight by remember { mutableFloatStateOf(0f) }
+    val scrollState = rememberScrollState()
+
+    // Auto-scroll when dragging near viewport edges
+    LaunchedEffect(draggedItemId) {
+        if (draggedItemId == null) return@LaunchedEffect
+        val threshold = 280f
+        while (isActive) {
+            val id = draggedItemId ?: break
+            val itemH = itemHeights[id] ?: break
+            val idx = orderedKeys.indexOfFirst { it.id == id }
+            if (idx < 0) break
+            val contentY = orderedKeys.take(idx).sumOf { itemHeights[it.id]?.toDouble() ?: 0.0 }.toFloat()
+            val visibleY = contentY - scrollState.value + dragOffset
+
+            val scrollDelta = when {
+                visibleY < threshold -> {
+                    val pressure = ((threshold - visibleY) / threshold)
+                        .coerceIn(0f, 1.8f)
+                    val amount = (160f + pressure * pressure * 900f)
+                        .coerceIn(160f, 2200f)
+                        .toInt()
+                    -amount.coerceAtMost(scrollState.value)
+                }
+                visibleY + itemH > containerHeight - threshold -> {
+                    val pressure = ((visibleY + itemH - (containerHeight - threshold)) / threshold)
+                        .coerceIn(0f, 1.8f)
+                    val amount = (160f + pressure * pressure * 900f)
+                        .coerceIn(160f, 2200f)
+                        .toInt()
+                    amount.coerceAtMost(scrollState.maxValue - scrollState.value)
+                }
+                else -> 0
+            }
+            if (scrollDelta != 0) {
+                scrollState.scrollTo(scrollState.value + scrollDelta)
+                autoScrollOffset += scrollDelta
+            }
+            kotlinx.coroutines.delay(6)
+        }
+    }
+
+    fun saveOrdered(updated: List<TerminalComboKey>) {
+        orderedKeys = updated
+        onSave(updated)
+    }
+
+    fun endDrag() {
+        val id = draggedItemId ?: return
+        val currentIdx = orderedKeys.indexOfFirst { it.id == id }
+        if (currentIdx < 0) { draggedItemId = null; dragOffset = 0f; return }
+
+        val itemH = itemHeights[id] ?: 64f
+        val positions = ((dragOffset + autoScrollOffset) / itemH).roundToInt()
+        if (positions != 0) {
+            val targetIdx = (currentIdx + positions).coerceIn(0, orderedKeys.lastIndex)
+            if (targetIdx != currentIdx) {
+                val updated = orderedKeys.toMutableList()
+                val item = updated.removeAt(currentIdx)
+                updated.add(targetIdx, item)
+                saveOrdered(updated)
+            }
+        }
+
+        draggedItemId = null
+        dragOffset = 0f
+        autoScrollOffset = 0f
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.combo_keys)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .height(460.dp)
+                    .onSizeChanged { containerHeight = it.height.toFloat() }
+                    .verticalScroll(scrollState),
+            ) {
+                Text(
+                    text = stringResource(R.string.combo_keys),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (orderedKeys.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.no_custom_combo_keys),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                } else {
+                    orderedKeys.forEachIndexed { index, key ->
+                        val isDragging = key.id == draggedItemId
+                        ListItem(
+                            headlineContent = { Text(key.label) },
+                            supportingContent = { Text(key.keys) },
+                            colors = ListItemDefaults.colors(
+                                containerColor = if (isDragging) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                } else {
+                                    Color.Transparent
+                                },
+                            ),
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    translationY = if (isDragging) dragOffset else 0f
+                                    if (isDragging) {
+                                        shadowElevation = 12f
+                                        alpha = 0.95f
+                                    }
+                                }
+                                .onSizeChanged { itemHeights += (key.id to it.height.toFloat()) }
+                                .pointerInput(key.id) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            draggedItemId = key.id
+                                            dragOffset = 0f
+                                            autoScrollOffset = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffset += dragAmount.y
+                                        },
+                                        onDragEnd = { endDrag() },
+                                        onDragCancel = { endDrag() },
+                                    )
+                                },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val currentIdx = orderedKeys.indexOfFirst { it.id == key.id }
+                                    val canUp = currentIdx > 0
+                                    val canDown = currentIdx < orderedKeys.lastIndex
+                                    val dimAlpha = 0.25f
+                                    Icon(
+                                        Icons.Filled.ArrowUpward,
+                                        contentDescription = stringResource(R.string.move_up),
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable(enabled = canUp) {
+                                                val upd = orderedKeys.toMutableList()
+                                                upd.add(currentIdx - 1, upd.removeAt(currentIdx))
+                                                saveOrdered(upd)
+                                            },
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = if (canUp) 0.7f else dimAlpha,
+                                        ),
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Icon(
+                                        Icons.Filled.ArrowDownward,
+                                        contentDescription = stringResource(R.string.move_down),
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable(enabled = canDown) {
+                                                val upd = orderedKeys.toMutableList()
+                                                upd.add(currentIdx + 1, upd.removeAt(currentIdx))
+                                                saveOrdered(upd)
+                                            },
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = if (canDown) 0.7f else dimAlpha,
+                                        ),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    TextButton(onClick = {
+                                        editingKey = key
+                                        showEditor = true
+                                    }) {
+                                        Text(stringResource(R.string.edit))
+                                    }
+                                    TextButton(onClick = {
+                                        saveOrdered(orderedKeys.filterNot { it.id == key.id })
+                                    }) {
+                                        Text(stringResource(R.string.delete))
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                TextButton(onClick = {
+                    editingKey = null
+                    showEditor = true
+                }) {
+                    Text(stringResource(R.string.add_combo_key))
+                }
+                TextButton(onClick = { saveOrdered(TerminalComboKeys.PRESETS) }) {
+                    Text(stringResource(R.string.reset))
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+        },
+    )
+
+    if (showEditor) {
+        ComboKeyEditorDialog(
+            initialKey = editingKey,
+            existingKeys = orderedKeys,
+            onDismiss = { showEditor = false },
+            onSave = { savedKey ->
+                val updated = if (editingKey == null) {
+                    orderedKeys + savedKey
+                } else {
+                    orderedKeys.map { if (it.id == savedKey.id) savedKey else it }
+                }
+                saveOrdered(updated)
+                showEditor = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ComboKeyEditorDialog(
+    initialKey: TerminalComboKey?,
+    existingKeys: List<TerminalComboKey>,
+    onDismiss: () -> Unit,
+    onSave: (TerminalComboKey) -> Unit,
+) {
+    var label by remember(initialKey) { mutableStateOf(initialKey?.label.orEmpty()) }
+    var keys by remember(initialKey) { mutableStateOf(initialKey?.keys.orEmpty()) }
+    val encoded = remember(keys) { TerminalComboKeys.encodeKeys(keys) }
+    val duplicate = encoded != null && existingKeys.any { key ->
+        key.id != initialKey?.id && key.send == encoded
+    }
+    val errorText = when {
+        keys.isBlank() -> null
+        encoded == null -> stringResource(R.string.combo_key_sequence_hint)
+        duplicate -> stringResource(R.string.combo_key_already_exists)
+        else -> null
+    }
+    val canSave = keys.isNotBlank() && encoded != null && !duplicate
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                if (initialKey == null) {
+                    stringResource(R.string.add_combo_key)
+                } else {
+                    stringResource(R.string.edit_combo_key)
+                }
+            )
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text(stringResource(R.string.combo_key_label)) },
+                    placeholder = { Text(keys.ifBlank { "Ctrl+C" }) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = keys,
+                    onValueChange = { keys = it },
+                    label = { Text(stringResource(R.string.combo_key_sequence)) },
+                    placeholder = { Text("Ctrl+C") },
+                    singleLine = true,
+                    isError = errorText != null,
+                    supportingText = {
+                        Text(
+                            errorText ?: stringResource(R.string.combo_key_sequence_hint),
+                            color = if (errorText != null) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    val keyText = keys.trim()
+                    onSave(
+                        TerminalComboKey(
+                            id = initialKey?.id ?: UUID.randomUUID().toString(),
+                            label = label.trim().ifBlank { keyText },
+                            keys = keyText,
+                            send = encoded ?: return@TextButton,
+                        )
+                    )
+                },
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
 
 @Composable
 private fun ToolbarConfigDialog(

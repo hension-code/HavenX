@@ -10,6 +10,8 @@
     <string name="terminal_color_scheme">终端配色方案</string>
     <string name="keyboard_toolbar">键盘工具栏</string>
     <string name="configure_toolbar_keys_and_layout">配置工具栏按键和布局</string>
+    <string name="combo_keys">组合键</string>
+    <string name="configure_terminal_combo_keys">配置终端控制组合键快捷项</string>
     <string name="theme">主题</string>
     <string name="language">语言</string>
     <string name="system_default">跟随系统</string>
@@ -55,4 +57,17 @@
     <string name="edit_toolbar_json">编辑工具栏 JSON</string>
     <string name="simple">简易模式</string>
     <string name="off">关</string>
+    <string name="preset_combo_keys">预设组合键</string>
+    <string name="custom_combo_keys">自定义组合键</string>
+    <string name="no_custom_combo_keys">暂无自定义组合键</string>
+    <string name="add_combo_key">添加组合键</string>
+    <string name="edit_combo_key">编辑组合键</string>
+    <string name="combo_key_label">名称</string>
+    <string name="combo_key_sequence">按键组合</string>
+    <string name="combo_key_sequence_hint">支持 Ctrl+C、Alt+B、Esc、Tab、Enter、Backspace、Space。</string>
+    <string name="combo_key_already_exists">这个组合键已存在。</string>
+    <string name="edit">编辑</string>
+    <string name="delete">删除</string>
+    <string name="move_up">上移</string>
+    <string name="move_down">下移</string>
 </resources>

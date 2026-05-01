@@ -30,6 +30,7 @@ import sh.haven.core.et.EtSessionManager
 import sh.haven.core.mosh.MoshSessionManager
 import sh.haven.core.reticulum.ReticulumSessionManager
 import sh.haven.core.data.preferences.UserPreferencesRepository
+import sh.haven.core.data.preferences.TerminalComboKey
 import javax.inject.Inject
 
 private const val TAG = "TerminalViewModel"
@@ -216,6 +217,14 @@ class TerminalViewModel @Inject constructor(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
                 emptyList(),
+            )
+
+    val comboKeys: StateFlow<List<TerminalComboKey>> =
+        preferencesRepository.terminalComboKeys
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                sh.haven.core.data.preferences.TerminalComboKeys.PRESETS,
             )
 
     fun addSnippet(snippet: sh.haven.core.data.db.entities.Snippet) {
