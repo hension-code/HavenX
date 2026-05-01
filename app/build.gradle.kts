@@ -161,9 +161,8 @@ chaquopy {
         version = "3.13"
 
         pip {
-            options("--no-scripts")
             install("rns")
-            install("rnsh")
+            install(rootProject.file("app/src/main/python/wheels/rnsh-0.1.7-py3-none-any.whl").absolutePath)
         }
     }
 }
