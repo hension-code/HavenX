@@ -1,10 +1,9 @@
 package sh.haven.feature.terminal
 
 import android.app.Activity
+import android.os.SystemClock
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
@@ -63,6 +62,7 @@ import sh.haven.feature.terminal.R
 
 // VT100/xterm escape sequences for special keys
 private const val ESC = "\u001b"
+private const val MENU_ANCHOR_REOPEN_SUPPRESSION_MS = 300L
 private val KEY_ESC = byteArrayOf(0x1b)
 private val KEY_TAB = byteArrayOf(0x09)
 private val KEY_SHIFT_TAB = "$ESC[Z".toByteArray()
@@ -625,13 +625,7 @@ private fun ComboKeyDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var keepImeOpen by remember { mutableStateOf(false) }
-    // Snapshot of `expanded` captured at the moment the button is pressed.
-    // When the menu is open and the button is tapped, the popup's
-    // onDismissRequest and the button's onClick both fire (in unspecified
-    // order), which causes a close-then-reopen flicker. By remembering whether
-    // the menu was open when the press began, onClick can act as a clean toggle
-    // regardless of which callback runs first.
-    var wasOpenOnPress by remember { mutableStateOf(false) }
+    var lastDismissUptime by remember { mutableStateOf(0L) }
 
     fun showImeIfNeeded() {
         if (!keepImeOpen) return
@@ -645,35 +639,22 @@ private fun ComboKeyDropdown(
     Box {
         FilledTonalButton(
             onClick = {
-                if (wasOpenOnPress) {
-                    // The menu was open when this tap began → toggle off.
-                    // onDismissRequest may have already set expanded=false; this
-                    // keeps it closed.
+                val dismissJustHappened = lastDismissUptime != 0L &&
+                    SystemClock.uptimeMillis() - lastDismissUptime <= MENU_ANCHOR_REOPEN_SUPPRESSION_MS
+                if (expanded || dismissJustHappened) {
                     expanded = false
+                    lastDismissUptime = 0L
                 } else {
+                    lastDismissUptime = 0L
                     keepImeOpen = imeVisible
                     focusRequester.requestFocus()
                     expanded = true
                     showImeIfNeeded()
                 }
-                wasOpenOnPress = false
             },
             modifier = Modifier
                 .padding(horizontal = 1.dp)
-                .height(32.dp)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.any { it.pressed } &&
-                                event.changes.none { it.previousPressed }
-                            ) {
-                                // Finger just went down — record current state.
-                                wasOpenOnPress = expanded
-                            }
-                        }
-                    }
-                },
+                .height(32.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
         ) {
             Text(stringResource(R.string.combo_keys), fontSize = 11.sp, lineHeight = 11.sp)
@@ -682,6 +663,7 @@ private fun ComboKeyDropdown(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
+                lastDismissUptime = SystemClock.uptimeMillis()
             },
             modifier = Modifier.heightIn(max = 240.dp),
             properties = PopupProperties(focusable = false),
@@ -696,6 +678,7 @@ private fun ComboKeyDropdown(
                     text = { Text(displayLabel) },
                     onClick = {
                         expanded = false
+                        lastDismissUptime = 0L
                         onSelect(comboKey)
                         showImeIfNeeded()
                     },
@@ -715,7 +698,7 @@ private fun SnippetsDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var keepImeOpen by remember { mutableStateOf(false) }
-    var wasOpenOnPress by remember { mutableStateOf(false) }
+    var lastDismissUptime by remember { mutableStateOf(0L) }
 
     fun showImeIfNeeded() {
         if (!keepImeOpen) return
@@ -729,31 +712,22 @@ private fun SnippetsDropdown(
     Box {
         FilledTonalButton(
             onClick = {
-                if (wasOpenOnPress) {
+                val dismissJustHappened = lastDismissUptime != 0L &&
+                    SystemClock.uptimeMillis() - lastDismissUptime <= MENU_ANCHOR_REOPEN_SUPPRESSION_MS
+                if (expanded || dismissJustHappened) {
                     expanded = false
+                    lastDismissUptime = 0L
                 } else {
+                    lastDismissUptime = 0L
                     keepImeOpen = imeVisible
                     focusRequester.requestFocus()
                     expanded = true
                     showImeIfNeeded()
                 }
-                wasOpenOnPress = false
             },
             modifier = Modifier
                 .padding(horizontal = 1.dp)
-                .height(32.dp)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.any { it.pressed } &&
-                                event.changes.none { it.previousPressed }
-                            ) {
-                                wasOpenOnPress = expanded
-                            }
-                        }
-                    }
-                },
+                .height(32.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
         ) {
             Text(stringResource(R.string.snippets), fontSize = 11.sp, lineHeight = 11.sp)
@@ -762,6 +736,7 @@ private fun SnippetsDropdown(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
+                lastDismissUptime = SystemClock.uptimeMillis()
             },
             modifier = Modifier.heightIn(max = 240.dp),
             properties = PopupProperties(focusable = false),
@@ -783,6 +758,7 @@ private fun SnippetsDropdown(
                         text = { Text(snippet.name) },
                         onClick = {
                             expanded = false
+                            lastDismissUptime = 0L
                             onSelect(snippet)
                             showImeIfNeeded()
                         },

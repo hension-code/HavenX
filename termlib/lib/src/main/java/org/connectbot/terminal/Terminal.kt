@@ -68,6 +68,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -87,6 +88,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Gesture type for unified gesture handling state machine.
@@ -630,13 +632,13 @@ fun TerminalWithAccessibility(
     }
 
     // Coroutine scope for animations
-    val coroutineScope = rememberCoroutineScope()
+    val uiCoroutineScope = rememberCoroutineScope()
 
     // Setup keyboard input callback to reset scroll position
     LaunchedEffect(screenState, scrollOffset) {
         keyboardHandler.onInputProcessed = {
             screenState.scrollToBottom()
-            coroutineScope.launch {
+            uiCoroutineScope.launch {
                 scrollOffset.snapTo(0f)
             }
         }
@@ -778,6 +780,33 @@ fun TerminalWithAccessibility(
             }).pointerInput(terminalEmulator, baseCharHeight) {
                 val touchSlopSquared =
                     viewConfiguration.touchSlop * viewConfiguration.touchSlop
+                fun handleTerminalTap(position: Offset) {
+                    if (selectionManager.mode != SelectionMode.NONE) {
+                        selectionManager.clearSelection()
+                        return
+                    }
+
+                    val tapCol = (position.x / baseCharWidth).toInt()
+                        .coerceIn(0, screenState.snapshot.cols - 1)
+                    val tapRow = (position.y / baseCharHeight).toInt()
+                        .coerceIn(0, screenState.snapshot.rows - 1)
+                    val line = screenState.getVisibleLine(tapRow)
+                    val hyperlinkUrl = line.getHyperlinkUrlAt(tapCol)
+
+                    if (hyperlinkUrl != null) {
+                        onHyperlinkClick(hyperlinkUrl)
+                    } else {
+                        if (keyboardEnabled) {
+                            screenState.scrollToBottom()
+                            uiCoroutineScope.launch {
+                                scrollOffset.snapTo(0f)
+                            }
+                            focusRequester.requestFocus()
+                        }
+                        onTerminalTap()
+                    }
+                }
+
                 coroutineScope {
                     awaitEachGesture {
                         var gestureType: GestureType = GestureType.Undetermined
@@ -943,10 +972,26 @@ fun TerminalWithAccessibility(
                         }
 
                         // 3. Check for multi-touch (zoom)
-                        val secondPointer = withTimeoutOrNull(
-                            WAIT_FOR_SECOND_TOUCH_MS
-                        ) {
-                            awaitPointerEvent().changes.firstOrNull { it.id != down.id && it.pressed }
+                        var primaryReleasedDuringZoomProbe = false
+                        val secondPointer: PointerInputChange? = withTimeoutOrNull(WAIT_FOR_SECOND_TOUCH_MS) {
+                            var candidate: PointerInputChange? = null
+                            while (candidate == null && !primaryReleasedDuringZoomProbe) {
+                                val event = awaitPointerEvent()
+                                candidate = event.changes
+                                    .firstOrNull { it.id != down.id && it.pressed }
+
+                                if (candidate == null && event.changes.any { it.id == down.id && !it.pressed }) {
+                                    primaryReleasedDuringZoomProbe = true
+                                }
+                            }
+                            candidate
+                        }
+
+                        if (primaryReleasedDuringZoomProbe) {
+                            gestureEnded = true
+                            longPressJob.cancel()
+                            handleTerminalTap(down.position)
+                            return@awaitEachGesture
                         }
 
                         if (secondPointer != null) {
@@ -1055,7 +1100,7 @@ fun TerminalWithAccessibility(
                                     // Drag up (negative dragAmount.y) = view newer content (decrease scrollbackPosition)
                                     val newOffset = (scrollOffset.value + dragAmount.y)
                                         .coerceIn(0f, maxScroll)
-                                    coroutineScope.launch {
+                                    uiCoroutineScope.launch {
                                         scrollOffset.snapTo(newOffset)
                                     }
 
@@ -1079,7 +1124,7 @@ fun TerminalWithAccessibility(
                             GestureType.Scroll -> {
                                 // Apply fling animation
                                 val velocity = velocityTracker.calculateVelocity()
-                                coroutineScope.launch {
+                                uiCoroutineScope.launch {
                                     var targetValue = scrollOffset.targetValue
                                     scrollOffset.animateDecay(
                                         initialVelocity = velocity.y,
@@ -1113,28 +1158,7 @@ fun TerminalWithAccessibility(
                             GestureType.Undetermined -> {
                                 // This is a tap. If a selection is active, clear it.
                                 // Otherwise, check for hyperlink or forward the tap.
-                                if (selectionManager.mode != SelectionMode.NONE) {
-                                    selectionManager.clearSelection()
-                                } else {
-                                    // Check if tap is on a hyperlink
-                                    val tapCol = (down.position.x / baseCharWidth).toInt()
-                                        .coerceIn(0, screenState.snapshot.cols - 1)
-                                    val tapRow = (down.position.y / baseCharHeight).toInt()
-                                        .coerceIn(0, screenState.snapshot.rows - 1)
-                                    val line = screenState.getVisibleLine(tapRow)
-                                    val hyperlinkUrl = line.getHyperlinkUrlAt(tapCol)
-
-                                    if (hyperlinkUrl != null) {
-                                        // User tapped on a hyperlink
-                                        onHyperlinkClick(hyperlinkUrl)
-                                    } else {
-                                        // Request focus when terminal is tapped to show keyboard
-                                        if (keyboardEnabled) {
-                                            focusRequester.requestFocus()
-                                        }
-                                        onTerminalTap()
-                                    }
-                                }
+                                handleTerminalTap(down.position)
                             }
 
                             else -> {}
