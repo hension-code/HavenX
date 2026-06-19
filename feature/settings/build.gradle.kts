@@ -34,6 +34,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.lifecycle.viewmodel)
+    implementation(libs.reorderable)
 }
 
 kotlin {

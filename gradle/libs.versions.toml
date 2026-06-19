@@ -21,6 +21,7 @@ activity-compose = "1.10.1"
 ksp = "2.3.6"
 chaquopy = "17.0.0"
 kotlinx-serialization = "1.6.3"
+reorderable = "3.1.0"
 
 [libraries]
 # Compose BOM
@@ -80,6 +81,9 @@ jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# Reorderable lazy lists (combo key drag-to-reorder)
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }

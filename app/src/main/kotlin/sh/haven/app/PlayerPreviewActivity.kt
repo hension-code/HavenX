@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageButton
 import android.widget.SeekBar
@@ -21,6 +23,7 @@ import androidx.media3.ui.PlayerView
 import sh.haven.feature.sftp.MediaTypeResolver
 import java.io.File
 import java.util.Locale
+import kotlin.math.abs
 
 class PlayerPreviewActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
@@ -30,6 +33,11 @@ class PlayerPreviewActivity : AppCompatActivity() {
     private var fullscreen = false
     private var initialRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var videoSize: VideoSize? = null
+
+    // Horizontal swipe-to-seek (video only)
+    private var seekGestureDetector: GestureDetector? = null
+    private var scrubbing = false
+    private var scrubTargetMs = 0L
 
     private val progressUpdater = object : Runnable {
         override fun run() {
@@ -65,6 +73,7 @@ class PlayerPreviewActivity : AppCompatActivity() {
             playerView.setFullscreenButtonClickListener { isFullscreen ->
                 setFullscreenMode(isFullscreen)
             }
+            setupVideoSeekGestures(playerView)
         }
 
         if (mediaType == MediaTypeResolver.MediaType.AUDIO) {
@@ -199,6 +208,69 @@ class PlayerPreviewActivity : AppCompatActivity() {
         } else {
             super.onBackPressed()
         }
+    }
+
+    private fun setupVideoSeekGestures(playerView: PlayerView) {
+        // Pixel-to-millisecond factor: ~1px ≈ 120ms scrub speed.
+        val pxToMs = 120L
+
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float,
+            ): Boolean {
+                // Only scrub on predominantly horizontal motion; leave vertical
+                // gestures (and taps) to PlayerView.
+                if (abs(distanceX) <= abs(distanceY)) return false
+                val p = player ?: return false
+                val duration = p.duration.takeIf { it > 0 } ?: return false
+
+                val base = if (scrubbing) scrubTargetMs else p.currentPosition
+                // distanceX is the delta between successive move events; sliding
+                // right seeks forward, sliding left seeks back.
+                scrubTargetMs = (base - (distanceX * pxToMs).toLong())
+                    .coerceIn(0L, duration)
+                scrubbing = true
+                showSeekIndicator(scrubTargetMs, duration)
+                return true
+            }
+        })
+        seekGestureDetector = detector
+
+        // Return false so PlayerView still handles its own click (toggle
+        // controller) and controller controls; we only consume the gesture
+        // sequence for tracking.
+        playerView.setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                finishScrub()
+            }
+            false
+        }
+    }
+
+    private fun showSeekIndicator(positionMs: Long, durationMs: Long) {
+        val indicator = findViewById<TextView?>(R.id.seekIndicator) ?: return
+        val sign = if (scrubbing && positionMs > (player?.currentPosition ?: 0L)) "+" else "-"
+        indicator.text = "$sign${formatMillis(positionMs)} / ${formatMillis(durationMs)}"
+        indicator.visibility = View.VISIBLE
+    }
+
+    private fun finishScrub() {
+        if (!scrubbing) return
+        val p = player
+        val indicator = findViewById<TextView?>(R.id.seekIndicator)
+        if (p != null) {
+            p.seekTo(scrubTargetMs)
+            // Reveal the controller briefly so the timeline reflects the jump.
+            playerView?.showController()
+        }
+        scrubbing = false
+        indicator?.visibility = View.GONE
     }
 
     private fun updateAudioProgress() {

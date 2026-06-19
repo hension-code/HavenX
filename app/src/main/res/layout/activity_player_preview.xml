@@ -20,6 +20,21 @@
         app:show_buffering="when_playing"
         app:use_controller="true" />
 
+    <!-- Horizontal swipe seek indicator (shown while scrubbing video) -->
+    <TextView
+        android:id="@+id/seekIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal|bottom"
+        android:layout_marginBottom="120dp"
+        android:background="#00000000"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="12dp"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/audioPanel"
         android:layout_width="match_parent"

@@ -68,6 +68,4 @@
     <string name="combo_key_already_exists">这个组合键已存在。</string>
     <string name="edit">编辑</string>
     <string name="delete">删除</string>
-    <string name="move_up">上移</string>
-    <string name="move_down">下移</string>
 </resources>

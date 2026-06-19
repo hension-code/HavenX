@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,9 +42,9 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -67,17 +69,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
-import kotlin.math.roundToInt
-import kotlinx.coroutines.isActive
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.intl.Locale
@@ -87,6 +91,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.haven.core.data.preferences.TerminalComboKey
 import sh.haven.core.data.preferences.TerminalComboKeys
 import sh.haven.core.data.preferences.ToolbarItem
@@ -1194,50 +1200,15 @@ private fun ComboKeysDialog(
     var editingKey by remember { mutableStateOf<TerminalComboKey?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
-    // Long-press drag reorder state
-    var draggedItemId by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableStateOf(0f) }
-    var autoScrollOffset by remember { mutableStateOf(0f) }
-    var itemHeights by remember { mutableStateOf(mapOf<String, Float>()) }
-    var containerHeight by remember { mutableFloatStateOf(0f) }
-    val scrollState = rememberScrollState()
-
-    // Auto-scroll when dragging near viewport edges
-    LaunchedEffect(draggedItemId) {
-        if (draggedItemId == null) return@LaunchedEffect
-        val threshold = 280f
-        while (isActive) {
-            val id = draggedItemId ?: break
-            val itemH = itemHeights[id] ?: break
-            val idx = orderedKeys.indexOfFirst { it.id == id }
-            if (idx < 0) break
-            val contentY = orderedKeys.take(idx).sumOf { itemHeights[it.id]?.toDouble() ?: 0.0 }.toFloat()
-            val visibleY = contentY - scrollState.value + dragOffset
-
-            val scrollDelta = when {
-                visibleY < threshold -> {
-                    val pressure = ((threshold - visibleY) / threshold)
-                        .coerceIn(0f, 1.8f)
-                    val amount = (160f + pressure * pressure * 900f)
-                        .coerceIn(160f, 2200f)
-                        .toInt()
-                    -amount.coerceAtMost(scrollState.value)
-                }
-                visibleY + itemH > containerHeight - threshold -> {
-                    val pressure = ((visibleY + itemH - (containerHeight - threshold)) / threshold)
-                        .coerceIn(0f, 1.8f)
-                    val amount = (160f + pressure * pressure * 900f)
-                        .coerceIn(160f, 2200f)
-                        .toInt()
-                    amount.coerceAtMost(scrollState.maxValue - scrollState.value)
-                }
-                else -> 0
-            }
-            if (scrollDelta != 0) {
-                scrollState.scrollTo(scrollState.value + scrollDelta)
-                autoScrollOffset += scrollDelta
-            }
-            kotlinx.coroutines.delay(6)
+    // Drag-to-reorder state (sh.calvin.reorderable provides item reuse, smooth
+    // animateItem placement and built-in edge auto-scroll out of the box).
+    val lazyListState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        // Must update the list synchronously before returning, otherwise the
+        // dragged item flickers (per library FAQ).
+        orderedKeys = orderedKeys.toMutableList().apply {
+            add(to.index, removeAt(from.index))
         }
     }
 
@@ -1246,43 +1217,14 @@ private fun ComboKeysDialog(
         onSave(updated)
     }
 
-    fun endDrag() {
-        val id = draggedItemId ?: return
-        val currentIdx = orderedKeys.indexOfFirst { it.id == id }
-        if (currentIdx < 0) { draggedItemId = null; dragOffset = 0f; return }
-
-        val itemH = itemHeights[id] ?: 64f
-        val positions = ((dragOffset + autoScrollOffset) / itemH).roundToInt()
-        if (positions != 0) {
-            val targetIdx = (currentIdx + positions).coerceIn(0, orderedKeys.lastIndex)
-            if (targetIdx != currentIdx) {
-                val updated = orderedKeys.toMutableList()
-                val item = updated.removeAt(currentIdx)
-                updated.add(targetIdx, item)
-                saveOrdered(updated)
-            }
-        }
-
-        draggedItemId = null
-        dragOffset = 0f
-        autoScrollOffset = 0f
-    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.combo_keys)) },
         text = {
             Column(
                 modifier = Modifier
-                    .height(460.dp)
-                    .onSizeChanged { containerHeight = it.height.toFloat() }
-                    .verticalScroll(scrollState),
+                    .height(460.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.combo_keys),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
                 if (orderedKeys.isEmpty()) {
                     Text(
                         text = stringResource(R.string.no_custom_combo_keys),
@@ -1291,92 +1233,88 @@ private fun ComboKeysDialog(
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
                 } else {
-                    orderedKeys.forEachIndexed { index, key ->
-                        val isDragging = key.id == draggedItemId
-                        ListItem(
-                            headlineContent = { Text(key.label) },
-                            supportingContent = { Text(key.keys) },
-                            colors = ListItemDefaults.colors(
-                                containerColor = if (isDragging) {
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                } else {
-                                    Color.Transparent
-                                },
-                            ),
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    translationY = if (isDragging) dragOffset else 0f
-                                    if (isDragging) {
-                                        shadowElevation = 12f
-                                        alpha = 0.95f
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    ) {
+                        items(orderedKeys, key = { it.id }) { key ->
+                            ReorderableItem(reorderableState, key = key.id) { isDragging ->
+                                // Animated elevation for dragged card
+                                val animatedElevation by animateDpAsState(
+                                    targetValue = if (isDragging) 8.dp else 0.dp,
+                                    animationSpec = tween(150),
+                                )
+                                // Animated scale for dragged card
+                                val animatedScale by animateFloatAsState(
+                                    targetValue = if (isDragging) 1.03f else 1f,
+                                    animationSpec = tween(150),
+                                )
+
+                                // Conditional shape: connect cards together
+                                val cardShape = when {
+                                    isDragging -> RoundedCornerShape(12.dp)
+                                    orderedKeys.size == 1 -> RoundedCornerShape(12.dp)
+                                    key.id == orderedKeys.first().id -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                                    key.id == orderedKeys.last().id -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                    else -> RoundedCornerShape(0.dp)
+                                }
+
+                                Card(
+                                    elevation = CardDefaults.cardElevation(
+                                        defaultElevation = animatedElevation,
+                                    ),
+                                    shape = cardShape,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateItem()
+                                        .graphicsLayer {
+                                            scaleX = animatedScale
+                                            scaleY = animatedScale
+                                        }
+                                        .longPressDraggableHandle(
+                                            onDragStarted = {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                            },
+                                            onDragStopped = {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                                onSave(orderedKeys)
+                                            },
+                                        ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = key.label,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                            )
+                                            Text(
+                                                text = key.keys,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        TextButton(onClick = {
+                                            editingKey = key
+                                            showEditor = true
+                                        }) {
+                                            Text(stringResource(R.string.edit))
+                                        }
+                                        TextButton(onClick = {
+                                            saveOrdered(orderedKeys.filterNot { it.id == key.id })
+                                        }) {
+                                            Text(stringResource(R.string.delete))
+                                        }
                                     }
                                 }
-                                .onSizeChanged { itemHeights += (key.id to it.height.toFloat()) }
-                                .pointerInput(key.id) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            draggedItemId = key.id
-                                            dragOffset = 0f
-                                            autoScrollOffset = 0f
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragOffset += dragAmount.y
-                                        },
-                                        onDragEnd = { endDrag() },
-                                        onDragCancel = { endDrag() },
-                                    )
-                                },
-                            trailingContent = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val currentIdx = orderedKeys.indexOfFirst { it.id == key.id }
-                                    val canUp = currentIdx > 0
-                                    val canDown = currentIdx < orderedKeys.lastIndex
-                                    val dimAlpha = 0.25f
-                                    Icon(
-                                        Icons.Filled.ArrowUpward,
-                                        contentDescription = stringResource(R.string.move_up),
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable(enabled = canUp) {
-                                                val upd = orderedKeys.toMutableList()
-                                                upd.add(currentIdx - 1, upd.removeAt(currentIdx))
-                                                saveOrdered(upd)
-                                            },
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(
-                                            alpha = if (canUp) 0.7f else dimAlpha,
-                                        ),
-                                    )
-                                    Spacer(Modifier.width(2.dp))
-                                    Icon(
-                                        Icons.Filled.ArrowDownward,
-                                        contentDescription = stringResource(R.string.move_down),
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable(enabled = canDown) {
-                                                val upd = orderedKeys.toMutableList()
-                                                upd.add(currentIdx + 1, upd.removeAt(currentIdx))
-                                                saveOrdered(upd)
-                                            },
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(
-                                            alpha = if (canDown) 0.7f else dimAlpha,
-                                        ),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    TextButton(onClick = {
-                                        editingKey = key
-                                        showEditor = true
-                                    }) {
-                                        Text(stringResource(R.string.edit))
-                                    }
-                                    TextButton(onClick = {
-                                        saveOrdered(orderedKeys.filterNot { it.id == key.id })
-                                    }) {
-                                        Text(stringResource(R.string.delete))
-                                    }
-                                }
-                            },
-                        )
+                            }
+                        }
                     }
                 }
             }

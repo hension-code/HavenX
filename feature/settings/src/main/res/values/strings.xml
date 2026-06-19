@@ -68,6 +68,4 @@
     <string name="combo_key_already_exists">This combo key already exists.</string>
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
-    <string name="move_up">Move up</string>
-    <string name="move_down">Move down</string>
 </resources>
