@@ -366,9 +366,6 @@ fun TerminalScreen(
 
                     LaunchedEffect(selectionActive) {
                         onSelectionActiveChanged(selectionActive)
-                        if (selectionActive && selectionController != null) {
-                            expandSelectionToWord(selectionController!!, activeTab.emulator)
-                        }
                     }
 
                     val isMouseMode by activeTab.mouseMode.collectAsState()

@@ -117,59 +117,6 @@ internal data class SelectionPosition(
 )
 
 /**
- * Expand a single-character selection to the word (contiguous non-whitespace
- * token) under the cursor. Called immediately after long-press starts selection.
- *
- * Uses reflection to access:
- * - SelectionManager from the SelectionController (library-internal)
- * - TerminalSnapshot from the TerminalEmulator (library-internal getSnapshot$lib)
- */
-internal fun expandSelectionToWord(
-    controller: SelectionController,
-    emulator: org.connectbot.terminal.TerminalEmulator,
-) {
-    try {
-        // Get SelectionManager from controller
-        val mgrField = controller.javaClass.getDeclaredField("\$selectionManager")
-        mgrField.isAccessible = true
-        val mgr = mgrField.get(controller) ?: return
-
-        // Get current selection position
-        val range = mgr.javaClass.getMethod("getSelectionRange").invoke(mgr) ?: return
-        val row = range.javaClass.getMethod("getStartRow").invoke(range) as Int
-        val col = range.javaClass.getMethod("getStartCol").invoke(range) as Int
-
-        val lines = getSnapshotLines(emulator) ?: return
-        if (row < 0 || row >= lines.size) return
-        val cells = getLineCells(lines[row]) ?: return
-        if (col < 0 || col >= cells.size) return
-
-        // Don't expand if long-pressed on whitespace
-        if (isCellWhitespace(cells[col])) return
-
-        // Expand to contiguous non-whitespace (selects full tokens: paths, URLs, etc.)
-        var startCol = col
-        while (startCol > 0 && !isCellWhitespace(cells[startCol - 1])) startCol--
-        var endCol = col
-        while (endCol < cells.size - 1 && !isCellWhitespace(cells[endCol + 1])) endCol++
-
-        // Update selection anchors if expanded
-        if (startCol != col || endCol != col) {
-            val updateStart = mgr.javaClass.getMethod(
-                "updateSelectionStart", Int::class.java, Int::class.java,
-            )
-            val updateEnd = mgr.javaClass.getMethod(
-                "updateSelectionEnd", Int::class.java, Int::class.java,
-            )
-            updateStart.invoke(mgr, row, startCol)
-            updateEnd.invoke(mgr, row, endCol)
-        }
-    } catch (e: Exception) {
-        Log.d(TAG, "expandSelectionToWord: ${e.message}")
-    }
-}
-
-/**
  * Set the selection end anchor to an absolute cell position.
  * Used by the highlighter-drag gesture during long-press selection.
  */
@@ -236,16 +183,6 @@ private fun getLineCells(line: Any): List<Any>? {
     } catch (e: Exception) {
         Log.d(TAG, "getLineCells: ${e.message}")
         null
-    }
-}
-
-private fun isCellWhitespace(cell: Any): Boolean {
-    return try {
-        val ch = cell.javaClass.getMethod("getChar").invoke(cell) as Char
-        ch == '\u0000' || ch.isWhitespace()
-    } catch (e: Exception) {
-        Log.d(TAG, "isCellWhitespace: ${e.message}")
-        true
     }
 }
 
@@ -383,9 +320,24 @@ internal fun smartCopy(
     controller: SelectionController,
     emulator: org.connectbot.terminal.TerminalEmulator,
 ): String? {
-    val sel = getSelectionRange(controller) ?: return null
+    val raw = getSelectionRange(controller) ?: return null
     val columns = getTerminalColumns(emulator) ?: return null
     val snapshotLines = getSnapshotLines(emulator) ?: return null
+
+    // Normalize so start <= end in both row and col. The drag handles can be
+    // swapped (e.g. the end handle dragged left of the start handle), and the
+    // extraction logic below assumes an ordered range. Without this, a swapped
+    // selection yields empty text here even though the library's own
+    // getSelectedText (which normalizes) returns the right string — leaving the
+    // clipboard empty while the "copied" toast still shows.
+    val startRow = minOf(raw.startRow, raw.endRow)
+    val endRow = maxOf(raw.startRow, raw.endRow)
+    val sameRow = raw.startRow == raw.endRow
+    val startCol = if (sameRow) minOf(raw.startCol, raw.endCol) else
+        if (raw.startRow < raw.endRow) raw.startCol else raw.endCol
+    val endCol = if (sameRow) maxOf(raw.startCol, raw.endCol) else
+        if (raw.startRow < raw.endRow) raw.endCol else raw.startCol
+    val sel = SelectionPosition(startRow, startCol, endRow, endCol)
 
     val fullTexts = (sel.startRow..sel.endRow).map { row ->
         if (row in snapshotLines.indices) getLineText(snapshotLines[row]) else ""

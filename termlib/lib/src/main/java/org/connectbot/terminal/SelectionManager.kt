@@ -143,6 +143,35 @@ internal class SelectionManager {
         selectionRange = SelectionRange(row, col, row, col)
     }
 
+    /**
+     * Expand the current single-cell selection to the contiguous non-whitespace
+     * token (word/path/URL) on the given line. Called right after a long-press
+     * starts selection so the two handles are immediately separated, making
+     * drag-to-extend practical instead of both sitting on one cell.
+     *
+     * No-op if there is no selection, the line is null, or the anchor cell is
+     * whitespace (e.g. the user long-pressed on a gap between words).
+     */
+    fun expandSelectionToWord(line: TerminalLine?) {
+        val range = selectionRange ?: return
+        if (line == null) return
+        val cells = line.cells
+        if (cells.isEmpty()) return
+        val col = range.startCol.coerceIn(0, cells.lastIndex)
+        if (isWordBoundary(cells[col].char)) return
+
+        var startCol = col
+        while (startCol > 0 && !isWordBoundary(cells[startCol - 1].char)) startCol--
+        var endCol = col
+        while (endCol < cells.lastIndex && !isWordBoundary(cells[endCol + 1].char)) endCol++
+
+        if (startCol != col || endCol != col) {
+            selectionRange = range.copy(startCol = startCol, endCol = endCol)
+        }
+    }
+
+    private fun isWordBoundary(ch: Char): Boolean = ch == '\u0000' || ch.isWhitespace()
+
     fun updateSelection(row: Int, col: Int) {
         if (!isSelecting) return
 

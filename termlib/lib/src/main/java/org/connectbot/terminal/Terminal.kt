@@ -195,9 +195,20 @@ private const val MAGNIFIER_BACKGROUND_ALPHA = 0.9f
 private const val MAGNIFIER_ROW_RANGE = 3
 
 /**
- * Width of selection handles (teardrop shape) in dp.
+ * Width of selection handles (vertical bar with a grip dot) in dp.
  */
-private val SELECTION_HANDLE_WIDTH = 24.dp
+private val SELECTION_HANDLE_WIDTH = 3.dp
+
+/**
+ * Radius of the grip dot at the outer end of each selection handle, in dp.
+ */
+private val SELECTION_HANDLE_DOT_RADIUS = 6.dp
+
+/**
+ * How far the handle bar extends beyond the text row (above for the start
+ * handle, below for the end handle), in dp.
+ */
+private val SELECTION_HANDLE_EXTEND = 6.dp
 
 /**
  * Alpha value for the block cursor.
@@ -790,30 +801,97 @@ fun TerminalWithAccessibility(
                                     showMagnifier = true
                                     magnifierPosition = down.position
 
-                                    drag(down.id) { change ->
-                                        val newRow =
-                                            (change.position.y / baseCharHeight).toInt()
-                                                .coerceIn(0, screenState.snapshot.rows - 1)
-                                        val newCol = cellIndexAtX(
-                                            line = screenState.getVisibleLine(newRow),
-                                            x = change.position.x,
-                                            charWidth = baseCharWidth,
-                                        )
+                                    val viewportRows = screenState.snapshot.rows
+                                    val edgeThreshold = baseCharHeight * 1.5f
+                                    val edgeScrollInterval = 40L
 
-                                        if (touchingStart) {
-                                            selectionManager.updateSelectionStart(
-                                                newRow,
-                                                newCol
-                                            )
-                                        } else {
-                                            selectionManager.updateSelectionEnd(
-                                                newRow,
-                                                newCol
-                                            )
+                                    // Track the finger Y across the drag so the
+                                    // edge-auto-scroll loop can use it even when the
+                                    // finger is held still at the viewport border.
+                                    var lastTouchY = down.position.y
+                                    var lastTouchX = down.position.x
+
+                                    while (true) {
+                                        val event = withTimeoutOrNull(edgeScrollInterval) {
+                                            awaitPointerEvent(PointerEventPass.Main)
+                                        }
+                                        val changes = event?.changes.orEmpty()
+                                        val active = changes.firstOrNull { it.id == down.id }
+                                        if (active != null) {
+                                            lastTouchY = active.position.y
+                                            lastTouchX = active.position.x
+                                            active.consume()
+                                        }
+                                        // Stop when the dragged pointer is released.
+                                        if (changes.isNotEmpty() && changes.all { !it.pressed }) break
+
+                                        // Edge auto-scroll: when the finger rests near the
+                                        // top/bottom of the viewport, scroll the terminal so
+                                        // content beyond the visible area can be selected.
+                                        val topEdge = edgeThreshold
+                                        val bottomEdge = terminalHeightPx - edgeThreshold
+                                        val scrollDir = when {
+                                            lastTouchY < topEdge &&
+                                                screenState.scrollbackPosition < screenState.snapshot.scrollback.size -> 1
+                                            lastTouchY > bottomEdge &&
+                                                screenState.scrollbackPosition > 0 -> -1
+                                            else -> 0
                                         }
 
-                                        magnifierPosition = change.position
-                                        change.consume()
+                                        if (scrollDir != 0) {
+                                            // Scroll one line. Viewport content shifts opposite
+                                            // to scrollDir, so the non-dragged anchor must move
+                                            // by scrollDir to keep pointing at the same content;
+                                            // the dragged anchor stays under the finger (clamped
+                                            // to the edge row), selecting the newly-scrolled-in
+                                            // content as the finger holds the border.
+                                            screenState.scrollBy(scrollDir)
+                                            val range = selectionManager.selectionRange
+                                            if (range != null) {
+                                                if (touchingStart) {
+                                                    val otherRow = (range.endRow + scrollDir)
+                                                        .coerceIn(0, viewportRows - 1)
+                                                    selectionManager.updateSelectionEnd(
+                                                        otherRow,
+                                                        range.endCol,
+                                                    )
+                                                } else {
+                                                    val otherRow = (range.startRow + scrollDir)
+                                                        .coerceIn(0, viewportRows - 1)
+                                                    selectionManager.updateSelectionStart(
+                                                        otherRow,
+                                                        range.startCol,
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Update the dragged anchor to the finger position.
+                                        val newRow = (lastTouchY / baseCharHeight).toInt()
+                                            .coerceIn(0, viewportRows - 1)
+                                        val line = screenState.getVisibleLine(newRow)
+                                        if (touchingStart) {
+                                            // Start handle sits on a character's left edge.
+                                            val gap = cellGapIndexAtX(
+                                                line = line,
+                                                x = lastTouchX,
+                                                charWidth = baseCharWidth,
+                                                preferLeft = true,
+                                            ).coerceIn(0, line.cells.lastIndex)
+                                            selectionManager.updateSelectionStart(newRow, gap)
+                                        } else {
+                                            // End handle sits on a character's right edge.
+                                            val gap = cellGapIndexAtX(
+                                                line = line,
+                                                x = lastTouchX,
+                                                charWidth = baseCharWidth,
+                                                preferLeft = false,
+                                            )
+                                            val endCol = (gap - 1).coerceAtLeast(0)
+                                            selectionManager.updateSelectionEnd(newRow, endCol)
+                                        }
+
+                                        magnifierPosition = Offset(lastTouchX, lastTouchY)
                                     }
 
                                     showMagnifier = false
@@ -851,6 +929,13 @@ fun TerminalWithAccessibility(
                                     row,
                                     col,
                                     SelectionMode.BLOCK
+                                )
+                                // Expand the single-cell selection to the whole
+                                // word/token under the finger so the two drag
+                                // handles start out separated (otherwise both
+                                // sit on one cell and are hard to grab).
+                                selectionManager.expandSelectionToWord(
+                                    screenState.getVisibleLine(row)
                                 )
                                 showMagnifier = true
                                 magnifierPosition = down.position
@@ -946,11 +1031,16 @@ fun TerminalWithAccessibility(
                                         val dragRow =
                                             (change.position.y / baseCharHeight).toInt()
                                                 .coerceIn(0, screenState.snapshot.rows - 1)
-                                        val dragCol = cellIndexAtX(
-                                            line = screenState.getVisibleLine(dragRow),
+                                        val dragLine = screenState.getVisibleLine(dragRow)
+                                        // Extend the end of the selection to a character
+                                        // gap so it aligns with the end handle.
+                                        val gap = cellGapIndexAtX(
+                                            line = dragLine,
                                             x = change.position.x,
                                             charWidth = baseCharWidth,
+                                            preferLeft = false,
                                         )
+                                        val dragCol = (gap - 1).coerceAtLeast(0)
                                         selectionManager.updateSelection(
                                             dragRow,
                                             dragCol
@@ -1128,6 +1218,7 @@ fun TerminalWithAccessibility(
                             charWidth = baseCharWidth,
                             charHeight = baseCharHeight,
                             pointingDown = false,
+                            isEnd = false,
                         )
 
                         // End handle
@@ -1139,6 +1230,7 @@ fun TerminalWithAccessibility(
                             charWidth = baseCharWidth,
                             charHeight = baseCharHeight,
                             pointingDown = true,
+                            isEnd = true,
                         )
                     }
                 }
@@ -1426,6 +1518,13 @@ private fun DrawScope.drawCurlyUnderline(
 
 /**
  * Check if a touch position is near a selection handle.
+ *
+ * Each handle is a vertical bar sitting on a character column edge (start
+ * handle points up from the row top, end handle points down from the row
+ * bottom). The hit box is a rectangle centered horizontally on the handle
+ * with generous width so horizontal drags are easy to grab, and vertically
+ * covers the bar plus its overhang.
+ *
  * Returns (touchingStart, touchingEnd).
  */
 private fun isTouchingHandle(
@@ -1438,23 +1537,24 @@ private fun isTouchingHandle(
     hitRadius: Float = HANDLE_HIT_RADIUS
 ): Pair<Boolean, Boolean> {
     val startX = cellVisualX(startLine, range.startCol, charWidth)
-    val endX = cellVisualX(endLine, range.endCol, charWidth)
-    val startPos = Offset(
-        startX + charWidth / 2,
-        range.startRow * charHeight
-    )
-    val endPos = Offset(
-        endX + charWidth / 2,
-        range.endRow * charHeight + charHeight
-    )
+    // End handle sits on the right edge of the last selected cell.
+    val endCellWidth = charWidth * (endLine.cells.getOrNull(range.endCol)?.width?.coerceAtLeast(1) ?: 1)
+    val endX = cellVisualX(endLine, range.endCol, charWidth) + endCellWidth
 
-    val distToStart = (touchPos - startPos).getDistance()
-    val distToEnd = (touchPos - endPos).getDistance()
+    // Start handle anchor: top of its row (bar extends upward).
+    val startCenterY = range.startRow * charHeight
+    // End handle anchor: bottom of its row (bar extends downward).
+    val endCenterY = range.endRow * charHeight + charHeight
 
-    return Pair(
-        distToStart < hitRadius,
-        distToEnd < hitRadius
-    )
+    fun near(handleX: Float, handleY: Float): Boolean {
+        // Wide horizontal tolerance (left/right drag is the common action),
+        // vertical tolerance scaled to row height plus the handle overhang.
+        val dx = kotlin.math.abs(touchPos.x - handleX)
+        val dy = kotlin.math.abs(touchPos.y - handleY)
+        return dx < hitRadius && dy < hitRadius + charHeight
+    }
+
+    return Pair(near(startX, startCenterY), near(endX, endCenterY))
 }
 
 private fun cellIndexAtX(
@@ -1471,6 +1571,43 @@ private fun cellIndexAtX(
         currentX = nextX
     }
     return line.cells.lastIndex
+}
+
+/**
+ * Return the gap index (cursor position) at the given x: 0 means before the
+ * first cell, `cells.size` means after the last cell, k means the boundary
+ * between cell k-1 and cell k. Used so selection handles land on character
+ * gaps rather than cell centers.
+ *
+ * If [preferLeft] is true, a touch in the right half of a cell snaps to the
+ * gap before it (used for the start handle so dragging leftward into a cell
+ * still selects it); otherwise the right half snaps to the gap after it
+ * (used for the end handle so dragging rightward into a cell selects it).
+ */
+private fun cellGapIndexAtX(
+    line: TerminalLine,
+    x: Float,
+    charWidth: Float,
+    preferLeft: Boolean,
+): Int {
+    if (line.cells.isEmpty()) return 0
+
+    var currentX = 0f
+    line.cells.forEachIndexed { index, cell ->
+        val cellW = charWidth * cell.width.coerceAtLeast(1)
+        val nextX = currentX + cellW
+        if (x < nextX) {
+            // Inside this cell: pick the gap on the preferred side of midpoint.
+            val mid = currentX + cellW / 2
+            return if (preferLeft) {
+                if (x < mid) index else index + 1
+            } else {
+                if (x <= mid) index else index + 1
+            }
+        }
+        currentX = nextX
+    }
+    return line.cells.size
 }
 
 private fun cellVisualX(
@@ -1575,7 +1712,12 @@ private fun MagnifyingGlass(
 }
 
 /**
- * Draw a selection handle (teardrop shape).
+ * Draw a selection handle as a thin vertical bar with a grip dot at the outer
+ * end. The bar sits on a character gap: the start handle on the selected
+ * first cell's left edge, the end handle on the selected last cell's right
+ * edge — so the handles bracket the highlighted text exactly. The start
+ * handle points up (extends above the row), the end handle points down.
+ * This shape is easier to grab and drag horizontally than a round ball.
  */
 private fun DrawScope.drawSelectionHandle(
     line: TerminalLine,
@@ -1584,35 +1726,42 @@ private fun DrawScope.drawSelectionHandle(
     charWidth: Float,
     charHeight: Float,
     pointingDown: Boolean,
+    isEnd: Boolean,
     color: Color = Color.White,
 ) {
-    val handleWidthPx = SELECTION_HANDLE_WIDTH.toPx()
+    val barWidth = SELECTION_HANDLE_WIDTH.toPx()
+    val dotRadius = SELECTION_HANDLE_DOT_RADIUS.toPx()
+    val extend = SELECTION_HANDLE_EXTEND.toPx()
 
-    // Position handle at the character position
-    val charX = cellVisualX(line, col, charWidth)
+    // Start handle sits on the left edge of the first selected cell;
+    // end handle sits on the right edge of the last selected cell.
+    val cellStartX = cellVisualX(line, col, charWidth)
+    val cellWidth = charWidth * (line.cells.getOrNull(col)?.width?.coerceAtLeast(1) ?: 1)
+    val centerX = if (isEnd) cellStartX + cellWidth else cellStartX
+
     val charY = row * charHeight
 
-    // Center the handle horizontally on the character
-    val handleX = charX + charWidth / 2
-
-    // Position vertically based on direction
-    val handleY = if (pointingDown) {
-        charY + charHeight // Bottom of character
+    // Bar spans the full row height plus a short overhang outward.
+    val barLeft = centerX - barWidth / 2
+    val (barTop, barBottom) = if (pointingDown) {
+        charY to (charY + charHeight + extend)
     } else {
-        charY // Top of character
+        (charY - extend) to (charY + charHeight)
     }
 
-    val circleRadius = handleWidthPx / 2
-    val circleY = if (pointingDown) {
-        handleY + circleRadius
-    } else {
-        handleY - circleRadius
-    }
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(barLeft, barTop),
+        size = Size(barWidth, barBottom - barTop),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2, barWidth / 2),
+    )
 
+    // Grip dot at the outer end to signal the drag point.
+    val dotCenterY = if (pointingDown) barBottom else barTop
     drawCircle(
         color = color,
-        radius = circleRadius,
-        center = Offset(handleX, circleY)
+        radius = dotRadius,
+        center = Offset(centerX, dotCenterY),
     )
 }
 
