@@ -68,4 +68,14 @@
     <string name="combo_key_already_exists">这个组合键已存在。</string>
     <string name="edit">编辑</string>
     <string name="delete">删除</string>
+    <string name="snippets">预设指令</string>
+    <string name="combo_keys_and_snippets">组合键与预设</string>
+    <string name="configure_combo_keys_and_snippets">配置终端组合键和预设指令</string>
+    <string name="add_snippet">添加预设指令</string>
+    <string name="add_snippet_title">添加预设指令</string>
+    <string name="edit_snippet_title">编辑预设指令</string>
+    <string name="no_saved_snippets">暂无保存的预设指令</string>
+    <string name="snippet_name">指令名称</string>
+    <string name="command_content">命令内容</string>
+    <string name="auto_append_enter">自动附加回车符执行</string>
 </resources>

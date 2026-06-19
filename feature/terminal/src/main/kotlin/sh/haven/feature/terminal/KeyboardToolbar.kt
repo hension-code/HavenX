@@ -3,6 +3,8 @@ package sh.haven.feature.terminal
 import android.app.Activity
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.connectbot.terminal.SelectionController
+import sh.haven.core.data.db.entities.Snippet
 import sh.haven.core.data.preferences.TerminalComboKey
 import sh.haven.core.data.preferences.TerminalComboKeys
 import sh.haven.core.data.preferences.ToolbarItem
@@ -113,7 +116,8 @@ fun KeyboardToolbar(
     onToggleCtrl: () -> Unit = {},
     onToggleAlt: () -> Unit = {},
     onVncTap: (() -> Unit)? = null,
-    onSnippetsTap: (() -> Unit)? = null,
+    snippets: List<Snippet> = emptyList(),
+    onSnippetSelected: (Snippet) -> Unit = {},
     comboKeys: List<TerminalComboKey> = TerminalComboKeys.PRESETS,
     onComboKeySelected: (TerminalComboKey) -> Unit = {},
     selectionController: SelectionController? = null,
@@ -149,7 +153,8 @@ fun KeyboardToolbar(
                         onToggleShift = { shiftActive = !shiftActive },
                         onShiftUsed = { shiftActive = false },
                         onVncTap = onVncTap,
-                        onSnippetsTap = onSnippetsTap,
+                        snippets = snippets,
+                        onSnippetSelected = onSnippetSelected,
                         comboKeys = comboKeys,
                         onComboKeySelected = onComboKeySelected,
                     )
@@ -177,7 +182,8 @@ fun KeyboardToolbar(
                 onToggleShift = { shiftActive = !shiftActive },
                 onShiftUsed = { shiftActive = false },
                 onVncTap = onVncTap,
-                onSnippetsTap = onSnippetsTap,
+                snippets = snippets,
+                onSnippetSelected = onSnippetSelected,
                 comboKeys = comboKeys,
                 onComboKeySelected = onComboKeySelected,
             )
@@ -200,7 +206,8 @@ fun KeyboardToolbar(
                             onToggleShift = { shiftActive = !shiftActive },
                             onShiftUsed = { shiftActive = false },
                             onVncTap = onVncTap,
-                            onSnippetsTap = onSnippetsTap,
+                            snippets = snippets,
+                        onSnippetSelected = onSnippetSelected,
                             comboKeys = comboKeys,
                             onComboKeySelected = onComboKeySelected,
                         )
@@ -232,7 +239,8 @@ private fun AlignedToolbarContent(
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)?,
-    onSnippetsTap: (() -> Unit)?,
+    snippets: List<Snippet>,
+    onSnippetSelected: (Snippet) -> Unit,
     comboKeys: List<TerminalComboKey>,
     onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
@@ -251,10 +259,10 @@ private fun AlignedToolbarContent(
     if (presentNavKeys.isEmpty()) {
         Column {
             ToolbarRow(layout.row1, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap,
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, snippets, onSnippetSelected,
                 comboKeys, onComboKeySelected)
             ToolbarRow(layout.row2, onSendBytes, focusRequester, ctrlActive, altActive,
-                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, onSnippetsTap,
+                shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed, onVncTap, snippets, onSnippetSelected,
                 comboKeys, onComboKeySelected)
         }
         return
@@ -273,8 +281,14 @@ private fun AlignedToolbarContent(
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                         shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
                         comboKeys, onComboKeySelected)
-                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
-                        ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD) {
+                        SnippetsDropdown(
+                            snippets = snippets,
+                            focusRequester = focusRequester,
+                            imeVisible = imeVisible,
+                            view = view,
+                            onSelect = onSnippetSelected,
+                        )
                     }
                 }
             }
@@ -287,8 +301,14 @@ private fun AlignedToolbarContent(
                     RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                         shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
                         comboKeys, onComboKeySelected)
-                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
-                        ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                    if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD) {
+                        SnippetsDropdown(
+                            snippets = snippets,
+                            focusRequester = focusRequester,
+                            imeVisible = imeVisible,
+                            view = view,
+                            onSelect = onSnippetSelected,
+                        )
                     }
                 }
             }
@@ -325,8 +345,14 @@ private fun AlignedToolbarContent(
                             RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                                 shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
                                 comboKeys, onComboKeySelected)
-                            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
-                                ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD) {
+                                SnippetsDropdown(
+                                    snippets = snippets,
+                                    focusRequester = focusRequester,
+                                    imeVisible = imeVisible,
+                                    view = view,
+                                    onSelect = onSnippetSelected,
+                                )
                             }
                         }
                     }
@@ -338,8 +364,14 @@ private fun AlignedToolbarContent(
                         RenderItem(item, onSendBytes, focusRequester, ctrlActive, altActive,
                             shiftActive, imeVisible, view, onToggleCtrl, onToggleAlt, onToggleShift, onShiftUsed,
                             comboKeys, onComboKeySelected)
-                        if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
-                            ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+                        if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD) {
+                            SnippetsDropdown(
+                                snippets = snippets,
+                                focusRequester = focusRequester,
+                                imeVisible = imeVisible,
+                                view = view,
+                                onSelect = onSnippetSelected,
+                            )
                         }
                     }
                 }
@@ -462,7 +494,8 @@ private fun ToolbarRow(
     onToggleShift: () -> Unit,
     onShiftUsed: () -> Unit,
     onVncTap: (() -> Unit)? = null,
-    onSnippetsTap: (() -> Unit)? = null,
+    snippets: List<Snippet> = emptyList(),
+    onSnippetSelected: (Snippet) -> Unit = {},
     comboKeys: List<TerminalComboKey>,
     onComboKeySelected: (TerminalComboKey) -> Unit,
 ) {
@@ -479,8 +512,14 @@ private fun ToolbarRow(
             if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onVncTap != null) {
                 ToolbarIconButton(Icons.Filled.DesktopWindows, "VNC Desktop", onVncTap)
             }
-            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD && onSnippetsTap != null) {
-                ToolbarTextButton(stringResource(R.string.snippets)) { onSnippetsTap() }
+            if (item is ToolbarItem.BuiltIn && item.key == ToolbarKey.KEYBOARD) {
+                SnippetsDropdown(
+                    snippets = snippets,
+                    focusRequester = focusRequester,
+                    imeVisible = imeVisible,
+                    view = view,
+                    onSelect = onSnippetSelected,
+                )
             }
         }
     }
@@ -586,6 +625,13 @@ private fun ComboKeyDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var keepImeOpen by remember { mutableStateOf(false) }
+    // Snapshot of `expanded` captured at the moment the button is pressed.
+    // When the menu is open and the button is tapped, the popup's
+    // onDismissRequest and the button's onClick both fire (in unspecified
+    // order), which causes a close-then-reopen flicker. By remembering whether
+    // the menu was open when the press began, onClick can act as a clean toggle
+    // regardless of which callback runs first.
+    var wasOpenOnPress by remember { mutableStateOf(false) }
 
     fun showImeIfNeeded() {
         if (!keepImeOpen) return
@@ -599,14 +645,35 @@ private fun ComboKeyDropdown(
     Box {
         FilledTonalButton(
             onClick = {
-                keepImeOpen = imeVisible
-                focusRequester.requestFocus()
-                expanded = true
-                showImeIfNeeded()
+                if (wasOpenOnPress) {
+                    // The menu was open when this tap began → toggle off.
+                    // onDismissRequest may have already set expanded=false; this
+                    // keeps it closed.
+                    expanded = false
+                } else {
+                    keepImeOpen = imeVisible
+                    focusRequester.requestFocus()
+                    expanded = true
+                    showImeIfNeeded()
+                }
+                wasOpenOnPress = false
             },
             modifier = Modifier
                 .padding(horizontal = 1.dp)
-                .height(32.dp),
+                .height(32.dp)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.pressed } &&
+                                event.changes.none { it.previousPressed }
+                            ) {
+                                // Finger just went down — record current state.
+                                wasOpenOnPress = expanded
+                            }
+                        }
+                    }
+                },
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
         ) {
             Text(stringResource(R.string.combo_keys), fontSize = 11.sp, lineHeight = 11.sp)
@@ -615,7 +682,6 @@ private fun ComboKeyDropdown(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
-                showImeIfNeeded()
             },
             modifier = Modifier.heightIn(max = 240.dp),
             properties = PopupProperties(focusable = false),
@@ -634,6 +700,94 @@ private fun ComboKeyDropdown(
                         showImeIfNeeded()
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnippetsDropdown(
+    snippets: List<Snippet>,
+    focusRequester: FocusRequester,
+    imeVisible: Boolean,
+    view: android.view.View,
+    onSelect: (Snippet) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var keepImeOpen by remember { mutableStateOf(false) }
+    var wasOpenOnPress by remember { mutableStateOf(false) }
+
+    fun showImeIfNeeded() {
+        if (!keepImeOpen) return
+        view.post {
+            focusRequester.requestFocus()
+            val window = (view.context as? Activity)?.window ?: return@post
+            WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.ime())
+        }
+    }
+
+    Box {
+        FilledTonalButton(
+            onClick = {
+                if (wasOpenOnPress) {
+                    expanded = false
+                } else {
+                    keepImeOpen = imeVisible
+                    focusRequester.requestFocus()
+                    expanded = true
+                    showImeIfNeeded()
+                }
+                wasOpenOnPress = false
+            },
+            modifier = Modifier
+                .padding(horizontal = 1.dp)
+                .height(32.dp)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.pressed } &&
+                                event.changes.none { it.previousPressed }
+                            ) {
+                                wasOpenOnPress = expanded
+                            }
+                        }
+                    }
+                },
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        ) {
+            Text(stringResource(R.string.snippets), fontSize = 11.sp, lineHeight = 11.sp)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+            },
+            modifier = Modifier.heightIn(max = 240.dp),
+            properties = PopupProperties(focusable = false),
+        ) {
+            if (snippets.isEmpty()) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(R.string.no_saved_snippets),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    enabled = false,
+                    onClick = {},
+                )
+            } else {
+                snippets.forEach { snippet ->
+                    DropdownMenuItem(
+                        text = { Text(snippet.name) },
+                        onClick = {
+                            expanded = false
+                            onSelect(snippet)
+                            showImeIfNeeded()
+                        },
+                    )
+                }
             }
         }
     }

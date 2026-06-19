@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,9 +14,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import sh.haven.core.data.backup.BackupService
+import sh.haven.core.data.db.entities.Snippet
 import sh.haven.core.data.preferences.TerminalComboKey
 import sh.haven.core.data.preferences.ToolbarLayout
 import sh.haven.core.data.preferences.UserPreferencesRepository
+import sh.haven.core.data.repository.SnippetRepository
 import sh.haven.core.security.BiometricAuthenticator
 import javax.inject.Inject
 
@@ -25,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     private val preferencesRepository: UserPreferencesRepository,
     private val authenticator: BiometricAuthenticator,
     private val backupService: BackupService,
+    private val snippetRepository: SnippetRepository,
 ) : ViewModel() {
 
     val biometricAvailable: Boolean =
@@ -225,6 +229,38 @@ class SettingsViewModel @Inject constructor(
     fun setComboKeys(keys: List<TerminalComboKey>) {
         viewModelScope.launch {
             preferencesRepository.setTerminalComboKeys(keys)
+        }
+    }
+
+    val snippets: StateFlow<List<Snippet>> =
+        snippetRepository.getAllSnippets()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                emptyList(),
+            )
+
+    fun addSnippet(snippet: Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.addSnippet(snippet)
+        }
+    }
+
+    fun updateSnippet(snippet: Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.updateSnippet(snippet)
+        }
+    }
+
+    fun deleteSnippet(snippet: Snippet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.deleteSnippet(snippet)
+        }
+    }
+
+    fun reorderSnippets(snippets: List<Snippet>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            snippetRepository.reorderSnippets(snippets)
         }
     }
 

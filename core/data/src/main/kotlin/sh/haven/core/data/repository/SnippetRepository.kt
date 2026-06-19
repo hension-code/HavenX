@@ -23,4 +23,9 @@ class SnippetRepository @Inject constructor(
     suspend fun deleteSnippet(snippet: Snippet) {
         snippetDao.deleteSnippet(snippet)
     }
+
+    /** Reorder snippets by writing each item's list index back as sortOrder. */
+    suspend fun reorderSnippets(snippets: List<Snippet>) {
+        snippetDao.updateSortOrders(snippets)
+    }
 }

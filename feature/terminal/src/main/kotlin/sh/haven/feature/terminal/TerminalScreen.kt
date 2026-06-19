@@ -115,7 +115,7 @@ fun TerminalScreen(
     val newTabSessionPicker by viewModel.newTabSessionPicker.collectAsState()
     val newTabLoading by viewModel.newTabLoading.collectAsState()
     var vncDialogInfo by remember { mutableStateOf<VncInfo?>(null) }
-    var showSnippetsBottomSheet by remember { mutableStateOf(false) }
+    val snippets by viewModel.snippets.collectAsState()
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val context = LocalContext.current
@@ -193,25 +193,6 @@ fun TerminalScreen(
             onNewSession = { viewModel.onNewTabSessionSelected(selection.sessionId, null) },
             onDismiss = { viewModel.dismissNewTabSessionPicker() },
             zh = zh,
-        )
-    }
-
-    if (showSnippetsBottomSheet) {
-        val snippets by viewModel.snippets.collectAsState()
-        SnippetsBottomSheet(
-            snippets = snippets,
-            onDismiss = { showSnippetsBottomSheet = false },
-            onSendSnippet = { snippet ->
-                val activeTab = tabs.getOrNull(activeTabIndex)
-                if (activeTab != null) {
-                    val text = if (snippet.autoReturn) snippet.command + "\r" else snippet.command
-                    activeTab.sendInput(text.toByteArray())
-                }
-            },
-            onAddSnippet = { viewModel.addSnippet(it) },
-            onUpdateSnippet = { viewModel.updateSnippet(it) },
-            onDeleteSnippet = { viewModel.deleteSnippet(it) },
-            zh = zh
         )
     }
 
@@ -455,7 +436,14 @@ fun TerminalScreen(
                                 }
                             }
                         }} else null,
-                        onSnippetsTap = { showSnippetsBottomSheet = true },
+                        snippets = snippets,
+                        onSnippetSelected = { snippet ->
+                            val activeTab = tabs.getOrNull(activeTabIndex)
+                            if (activeTab != null) {
+                                val text = if (snippet.autoReturn) snippet.command + "\r" else snippet.command
+                                activeTab.sendInput(text.toByteArray())
+                            }
+                        },
                         selectionController = selectionController,
                         selectionActive = selectionActive,
                         hyperlinkUri = currentHyperlinkUri,

@@ -57,7 +57,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -86,6 +88,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -93,6 +96,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import sh.haven.core.data.db.entities.Snippet
 import sh.haven.core.data.preferences.TerminalComboKey
 import sh.haven.core.data.preferences.TerminalComboKeys
 import sh.haven.core.data.preferences.ToolbarItem
@@ -117,6 +121,7 @@ fun SettingsScreen(
     val toolbarLayout by viewModel.toolbarLayout.collectAsState()
     val toolbarLayoutJson by viewModel.toolbarLayoutJson.collectAsState()
     val comboKeys by viewModel.comboKeys.collectAsState()
+    val snippets by viewModel.snippets.collectAsState()
     val backupStatus by viewModel.backupStatus.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
     var showFontSizeDialog by remember { mutableStateOf(false) }
@@ -225,8 +230,8 @@ fun SettingsScreen(
         )
         SettingsItem(
             icon = Icons.Filled.KeyboardAlt,
-            title = stringResource(R.string.combo_keys),
-            subtitle = stringResource(R.string.configure_terminal_combo_keys),
+            title = stringResource(R.string.combo_keys_and_snippets),
+            subtitle = stringResource(R.string.configure_combo_keys_and_snippets),
             onClick = { showComboKeysDialog = true },
         )
         SettingsItem(
@@ -453,10 +458,15 @@ fun SettingsScreen(
     }
 
     if (showComboKeysDialog) {
-        ComboKeysDialog(
+        ComboKeysAndSnippetsDialog(
             comboKeys = comboKeys,
+            snippets = snippets,
             onDismiss = { showComboKeysDialog = false },
-            onSave = viewModel::setComboKeys,
+            onSaveComboKeys = viewModel::setComboKeys,
+            onAddSnippet = viewModel::addSnippet,
+            onUpdateSnippet = viewModel::updateSnippet,
+            onDeleteSnippet = viewModel::deleteSnippet,
+            onReorderSnippets = viewModel::reorderSnippets,
         )
     }
 
@@ -1191,125 +1201,254 @@ private fun colorSchemeLabel(
 private enum class KeyAssignment { ROW1, ROW2, OFF }
 
 @Composable
-private fun ComboKeysDialog(
+private fun ComboKeysAndSnippetsDialog(
     comboKeys: List<TerminalComboKey>,
+    snippets: List<Snippet>,
     onDismiss: () -> Unit,
-    onSave: (List<TerminalComboKey>) -> Unit,
+    onSaveComboKeys: (List<TerminalComboKey>) -> Unit,
+    onAddSnippet: (Snippet) -> Unit,
+    onUpdateSnippet: (Snippet) -> Unit,
+    onDeleteSnippet: (Snippet) -> Unit,
+    onReorderSnippets: (List<Snippet>) -> Unit,
 ) {
     var orderedKeys by remember(comboKeys) { mutableStateOf(comboKeys) }
+    var orderedSnippets by remember(snippets) { mutableStateOf(snippets) }
     var editingKey by remember { mutableStateOf<TerminalComboKey?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var editingSnippet by remember { mutableStateOf<Snippet?>(null) }
+    var showSnippetEditor by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) } // 0 = combo keys, 1 = snippets
 
     // Drag-to-reorder state (sh.calvin.reorderable provides item reuse, smooth
     // animateItem placement and built-in edge auto-scroll out of the box).
-    val lazyListState = rememberLazyListState()
+    val comboListState = rememberLazyListState()
     val hapticFeedback = LocalHapticFeedback.current
-    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        // Must update the list synchronously before returning, otherwise the
-        // dragged item flickers (per library FAQ).
+    val comboReorderableState = rememberReorderableLazyListState(comboListState) { from, to ->
         orderedKeys = orderedKeys.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+    }
+
+    val snippetListState = rememberLazyListState()
+    val snippetReorderableState = rememberReorderableLazyListState(snippetListState) { from, to ->
+        orderedSnippets = orderedSnippets.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
     }
 
     fun saveOrdered(updated: List<TerminalComboKey>) {
         orderedKeys = updated
-        onSave(updated)
+        onSaveComboKeys(updated)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.combo_keys)) },
+        title = { Text(stringResource(R.string.combo_keys_and_snippets)) },
         text = {
             Column(
                 modifier = Modifier
                     .height(460.dp),
             ) {
-                if (orderedKeys.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.no_custom_combo_keys),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp),
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.Transparent,
+                    divider = {},
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text(stringResource(R.string.combo_keys)) },
                     )
-                } else {
-                    LazyColumn(
-                        state = lazyListState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-                        items(orderedKeys, key = { it.id }) { key ->
-                            ReorderableItem(reorderableState, key = key.id) { isDragging ->
-                                // Animated elevation for dragged card
-                                val animatedElevation by animateDpAsState(
-                                    targetValue = if (isDragging) 8.dp else 0.dp,
-                                    animationSpec = tween(150),
-                                )
-                                // Animated scale for dragged card
-                                val animatedScale by animateFloatAsState(
-                                    targetValue = if (isDragging) 1.03f else 1f,
-                                    animationSpec = tween(150),
-                                )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text(stringResource(R.string.snippets)) },
+                    )
+                }
 
-                                // Conditional shape: connect cards together
-                                val cardShape = when {
-                                    isDragging -> RoundedCornerShape(12.dp)
-                                    orderedKeys.size == 1 -> RoundedCornerShape(12.dp)
-                                    key.id == orderedKeys.first().id -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                                    key.id == orderedKeys.last().id -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                                    else -> RoundedCornerShape(0.dp)
+                when (selectedTab) {
+                    0 -> {
+                        if (orderedKeys.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.no_custom_combo_keys),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        } else {
+                            LazyColumn(
+                                state = comboListState,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                            ) {
+                                items(orderedKeys, key = { it.id }) { key ->
+                                    ReorderableItem(comboReorderableState, key = key.id) { isDragging ->
+                                        // Animated elevation for dragged card
+                                        val animatedElevation by animateDpAsState(
+                                            targetValue = if (isDragging) 8.dp else 0.dp,
+                                            animationSpec = tween(150),
+                                        )
+                                        // Animated scale for dragged card
+                                        val animatedScale by animateFloatAsState(
+                                            targetValue = if (isDragging) 1.03f else 1f,
+                                            animationSpec = tween(150),
+                                        )
+
+                                        // Conditional shape: connect cards together
+                                        val cardShape = when {
+                                            isDragging -> RoundedCornerShape(12.dp)
+                                            orderedKeys.size == 1 -> RoundedCornerShape(12.dp)
+                                            key.id == orderedKeys.first().id -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                                            key.id == orderedKeys.last().id -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                            else -> RoundedCornerShape(0.dp)
+                                        }
+
+                                        Card(
+                                            elevation = CardDefaults.cardElevation(
+                                                defaultElevation = animatedElevation,
+                                            ),
+                                            shape = cardShape,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .animateItem()
+                                                .graphicsLayer {
+                                                    scaleX = animatedScale
+                                                    scaleY = animatedScale
+                                                }
+                                                .longPressDraggableHandle(
+                                                    onDragStarted = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                                    },
+                                                    onDragStopped = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                                        onSaveComboKeys(orderedKeys)
+                                                    },
+                                                ),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = key.label,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                    )
+                                                    Text(
+                                                        text = key.keys,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                                TextButton(onClick = {
+                                                    editingKey = key
+                                                    showEditor = true
+                                                }) {
+                                                    Text(stringResource(R.string.edit))
+                                                }
+                                                TextButton(onClick = {
+                                                    saveOrdered(orderedKeys.filterNot { it.id == key.id })
+                                                }) {
+                                                    Text(stringResource(R.string.delete))
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
+                            }
+                        }
+                    }
+                    1 -> {
+                        if (orderedSnippets.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.no_saved_snippets),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        } else {
+                            LazyColumn(
+                                state = snippetListState,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                            ) {
+                                items(orderedSnippets, key = { it.id }) { snippet ->
+                                    ReorderableItem(snippetReorderableState, key = snippet.id) { isDragging ->
+                                        val animatedElevation by animateDpAsState(
+                                            targetValue = if (isDragging) 8.dp else 0.dp,
+                                            animationSpec = tween(150),
+                                        )
+                                        val animatedScale by animateFloatAsState(
+                                            targetValue = if (isDragging) 1.03f else 1f,
+                                            animationSpec = tween(150),
+                                        )
 
-                                Card(
-                                    elevation = CardDefaults.cardElevation(
-                                        defaultElevation = animatedElevation,
-                                    ),
-                                    shape = cardShape,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .animateItem()
-                                        .graphicsLayer {
-                                            scaleX = animatedScale
-                                            scaleY = animatedScale
+                                        val cardShape = when {
+                                            isDragging -> RoundedCornerShape(12.dp)
+                                            orderedSnippets.size == 1 -> RoundedCornerShape(12.dp)
+                                            snippet.id == orderedSnippets.first().id -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                                            snippet.id == orderedSnippets.last().id -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                            else -> RoundedCornerShape(0.dp)
                                         }
-                                        .longPressDraggableHandle(
-                                            onDragStarted = {
-                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-                                            },
-                                            onDragStopped = {
-                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                                                onSave(orderedKeys)
-                                            },
-                                        ),
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = key.label,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                            Text(
-                                                text = key.keys,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                        TextButton(onClick = {
-                                            editingKey = key
-                                            showEditor = true
-                                        }) {
-                                            Text(stringResource(R.string.edit))
-                                        }
-                                        TextButton(onClick = {
-                                            saveOrdered(orderedKeys.filterNot { it.id == key.id })
-                                        }) {
-                                            Text(stringResource(R.string.delete))
+
+                                        Card(
+                                            elevation = CardDefaults.cardElevation(
+                                                defaultElevation = animatedElevation,
+                                            ),
+                                            shape = cardShape,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .animateItem()
+                                                .graphicsLayer {
+                                                    scaleX = animatedScale
+                                                    scaleY = animatedScale
+                                                }
+                                                .longPressDraggableHandle(
+                                                    onDragStarted = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                                    },
+                                                    onDragStopped = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                                        onReorderSnippets(orderedSnippets)
+                                                    },
+                                                ),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = snippet.name,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                    )
+                                                    Text(
+                                                        text = snippet.command,
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 2,
+                                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                                    )
+                                                }
+                                                TextButton(onClick = {
+                                                    editingSnippet = snippet
+                                                    showSnippetEditor = true
+                                                }) {
+                                                    Text(stringResource(R.string.edit))
+                                                }
+                                                TextButton(onClick = {
+                                                    onDeleteSnippet(snippet)
+                                                    orderedSnippets = orderedSnippets.filterNot { it.id == snippet.id }
+                                                }) {
+                                                    Text(stringResource(R.string.delete))
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1321,14 +1460,23 @@ private fun ComboKeysDialog(
         },
         confirmButton = {
             Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                TextButton(onClick = {
-                    editingKey = null
-                    showEditor = true
-                }) {
-                    Text(stringResource(R.string.add_combo_key))
-                }
-                TextButton(onClick = { saveOrdered(TerminalComboKeys.PRESETS) }) {
-                    Text(stringResource(R.string.reset))
+                if (selectedTab == 0) {
+                    TextButton(onClick = {
+                        editingKey = null
+                        showEditor = true
+                    }) {
+                        Text(stringResource(R.string.add_combo_key))
+                    }
+                    TextButton(onClick = { saveOrdered(TerminalComboKeys.PRESETS) }) {
+                        Text(stringResource(R.string.reset))
+                    }
+                } else {
+                    TextButton(onClick = {
+                        editingSnippet = null
+                        showSnippetEditor = true
+                    }) {
+                        Text(stringResource(R.string.add_snippet))
+                    }
                 }
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.close))
@@ -1350,6 +1498,25 @@ private fun ComboKeysDialog(
                 }
                 saveOrdered(updated)
                 showEditor = false
+            },
+        )
+    }
+
+    if (showSnippetEditor) {
+        SnippetEditorDialog(
+            initialSnippet = editingSnippet,
+            onDismiss = { showSnippetEditor = false },
+            onSave = { saved ->
+                if (editingSnippet == null) {
+                    onAddSnippet(saved)
+                    orderedSnippets = orderedSnippets + saved
+                } else {
+                    onUpdateSnippet(saved)
+                    orderedSnippets = orderedSnippets.map {
+                        if (it.id == saved.id) saved else it
+                    }
+                }
+                showSnippetEditor = false
             },
         )
     }
@@ -1432,6 +1599,85 @@ private fun ComboKeyEditorDialog(
                             send = encoded ?: return@TextButton,
                         )
                     )
+                },
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun SnippetEditorDialog(
+    initialSnippet: Snippet?,
+    onDismiss: () -> Unit,
+    onSave: (Snippet) -> Unit,
+) {
+    var name by remember(initialSnippet) { mutableStateOf(initialSnippet?.name ?: "") }
+    var command by remember(initialSnippet) { mutableStateOf(initialSnippet?.command ?: "") }
+    var autoReturn by remember(initialSnippet) { mutableStateOf(initialSnippet?.autoReturn ?: true) }
+
+    val canSave = name.isNotBlank() && command.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                if (initialSnippet == null) stringResource(R.string.add_snippet_title)
+                else stringResource(R.string.edit_snippet_title)
+            )
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.snippet_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = command,
+                    onValueChange = { command = it },
+                    label = { Text(stringResource(R.string.command_content)) },
+                    maxLines = 5,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.auto_append_enter))
+                    Switch(
+                        checked = autoReturn,
+                        onCheckedChange = { autoReturn = it },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    val saved = initialSnippet?.copy(
+                        name = name.trim(),
+                        command = command,
+                        autoReturn = autoReturn,
+                    ) ?: Snippet(
+                        name = name.trim(),
+                        command = command,
+                        autoReturn = autoReturn,
+                    )
+                    onSave(saved)
                 },
             ) {
                 Text(stringResource(R.string.save))
