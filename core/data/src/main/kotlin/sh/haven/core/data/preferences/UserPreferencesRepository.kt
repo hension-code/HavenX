@@ -1,5 +1,6 @@
 package sh.haven.core.data.preferences
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -7,15 +8,18 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import sh.haven.core.security.KeyEncryption
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class UserPreferencesRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
+    @ApplicationContext private val context: Context,
 ) {
     private val biometricEnabledKey = booleanPreferencesKey("biometric_enabled")
     private val terminalFontSizeKey = intPreferencesKey("terminal_font_size")
@@ -100,7 +104,10 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     val reticulumRpcKey: Flow<String?> = dataStore.data.map { prefs ->
-        prefs[reticulumRpcKeyKey]
+        // Decrypt at the repository boundary — the stored value is Tink-encrypted
+        // (prefixed with "ENC$"). Legacy plaintext values are returned as-is and
+        // re-encrypted on the next setReticulumConfig call.
+        prefs[reticulumRpcKeyKey]?.let { KeyEncryption.decryptString(context, it) }
     }
 
     val reticulumHost: Flow<String> = dataStore.data.map { prefs ->
@@ -112,12 +119,14 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     val reticulumConfigured: Flow<Boolean> = dataStore.data.map { prefs ->
+        // A key entry exists whether stored as plaintext (legacy) or encrypted.
         prefs[reticulumRpcKeyKey] != null
     }
 
     suspend fun setReticulumConfig(rpcKey: String, host: String, port: Int) {
         dataStore.edit { prefs ->
-            prefs[reticulumRpcKeyKey] = rpcKey
+            // rpcKey is non-null, so encryptString returns a non-null ciphertext.
+            prefs[reticulumRpcKeyKey] = KeyEncryption.encryptString(context, rpcKey)!!
             prefs[reticulumHostKey] = host
             prefs[reticulumPortKey] = port
         }

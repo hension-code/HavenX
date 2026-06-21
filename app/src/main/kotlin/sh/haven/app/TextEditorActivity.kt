@@ -255,7 +255,7 @@ class TextEditorActivity : ComponentActivity() {
         val profileId = intent.getStringExtra("PROFILE_ID")
         val isSmb = intent.getBooleanExtra("IS_SMB", false)
 
-        if (filePath == null || remotePath == null) {
+        if (filePath == null || remotePath == null || !PreviewIntentGuard.isCachePath(this, filePath)) {
             finish()
             return
         }

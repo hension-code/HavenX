@@ -55,6 +55,7 @@
     <string name="username">Username</string>
     <string name="domain_optional">Domain (optional)</string>
     <string name="ssh_tunnel">SSH tunnel</string>
+    <string name="require_encryption">Require encryption</string>
     <string name="select_ssh_connection">Select SSH connection</string>
     <string name="ssh_connection">SSH connection</string>
     <string name="add_an_ssh_connection_first">Add an SSH connection first</string>

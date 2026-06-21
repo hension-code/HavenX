@@ -175,7 +175,7 @@ class TerminalViewModel @Inject constructor(
     private val etSessionManager: EtSessionManager,
     private val hostKeyVerifier: HostKeyVerifier,
     private val preferencesRepository: UserPreferencesRepository,
-    private val connectionDao: sh.haven.core.data.db.ConnectionDao,
+    private val connectionRepository: sh.haven.core.data.repository.ConnectionRepository,
     private val snippetRepository: sh.haven.core.data.repository.SnippetRepository,
 ) : ViewModel() {
 
@@ -272,7 +272,7 @@ class TerminalViewModel @Inject constructor(
     /** Get VNC connection info for the active terminal tab's SSH host. */
     suspend fun getActiveVncInfo(): VncInfo? {
         val tab = _tabs.value.getOrNull(_activeTabIndex.value) ?: return null
-        val profile = connectionDao.getById(tab.profileId)
+        val profile = connectionRepository.getById(tab.profileId)
         // For SSH tabs, use the stored connection config; for mosh/ET, use the profile directly
         val host = sessionManager.getConnectionConfigForProfile(tab.profileId)?.first?.host
             ?: profile?.host
@@ -296,7 +296,7 @@ class TerminalViewModel @Inject constructor(
     fun sendRedrawIfZellij() {
         val tab = _tabs.value.getOrNull(_activeTabIndex.value) ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val profile = connectionDao.getById(tab.profileId)
+            val profile = connectionRepository.getById(tab.profileId)
             val smOverride = profile?.sessionManager
             val isZellij = if (smOverride != null) {
                 smOverride.equals("ZELLIJ", ignoreCase = true)
@@ -315,7 +315,7 @@ class TerminalViewModel @Inject constructor(
     /** Save VNC settings for a profile. */
     fun saveVncSettings(profileId: String, port: Int, password: String?, sshForward: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            connectionDao.updateVncSettings(profileId, port, password, sshForward)
+            connectionRepository.saveVncSettings(profileId, port, password, sshForward)
         }
     }
 
@@ -901,11 +901,21 @@ class TerminalViewModel @Inject constructor(
                     client.connect(config)
                 }
 
-                // Silent TOFU: auto-accept new hosts, reject key changes
+                // Abort on both new hosts and key changes — never auto-accept.
+                // A NewHost here means known_hosts has no record for this profile
+                // (e.g. after backup restore / data clear). Auto-accepting would
+                // open a MITM window: JSch already disabled StrictHostKeyChecking
+                // and the credentials were sent during connect(). The user must
+                // reconnect from the Connections screen, which surfaces the
+                // NewHostKeyDialog so the fingerprint can be confirmed.
                 when (val hkResult = hostKeyVerifier.verify(hostKeyEntry)) {
                     is HostKeyResult.Trusted -> { /* matches — continue */ }
                     is HostKeyResult.NewHost -> {
-                        hostKeyVerifier.accept(hkResult.entry)
+                        client.disconnect()
+                        sessionManager.removeSession(sessionId)
+                        Log.w(TAG, "Unknown host key for ${config.host}:${config.port} on new tab — aborting (reconnect from Connections to confirm)")
+                        _newTabLoading.value = false
+                        return@launch
                     }
                     is HostKeyResult.KeyChanged -> {
                         client.disconnect()

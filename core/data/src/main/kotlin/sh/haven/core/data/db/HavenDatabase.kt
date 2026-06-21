@@ -20,7 +20,7 @@ import sh.haven.core.data.db.entities.Snippet
         PortForwardRule::class,
         Snippet::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 abstract class HavenDatabase : RoomDatabase() {
@@ -177,6 +177,12 @@ abstract class HavenDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`)
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE connection_profiles ADD COLUMN smbRequireEncryption INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

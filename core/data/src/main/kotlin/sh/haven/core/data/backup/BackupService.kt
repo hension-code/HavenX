@@ -6,7 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
-import sh.haven.core.data.db.ConnectionDao
+import sh.haven.core.data.repository.ConnectionRepository
 import sh.haven.core.data.db.KnownHostDao
 import sh.haven.core.data.db.PortForwardRuleDao
 import sh.haven.core.data.db.SshKeyDao
@@ -25,7 +25,7 @@ import javax.inject.Singleton
 
 @Singleton
 class BackupService @Inject constructor(
-    private val connectionDao: ConnectionDao,
+    private val connectionRepository: ConnectionRepository,
     private val sshKeyDao: SshKeyDao,
     private val sshKeyRepository: sh.haven.core.data.repository.SshKeyRepository,
     private val knownHostDao: KnownHostDao,
@@ -41,7 +41,7 @@ class BackupService @Inject constructor(
 
         // Connections
         val connections = JSONArray()
-        connectionDao.getAll().forEach { p ->
+        connectionRepository.getAll().forEach { p ->
             connections.put(JSONObject().apply {
                 put("id", p.id)
                 put("label", p.label)
@@ -64,6 +64,9 @@ class BackupService @Inject constructor(
                 put("vncPassword", p.vncPassword ?: JSONObject.NULL)
                 put("vncSshForward", p.vncSshForward)
                 put("sessionManager", p.sessionManager ?: JSONObject.NULL)
+                put("rdpPassword", p.rdpPassword ?: JSONObject.NULL)
+                put("smbPassword", p.smbPassword ?: JSONObject.NULL)
+                put("smbRequireEncryption", p.smbRequireEncryption)
             })
         }
         json.put("connections", connections)
@@ -117,6 +120,10 @@ class BackupService @Inject constructor(
         val settings = JSONObject()
         val prefs = dataStore.data.first()
         prefs.asMap().forEach { (key, value) ->
+            // Skip the Reticulum RPC key — it is encrypted with this device's
+            // Android Keystore master key, so it is meaningless on another
+            // device. The user must reconfigure Reticulum after a restore.
+            if (key.name == RETICULUM_RPC_KEY_PREF) return@forEach
             when (value) {
                 is String -> settings.put(key.name, value)
                 is Int -> settings.put(key.name, value)
@@ -172,7 +179,7 @@ class BackupService @Inject constructor(
             for (i in 0 until connections.length()) {
                 try {
                     val c = connections.getJSONObject(i)
-                    connectionDao.upsert(
+                    connectionRepository.save(
                         ConnectionProfile(
                             id = c.getString("id"),
                             label = c.getString("label"),
@@ -197,6 +204,9 @@ class BackupService @Inject constructor(
                             vncPassword = c.optStringOrNull("vncPassword"),
                             vncSshForward = c.optBoolean("vncSshForward", true),
                             sessionManager = c.optStringOrNull("sessionManager"),
+                            rdpPassword = c.optStringOrNull("rdpPassword"),
+                            smbPassword = c.optStringOrNull("smbPassword"),
+                            smbRequireEncryption = c.optBoolean("smbRequireEncryption", false),
                         ),
                     )
                     count++
@@ -260,6 +270,8 @@ class BackupService @Inject constructor(
             dataStore.updateData { prefs ->
                 val mutable = prefs.toMutablePreferences()
                 settings.keys().forEach { key ->
+                    // Skip the Reticulum RPC key on import — see export() for rationale.
+                    if (key == RETICULUM_RPC_KEY_PREF) return@forEach
                     val value = settings.get(key)
                     when (value) {
                         is String -> mutable[androidx.datastore.preferences.core.stringPreferencesKey(key)] = value
@@ -317,6 +329,9 @@ class BackupService @Inject constructor(
         private const val IV_LENGTH = 12
         private const val TAG_LENGTH_BITS = 128
         private const val PBKDF2_ITERATIONS = 100_000
+        // DataStore preference key for the Reticulum RPC key — excluded from
+        // backup/restore because it is encrypted with this device's Keystore.
+        private const val RETICULUM_RPC_KEY_PREF = "reticulum_rpc_key"
     }
 }
 

@@ -43,6 +43,15 @@ data class ConnectionProfile(
     val smbPassword: String? = null,
     val smbSshForward: Boolean = false,
     val smbSshProfileId: String? = null,
+    /**
+     * Require SMB 3.0+ encryption for direct (non-tunneled) connections.
+     * When true, refuse to connect if the server does not support encryption
+     * (prevents a silent downgrade to plaintext). Default false for
+     * compatibility with SMB 1/2.x servers and SMB 3.x servers with
+     * encryption disabled. Ignored when [smbSshForward] is true (the SSH
+     * tunnel secures the connection).
+     */
+    val smbRequireEncryption: Boolean = false,
 ) {
     enum class AuthType {
         PASSWORD,

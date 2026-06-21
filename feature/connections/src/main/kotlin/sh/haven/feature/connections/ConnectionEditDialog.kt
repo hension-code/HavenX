@@ -106,6 +106,7 @@ fun ConnectionEditDialog(
     var smbDomain by rememberSaveable { mutableStateOf(existing?.smbDomain ?: "") }
     var smbSshForward by rememberSaveable { mutableStateOf(existing?.smbSshForward ?: false) }
     var smbSshProfileId by rememberSaveable { mutableStateOf(existing?.smbSshProfileId) }
+    var smbRequireEncryption by rememberSaveable { mutableStateOf(existing?.smbRequireEncryption ?: false) }
     var vncPassword by rememberSaveable { mutableStateOf(existing?.vncPassword ?: "") }
     var destinationHash by rememberSaveable { mutableStateOf(existing?.destinationHash ?: "") }
     var jumpProfileId by rememberSaveable { mutableStateOf(existing?.jumpProfileId) }
@@ -588,6 +589,13 @@ fun ConnectionEditDialog(
                             )
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    FilterChip(
+                        selected = smbRequireEncryption,
+                        onClick = { smbRequireEncryption = !smbRequireEncryption },
+                        enabled = !smbSshForward,
+                        label = { Text(stringResource(R.string.require_encryption)) },
+                    )
                 } else if (connectionType == "SSH") {
                     // Discovered hosts — filter by typed prefix
                     val filteredHosts = remember(discoveredHosts, host) {
@@ -1102,6 +1110,7 @@ fun ConnectionEditDialog(
                             smbDomain = smbDomain.ifBlank { null },
                             smbSshForward = smbSshForward,
                             smbSshProfileId = if (smbSshForward) smbSshProfileId else null,
+                            smbRequireEncryption = smbRequireEncryption,
                         )
                     } else if (connectionType == "SSH") {
                         val portInt = port.toIntOrNull() ?: 22
