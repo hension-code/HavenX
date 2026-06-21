@@ -278,12 +278,22 @@ class SshSessionManager @Inject constructor(
                 val newClient = SshClient()
                 val hostKeyEntry = newClient.connectBlocking(config, proxy = proxy)
 
-                // Silent TOFU on reconnect: auto-accept new, abort on change
+                // Abort on both new hosts and key changes — never auto-accept.
+                // A NewHost during reconnect means known_hosts has no record
+                // (e.g. after data clear). Auto-accepting would open a MITM
+                // window: JSch already disabled StrictHostKeyChecking and the
+                // credentials were sent during connectBlocking(). Reconnect has
+                // no UI context to prompt, so abort to ERROR and let the user
+                // reconnect from the Connections screen, which surfaces the
+                // NewHostKeyDialog so the fingerprint can be confirmed.
                 val hkResult = runBlocking { hostKeyVerifier.verify(hostKeyEntry) }
                 when (hkResult) {
                     is HostKeyResult.Trusted -> { /* matches — continue */ }
                     is HostKeyResult.NewHost -> {
-                        runBlocking { hostKeyVerifier.accept(hkResult.entry) }
+                        Log.w(TAG, "Unknown host key during reconnect for $sessionId — aborting (reconnect from Connections to confirm)")
+                        newClient.disconnect()
+                        updateStatus(sessionId, SessionState.Status.ERROR)
+                        return
                     }
                     is HostKeyResult.KeyChanged -> {
                         Log.w(TAG, "Host key changed during reconnect for $sessionId — aborting")

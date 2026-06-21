@@ -66,6 +66,7 @@ class SmbSessionManager @Inject constructor() {
         domain: String = "",
         sshClient: Closeable? = null,
         tunnelPort: Int? = null,
+        requireEncryption: Boolean = false,
     ) {
         _sessions.value[sessionId]
             ?: throw IllegalStateException("Session $sessionId not found")
@@ -76,7 +77,11 @@ class SmbSessionManager @Inject constructor() {
         try {
             val connectHost = if (tunnelPort != null) "127.0.0.1" else host
             val connectPort = tunnelPort ?: port
-            client.connect(connectHost, connectPort, shareName, username, password, domain)
+            // Encryption requirement only applies to direct connections — when
+            // tunneled, the SSH tunnel already secures the SMB traffic, so SMB-level
+            // encryption is unnecessary (and may not be supported by the server).
+            val needEncryption = requireEncryption && tunnelPort == null
+            client.connect(connectHost, connectPort, shareName, username, password, domain, requireEncryption = needEncryption)
 
             _sessions.update { map ->
                 val existing = map[sessionId] ?: return@update map

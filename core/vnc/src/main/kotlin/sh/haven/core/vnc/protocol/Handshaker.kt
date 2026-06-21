@@ -53,7 +53,9 @@ object Handshaker {
                     authenticateVnc(session)
                 }
                 1 in types -> {
-                    // No authentication
+                    // No authentication — refuse when the caller requires auth
+                    // (a password was configured for a direct connection).
+                    if (session.config.requireAuth) throw noAuthRefused()
                     session.outputStream.write(1)
                     session.outputStream.flush()
                 }
@@ -73,7 +75,10 @@ object Handshaker {
                     d.readFully(errBytes)
                     throw HandshakingFailedException(String(errBytes, Charsets.US_ASCII))
                 }
-                1 -> { /* no auth */ }
+                1 -> {
+                    // No authentication — refuse when the caller requires auth.
+                    if (session.config.requireAuth) throw noAuthRefused()
+                }
                 2 -> authenticateVnc(session)
                 else -> throw HandshakingFailedException("Unsupported security type: $type")
             }
@@ -125,8 +130,19 @@ object Handshaker {
         }
     }
 
-    private fun reverseBits(b: Byte): Byte {
-        var v = b.toInt() and 0xFF
+    /**
+     * Exception raised when the server offers "no authentication" (RFB security
+     * type 1) but the caller required auth (a password was configured for a
+     * direct, non-tunneled connection). Silently accepting would let a MitM
+     * strip authentication or a misconfigured server bypass the user's password.
+     */
+    private fun noAuthRefused() = HandshakingFailedException(
+        "Server offered no authentication (security type 1) but a password was configured. " +
+            "Refusing to connect without authentication — this may indicate a downgrade attack " +
+            "or a misconfigured server."
+    )
+
+    private fun reverseBits(b: Byte): Byte {        var v = b.toInt() and 0xFF
         var result = 0
         for (i in 0 until 8) {
             result = (result shl 1) or (v and 1)

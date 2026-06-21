@@ -529,6 +529,7 @@ class ConnectionsViewModel @Inject constructor(
                         sessionId, host, port, shareName, smbUsername, smbPassword, domain,
                         sshClient = sshClientCloseable,
                         tunnelPort = tunnelPort,
+                        requireEncryption = profile.smbRequireEncryption,
                     )
                 }
                 _navigateToSmb.value = profile.id

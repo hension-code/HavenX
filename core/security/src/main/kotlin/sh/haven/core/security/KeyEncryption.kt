@@ -1,6 +1,7 @@
 package sh.haven.core.security
 
 import android.content.Context
+import android.util.Base64
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.aead.AeadConfig
@@ -22,6 +23,15 @@ object KeyEncryption {
 
     // Associated data for AEAD — prevents ciphertext from being used in a different context
     private val ASSOCIATED_DATA = "haven-ssh-private-key".toByteArray()
+
+    // Separate associated data for connection passwords — a key ciphertext cannot be
+    // decrypted as a password (and vice versa) even though both share the master keyset.
+    private val PASSWORD_ASSOCIATED_DATA = "haven-connection-password".toByteArray()
+
+    // Prefix marking a stored string as Tink-encrypted. Legacy plaintext values (stored
+    // before password encryption was introduced) lack this prefix and are returned as-is,
+    // then re-encrypted on the next save — a lazy migration matching the SshKey approach.
+    private const val ENCRYPTED_STRING_PREFIX = "ENC$"
 
     @Volatile
     private var aead: Aead? = null
@@ -61,5 +71,28 @@ object KeyEncryption {
         // Plain key formats start with '-' (PEM) or 0x30 (DER SEQUENCE)
         val first = bytes[0]
         return first != '-'.code.toByte() && first != 0x30.toByte()
+    }
+
+    /**
+     * Encrypt a connection password string for storage. Returns null for null input.
+     * The result is [ENCRYPTED_STRING_PREFIX] + Base64(Tink ciphertext) and should be
+     * stored in the password column as-is.
+     */
+    fun encryptString(context: Context, plaintext: String?): String? {
+        if (plaintext == null) return null
+        val ciphertext = getAead(context).encrypt(plaintext.toByteArray(Charsets.UTF_8), PASSWORD_ASSOCIATED_DATA)
+        return ENCRYPTED_STRING_PREFIX + Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+    }
+
+    /**
+     * Decrypt a stored connection password. Returns null for null input.
+     * Values without [ENCRYPTED_STRING_PREFIX] are treated as legacy plaintext and
+     * returned unchanged (they get re-encrypted on the next save).
+     */
+    fun decryptString(context: Context, stored: String?): String? {
+        if (stored == null) return null
+        if (!stored.startsWith(ENCRYPTED_STRING_PREFIX)) return stored
+        val ciphertext = Base64.decode(stored.removePrefix(ENCRYPTED_STRING_PREFIX), Base64.NO_WRAP)
+        return String(getAead(context).decrypt(ciphertext, PASSWORD_ASSOCIATED_DATA), Charsets.UTF_8)
     }
 }

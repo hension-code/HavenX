@@ -55,6 +55,7 @@
     <string name="username">用户名</string>
     <string name="domain_optional">域（可选）</string>
     <string name="ssh_tunnel">SSH 隧道</string>
+    <string name="require_encryption">要求加密</string>
     <string name="select_ssh_connection">选择 SSH 连接</string>
     <string name="ssh_connection">SSH 连接</string>
     <string name="add_an_ssh_connection_first">请先添加一个 SSH 连接</string>

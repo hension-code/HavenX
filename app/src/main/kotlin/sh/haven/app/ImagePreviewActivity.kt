@@ -13,6 +13,7 @@ class ImagePreviewActivity : AppCompatActivity() {
         setContentView(R.layout.activity_image_preview)
 
         val filePath = intent.getStringExtra("FILE_PATH") ?: return finish()
+        if (!PreviewIntentGuard.isCachePath(this, filePath)) return finish()
         val remotePath = intent.getStringExtra("REMOTE_PATH") ?: filePath
 
         supportActionBar?.title = remotePath.substringAfterLast('/')

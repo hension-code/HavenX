@@ -121,7 +121,11 @@ class VncViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _error.value = null
-                doConnect(host, port, password, host, port)
+                // Direct (non-tunneled) connection: if a password was supplied, require
+                // the server to actually authenticate. This prevents a silent downgrade
+                // to no-auth (MitM stripping or misconfigured server) that would bypass
+                // the configured password over a plaintext connection.
+                doConnect(host, port, password, host, port, requireAuth = !password.isNullOrEmpty())
             } catch (e: Exception) {
                 Log.e(TAG, "VNC connect failed", e)
                 _error.value = describeError(e, host, port)
@@ -132,11 +136,13 @@ class VncViewModel @Inject constructor(
     private fun doConnect(
         host: String, port: Int, password: String?,
         displayHost: String? = null, displayPort: Int? = null,
+        requireAuth: Boolean = false,
     ) {
         val config = VncConfig().apply {
             colorDepth = ColorDepth.BPP_24_TRUE
             targetFps = 10
             shared = true
+            this.requireAuth = requireAuth
             if (!password.isNullOrEmpty()) {
                 passwordSupplier = { password }
             }
@@ -264,12 +270,26 @@ class VncViewModel @Inject constructor(
                     append("Check your VNC password. VNC passwords are limited to 8 characters.\n")
                     append("To reset: vncpasswd ~/.vnc/passwd")
                 }
-                is HandshakingFailedException -> buildString {
-                    append("VNC handshake failed: ${e.message}\n\n")
-                    append("This may indicate:\n")
-                    append("  - An incompatible VNC server version\n")
-                    append("  - Something other than a VNC server on port $portStr\n")
-                    append("  - A web-based VNC proxy (noVNC) instead of a raw VNC port")
+                is HandshakingFailedException -> {
+                    val msg = e.message ?: ""
+                    if (msg.contains("no authentication", ignoreCase = true)) {
+                        buildString {
+                            append("VNC handshake failed: $msg\n\n")
+                            append("The server does not require a password. Options:\n")
+                            append("  - Connect through an SSH tunnel (recommended) so the tunnel\n")
+                            append("    authenticates the server, or\n")
+                            append("  - Clear the VNC password on this profile if you intentionally\n")
+                            append("    want to connect without authentication over a trusted network.")
+                        }
+                    } else {
+                        buildString {
+                            append("VNC handshake failed: $msg\n\n")
+                            append("This may indicate:\n")
+                            append("  - An incompatible VNC server version\n")
+                            append("  - Something other than a VNC server on port $portStr\n")
+                            append("  - A web-based VNC proxy (noVNC) instead of a raw VNC port")
+                        }
+                    }
                 }
                 is VncException -> buildString {
                     val msg = e.message ?: "Unknown protocol error"

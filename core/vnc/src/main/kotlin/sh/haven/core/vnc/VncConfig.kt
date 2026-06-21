@@ -15,6 +15,16 @@ class VncConfig {
     var shared: Boolean = true
     var targetFps: Int = 30
     var colorDepth: ColorDepth = ColorDepth.BPP_24_TRUE
+
+    /**
+     * When true, refuse the "no authentication" security type (RFB type 1).
+     * Set for direct (non-tunneled) connections where a password was supplied:
+     * a server silently dropping to no-auth despite a configured password may
+     * indicate a downgrade attack or a misconfiguration. Left false for SSH
+     * tunnels, where the tunnel itself authenticates the server and a
+     * no-auth VNC server behind it is a legitimate configuration.
+     */
+    var requireAuth: Boolean = false
 }
 
 enum class ColorDepth(

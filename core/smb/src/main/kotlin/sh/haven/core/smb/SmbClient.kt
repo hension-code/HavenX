@@ -8,11 +8,13 @@ import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2CreateOptions
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.smbj.SMBClient
+import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
 import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
 import java.io.Closeable
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.EnumSet
@@ -45,18 +47,56 @@ class SmbClient : Closeable {
         username: String,
         password: String,
         domain: String,
+        requireEncryption: Boolean = false,
     ) {
-        val smbClient = SMBClient()
+        // When encryption is required, advertise the SMB3 encryption capability so
+        // smbj will encrypt if the server supports it. This alone does NOT force the
+        // server — we verify below that the session is actually encrypted and refuse
+        // otherwise, preventing a silent downgrade to plaintext.
+        val smbClient = if (requireEncryption) {
+            SMBClient(SmbConfig.builder().withEncryptData(true).build())
+        } else {
+            SMBClient()
+        }
         val conn = smbClient.connect(host, port)
-        val auth = AuthenticationContext(username, password.toCharArray(), domain)
-        val sess = conn.authenticate(auth)
-        val diskShare = sess.connectShare(shareName) as DiskShare
+        try {
+            val auth = AuthenticationContext(username, password.toCharArray(), domain)
+            val sess = conn.authenticate(auth)
 
-        client = smbClient
-        connection = conn
-        session = sess
-        share = diskShare
-        Log.d(TAG, "Connected to \\\\$host\\$shareName as $username")
+            if (requireEncryption) {
+                // shouldEncryptData() is true only when the negotiated session will
+                // actually encrypt (server supports SMB3 encryption AND a key was
+                // established during session setup). If false, the server cannot or
+                // will not encrypt — refuse rather than continue in plaintext.
+                val encrypted = try {
+                    sess.shouldEncryptData()
+                } catch (_: Exception) {
+                    false
+                }
+                if (!encrypted) {
+                    try { sess.close() } catch (_: Exception) {}
+                    throw IOException(
+                        "Server does not support SMB encryption (requires SMB 3.0+ with encryption enabled). " +
+                            "Refusing to connect without encryption — disable \"Require encryption\" on this " +
+                            "profile or connect through an SSH tunnel."
+                    )
+                }
+                session = sess
+            } else {
+                session = sess
+            }
+
+            val diskShare = sess.connectShare(shareName) as DiskShare
+
+            client = smbClient
+            connection = conn
+            share = diskShare
+            Log.d(TAG, "Connected to \\\\$host\\$shareName as $username (encrypted=$requireEncryption)")
+        } catch (e: Exception) {
+            try { conn.close() } catch (_: Exception) {}
+            try { smbClient.close() } catch (_: Exception) {}
+            throw e
+        }
     }
 
     fun listDirectory(path: String): List<SmbFileEntry> {

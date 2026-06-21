@@ -55,6 +55,11 @@ class PlayerPreviewActivity : AppCompatActivity() {
         val streamUrl = intent.getStringExtra("STREAM_URL")
         val remotePath = intent.getStringExtra("REMOTE_PATH") ?: filePath
         if (remotePath == null) return finish()
+        // Defence-in-depth: FILE_PATH must be an app cache file, STREAM_URL must
+        // be a loopback URL from the local preview server. Reject anything else.
+        val safeFilePath = filePath?.takeIf { PreviewIntentGuard.isCachePath(this, it) }
+        val safeStreamUrl = streamUrl?.takeIf { PreviewIntentGuard.isLoopbackUrl(it) }
+        if (safeFilePath == null && safeStreamUrl == null) return finish()
         val mediaType = MediaTypeResolver.resolve(remotePath)
 
         supportActionBar?.title = remotePath.substringAfterLast('/')
@@ -87,8 +92,8 @@ class PlayerPreviewActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this).build().also { exo ->
             playerView.player = exo
             val uri = when {
-                !streamUrl.isNullOrBlank() -> Uri.parse(streamUrl)
-                !filePath.isNullOrBlank() -> Uri.fromFile(File(filePath))
+                !safeStreamUrl.isNullOrBlank() -> Uri.parse(safeStreamUrl)
+                !safeFilePath.isNullOrBlank() -> Uri.fromFile(File(safeFilePath))
                 else -> null
             } ?: return finish()
             exo.setMediaItem(MediaItem.fromUri(uri))
