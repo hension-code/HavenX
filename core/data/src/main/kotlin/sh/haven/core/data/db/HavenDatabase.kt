@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import sh.haven.core.data.db.entities.ConnectionLog
 import sh.haven.core.data.db.entities.ConnectionProfile
+import sh.haven.core.data.db.entities.DownloadRecord
 import sh.haven.core.data.db.entities.KnownHost
 import sh.haven.core.data.db.entities.PortForwardRule
 import sh.haven.core.data.db.entities.SshKey
@@ -19,8 +20,9 @@ import sh.haven.core.data.db.entities.Snippet
         SshKey::class,
         PortForwardRule::class,
         Snippet::class,
+        DownloadRecord::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 abstract class HavenDatabase : RoomDatabase() {
@@ -30,6 +32,7 @@ abstract class HavenDatabase : RoomDatabase() {
     abstract fun sshKeyDao(): SshKeyDao
     abstract fun portForwardRuleDao(): PortForwardRuleDao
     abstract fun snippetDao(): SnippetDao
+    abstract fun downloadRecordDao(): DownloadRecordDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -183,6 +186,32 @@ abstract class HavenDatabase : RoomDatabase() {
         val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_profiles ADD COLUMN smbRequireEncryption INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `download_records` (
+                        `id` TEXT NOT NULL,
+                        `profileId` TEXT NOT NULL,
+                        `fileName` TEXT NOT NULL,
+                        `remotePath` TEXT NOT NULL,
+                        `localUri` TEXT,
+                        `totalBytes` INTEGER NOT NULL,
+                        `transferredBytes` INTEGER NOT NULL,
+                        `isUpload` INTEGER NOT NULL,
+                        `isSmb` INTEGER NOT NULL,
+                        `state` TEXT NOT NULL,
+                        `error` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`profileId`) REFERENCES `connection_profiles`(`id`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_records_profileId` ON `download_records` (`profileId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_records_updatedAt` ON `download_records` (`updatedAt`)")
             }
         }
     }

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -62,6 +64,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DropdownMenu
@@ -74,12 +77,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -107,6 +112,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
@@ -124,6 +130,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import sh.haven.core.data.db.entities.DownloadRecord
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -155,6 +162,7 @@ fun SftpScreen(
     val canGoForward by viewModel.canGoForward.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val transfers by viewModel.transfers.collectAsState()
+    val downloadHistory by viewModel.downloadHistory.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
     val error by viewModel.error.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -192,9 +200,18 @@ fun SftpScreen(
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
             try {
-                val mimeType = context.contentResolver.getType(dl.uri) ?: "*/*"
+                val contentUri = if (dl.uri.scheme == "file") {
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        java.io.File(dl.uri.path ?: ""),
+                    )
+                } else {
+                    dl.uri
+                }
+                val mimeType = context.contentResolver.getType(contentUri) ?: "*/*"
                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                    setDataAndType(dl.uri, mimeType)
+                    setDataAndType(contentUri, mimeType)
                     addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(intent)
@@ -279,7 +296,7 @@ fun SftpScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var showSortMenu by remember { mutableStateOf(false) }
-    var showTransfersMenu by remember { mutableStateOf(false) }
+    var showTransferSheet by remember { mutableStateOf(false) }
     var showFavoritesMenu by remember { mutableStateOf(false) }
     var pathEditMode by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf(TextFieldValue(currentPath)) }
@@ -417,7 +434,7 @@ fun SftpScreen(
                         
                         Box {
                             val activeCount = transfers.count { it.state == TransferState.DOWNLOADING || it.state == TransferState.PAUSED }
-                            IconButton(onClick = { showTransfersMenu = true }, enabled = canInteract) {
+                            IconButton(onClick = { showTransferSheet = true }) {
                                 BadgedBox(
                                     badge = {
                                         if (activeCount > 0) {
@@ -428,16 +445,6 @@ fun SftpScreen(
                                     Icon(Icons.Filled.Download, if (zh) "传输任务" else "Transfers")
                                 }
                             }
-                            TransfersDropdown(
-                                expanded = showTransfersMenu,
-                                transfers = transfers,
-                                zh = zh,
-                                onDismiss = { showTransfersMenu = false },
-                                onPause = { viewModel.pauseTransfer(it) },
-                                onResume = { viewModel.resumeTransfer(it) },
-                                onCancel = { viewModel.cancelTransfer(it) },
-                                onRemove = { viewModel.removeTransfer(it) },
-                            )
                         }
 
                         var showMoreMenu by remember { mutableStateOf(false) }
@@ -808,6 +815,50 @@ fun SftpScreen(
             }
         }
     }
+
+    if (showTransferSheet) {
+        val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showTransferSheet = false },
+            sheetState = sheetState,
+        ) {
+            TransferSheetContent(
+                transfers = transfers,
+                history = downloadHistory,
+                zh = zh,
+                connectedProfileIds = connectedProfiles.map { it.id }.toSet(),
+                onPause = { viewModel.pauseTransfer(it) },
+                onResume = { viewModel.resumeTransfer(it) },
+                onCancel = { viewModel.cancelTransfer(it) },
+                onRemove = { viewModel.removeTransfer(it) },
+                onResumeHistory = { viewModel.resumeHistoryRecord(it) },
+                onDeleteHistory = { viewModel.deleteHistoryRecord(it) },
+                onClearHistory = { viewModel.clearDownloadHistory() },
+                onOpenFile = { uriString ->
+                    try {
+                        val uri = android.net.Uri.parse(uriString)
+                        val contentUri = if (uri.scheme == "file") {
+                            androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                java.io.File(uri.path ?: ""),
+                            )
+                        } else {
+                            uri
+                        }
+                        val mimeType = context.contentResolver.getType(contentUri) ?: "*/*"
+                        val openIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                            setDataAndType(contentUri, mimeType)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(openIntent)
+                    } catch (_: Exception) {
+                        scope.launch { snackbarHostState.showSnackbar(noAppMessage) }
+                    }
+                },
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -1070,37 +1121,210 @@ private fun resolveFileVisual(entry: SftpEntry): FileVisual {
 }
 
 @Composable
-fun TransfersDropdown(
-    expanded: Boolean,
+fun TransferSheetContent(
     transfers: List<TransferTask>,
+    history: List<DownloadRecord>,
     zh: Boolean,
-    onDismiss: () -> Unit,
+    connectedProfileIds: Set<String>,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onResumeHistory: (String) -> Unit,
+    onDeleteHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onOpenFile: (String) -> Unit,
 ) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        modifier = androidx.compose.ui.Modifier.widthIn(max = 350.dp, min = 250.dp)
+    val activeIds = transfers.map { it.id }.toSet()
+    // Active section only shows tasks that are still in progress (or interrupted
+    // but still live). Completed/cancelled records are shown in history even if
+    // the live task hasn't been dismissed yet, so users see finished downloads
+    // immediately without having to remove them first.
+    val activeTransfers = transfers.filter {
+        it.state != TransferState.DONE && it.state != TransferState.CANCELLED
+    }
+    val historyItems = history.filter { record ->
+        record.state == TransferState.DONE.name ||
+            record.state == TransferState.CANCELLED.name ||
+            record.id !in activeIds
+    }
+    val hasActive = activeTransfers.isNotEmpty()
+    val hasHistory = historyItems.isNotEmpty()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
     ) {
-        if (transfers.isEmpty()) {
-            DropdownMenuItem(
-                text = { Text(if (zh) "没有活动的传输任务" else "No active transfers") },
-                onClick = { }
-            )
-        } else {
-            transfers.forEach { task ->
+        // Header
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (zh) "传输任务" else "Transfers",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (hasHistory) {
+                    TextButton(onClick = onClearHistory) {
+                        Text(if (zh) "清除历史" else "Clear history")
+                    }
+                }
+            }
+        }
+
+        // Active section
+        if (hasActive) {
+            item { SectionHeader(if (zh) "进行中" else "Active", activeTransfers.size) }
+            items(activeTransfers, key = { it.id }) { task ->
                 TransferItem(
                     task = task,
                     zh = zh,
+                    canResume = task.profileId in connectedProfileIds,
                     onPause = { onPause(task.id) },
                     onResume = { onResume(task.id) },
                     onCancel = { onCancel(task.id) },
-                    onRemove = { onRemove(task.id) }
+                    onRemove = { onRemove(task.id) },
                 )
             }
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp)) }
+        }
+
+        // History section
+        item { SectionHeader(if (zh) "历史记录" else "History", historyItems.size) }
+        if (!hasActive && !hasHistory) {
+            item {
+                Text(
+                    if (zh) "暂无传输记录" else "No transfer history",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        items(historyItems, key = { it.id }) { record ->
+            HistoryItem(
+                record = record,
+                zh = zh,
+                canResume = record.profileId in connectedProfileIds,
+                onResume = { onResumeHistory(record.id) },
+                onDelete = { onDeleteHistory(record.id) },
+                onOpen = { onOpenFile(record.localUri ?: "") },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(8.dp))
+        Text("($count)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun HistoryItem(
+    record: DownloadRecord,
+    zh: Boolean,
+    canResume: Boolean,
+    onResume: () -> Unit,
+    onDelete: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    val context = LocalContext.current
+    val state = runCatching { TransferState.valueOf(record.state) }.getOrDefault(TransferState.DONE)
+    val canOpen = !record.isUpload && !record.localUri.isNullOrEmpty() && state == TransferState.DONE
+    // DOWNLOADING here means a stale in-flight record (e.g. restore hasn't run
+    // or the task was removed from the live list) — treat it as resumable.
+    val isResumable = state == TransferState.PAUSED || state == TransferState.ERROR || state == TransferState.DOWNLOADING
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable(
+                enabled = canOpen,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onOpen,
+            ),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (record.isUpload) Icons.Filled.Upload else Icons.Filled.Download,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    record.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val sizeText = android.text.format.Formatter.formatFileSize(context, record.totalBytes)
+                val dateText = remember(record.updatedAt) {
+                    val pattern = if (zh) "MM-dd HH:mm" else "MMM dd HH:mm"
+                    java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault())
+                        .format(java.util.Date(record.updatedAt))
+                }
+                val transferredText = if (isResumable && record.totalBytes > 0) {
+                    val pct = (record.transferredBytes * 100 / record.totalBytes).coerceIn(0L, 100L)
+                    " · $pct%"
+                } else ""
+                Text(
+                    "$dateText · $sizeText$transferredText",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            // State badge + actions
+            when (state) {
+                TransferState.DONE -> {
+                    Text(if (zh) "完成" else "Done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+                TransferState.PAUSED, TransferState.ERROR, TransferState.DOWNLOADING -> {
+                    IconButton(onClick = onResume, enabled = canResume, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Filled.PlayArrow, if (zh) "续传" else "Resume")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    val stateLabel = when (state) {
+                        TransferState.PAUSED -> if (zh) "已暂停" else "Paused"
+                        TransferState.ERROR -> if (zh) "出错" else "Error"
+                        else -> if (zh) "进行中" else "Active"
+                    }
+                    Text(
+                        stateLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (state == TransferState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+                TransferState.CANCELLED -> {
+                    Text(if (zh) "已取消" else "Cancelled", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
+                }
+            }
+        }
+        if (isResumable && record.totalBytes > 0) {
+            val fraction = (record.transferredBytes.toFloat() / record.totalBytes).coerceIn(0f, 1f)
+            Spacer(Modifier.size(4.dp))
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -1109,6 +1333,7 @@ fun TransfersDropdown(
 fun TransferItem(
     task: TransferTask,
     zh: Boolean,
+    canResume: Boolean = true,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
@@ -1128,7 +1353,7 @@ fun TransferItem(
                     IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
                 }
                 TransferState.PAUSED, TransferState.ERROR -> {
-                    IconButton(onClick = onResume, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.PlayArrow, null) }
+                    IconButton(onClick = onResume, enabled = canResume, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.PlayArrow, null) }
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
                 }

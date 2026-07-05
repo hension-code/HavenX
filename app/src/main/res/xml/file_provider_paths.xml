@@ -3,4 +3,9 @@
     <cache-path
         name="sftp_preview"
         path="sftp_preview/" />
+    <!-- Public Downloads/HavenX directory where SFTP/SMB files are saved. -->
+    <external-path
+        name="haven_downloads"
+        path="Download/HavenX/" />
 </paths>
+

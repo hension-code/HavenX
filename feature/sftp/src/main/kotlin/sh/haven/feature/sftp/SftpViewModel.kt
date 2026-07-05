@@ -13,16 +13,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 import sh.haven.core.data.db.entities.ConnectionProfile
+import sh.haven.core.data.db.entities.DownloadRecord
 import sh.haven.core.data.preferences.UserPreferencesRepository
 import sh.haven.core.data.repository.ConnectionRepository
+import sh.haven.core.data.repository.DownloadRecordRepository
 import sh.haven.core.et.EtSessionManager
 import sh.haven.core.mosh.MoshSessionManager
 import sh.haven.core.smb.SmbClient
@@ -54,6 +58,7 @@ class SftpViewModel @Inject constructor(
     private val smbSessionManager: SmbSessionManager,
     private val repository: ConnectionRepository,
     private val preferencesRepository: UserPreferencesRepository,
+    private val downloadRecordRepository: DownloadRecordRepository,
     @ApplicationContext private val appContext: Context,
     private val transferManager: sh.haven.feature.sftp.transfer.SftpTransferManager,
 ) : ViewModel() {
@@ -95,6 +100,11 @@ class SftpViewModel @Inject constructor(
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
     val transfers: StateFlow<List<TransferTask>> = transferManager.transfers
+
+    /** Persistent transfer history (downloads + uploads), newest first. */
+    val downloadHistory: StateFlow<List<DownloadRecord>> =
+        downloadRecordRepository.observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _transferProgress = MutableStateFlow<TransferProgress?>(null)
     val transferProgress: StateFlow<TransferProgress?> = _transferProgress.asStateFlow()
@@ -567,6 +577,21 @@ class SftpViewModel @Inject constructor(
 
     fun removeTransfer(id: String) {
         transferManager.removeTransfer(id)
+    }
+
+    /** Resume an interrupted transfer that only exists in history (not the live list). */
+    fun resumeHistoryRecord(id: String) {
+        transferManager.resumeFromHistory(id)
+    }
+
+    /** Delete a single history record (and any matching live task). */
+    fun deleteHistoryRecord(id: String) {
+        transferManager.deleteHistoryRecord(id)
+    }
+
+    /** Remove all finished/cancelled records from history. */
+    fun clearDownloadHistory() {
+        transferManager.clearHistory()
     }
 
     fun deleteEntry(entry: SftpEntry) {
