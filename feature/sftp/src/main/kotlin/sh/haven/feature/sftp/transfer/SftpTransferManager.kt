@@ -49,6 +49,16 @@ class SftpTransferManager @Inject constructor(
     private val transferJobs = ConcurrentHashMap<String, Job>()
     /** Per-task timestamp of the last progress write to DB, for throttling. */
     private val lastPersistMs = ConcurrentHashMap<String, Long>()
+    /** Per-task timestamp of the last UI progress update, for throttling. */
+    private val lastUiUpdateMs = ConcurrentHashMap<String, Long>()
+    /** Per-task speed sampling state for smoothed throughput calculation. */
+    private val speedSamples = ConcurrentHashMap<String, SpeedSample>()
+
+    private data class SpeedSample(
+        var lastTimeMs: Long,
+        var lastBytes: Long,
+        var smoothedSpeed: Long = 0L,
+    )
 
     init {
         // Rebuild interrupted transfers (paused/errored) from DB so the user can
@@ -66,6 +76,8 @@ class SftpTransferManager @Inject constructor(
     }
 
     private fun startTransferJob(initialTask: TransferTask) {
+        speedSamples.remove(initialTask.id)
+        lastUiUpdateMs.remove(initialTask.id)
         ensureServiceState()
         val job = scope.launch {
             try {
@@ -78,9 +90,13 @@ class SftpTransferManager @Inject constructor(
                 // Ignore
             } catch (e: Exception) {
                 Log.e("SftpTransferManager", "Transfer failed: ${initialTask.fileName}", e)
-                updateTask(initialTask.id) { it.copy(state = TransferState.ERROR, error = e.message) }
+                updateTask(initialTask.id) {
+                    it.copy(state = TransferState.ERROR, error = e.message, speedBytesPerSec = 0L)
+                }
             } finally {
                 transferJobs.remove(initialTask.id)
+                speedSamples.remove(initialTask.id)
+                lastUiUpdateMs.remove(initialTask.id)
                 ensureServiceState()
             }
         }
@@ -104,12 +120,12 @@ class SftpTransferManager @Inject constructor(
                     if (isAppend && current > 0) {
                         client.downloadRange(entry.path, current, task.totalBytes - current, out) {
                             current += it
-                            updateTask(task.id) { t -> t.copy(transferredBytes = current) }
+                            reportProgress(task.id, current, task.totalBytes)
                             this@withContext.isActive
                         }
                     } else {
                         client.download(entry.path, out) { transferred, _ ->
-                            updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                            reportProgress(task.id, transferred, task.totalBytes)
                             this@withContext.isActive
                         }
                     }
@@ -126,7 +142,7 @@ class SftpTransferManager @Inject constructor(
                             override fun init(op: Int, src: String, dest: String, max: Long) {}
                             override fun count(bytes: Long): Boolean {
                                 transferred += bytes
-                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                                reportProgress(task.id, transferred, task.totalBytes)
                                 return this@withContext.isActive
                             }
                             override fun end() {}
@@ -144,7 +160,13 @@ class SftpTransferManager @Inject constructor(
         }
         val currentState = _transfers.value.find { it.id == task.id }?.state
         if (currentState == TransferState.DOWNLOADING) {
-            updateTask(task.id) { it.copy(state = TransferState.DONE) }
+            updateTask(task.id) {
+                it.copy(
+                    state = TransferState.DONE,
+                    transferredBytes = if (it.totalBytes > 0L) it.totalBytes else it.transferredBytes,
+                    speedBytesPerSec = 0L,
+                )
+            }
         }
     }
 
@@ -160,7 +182,7 @@ class SftpTransferManager @Inject constructor(
                     val client = smbSessionManager.getClientForProfile(task.profileId)
                         ?: throw IllegalStateException("SMB not connected")
                     client.upload(input, destPath, task.totalBytes) { transferred, _ ->
-                        updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                        reportProgress(task.id, transferred, task.totalBytes)
                         this@withContext.isActive
                     }
                 } else {
@@ -172,7 +194,7 @@ class SftpTransferManager @Inject constructor(
                             override fun init(op: Int, src: String, dest: String, max: Long) {}
                             override fun count(bytes: Long): Boolean {
                                 transferred += bytes
-                                updateTask(task.id) { t -> t.copy(transferredBytes = transferred) }
+                                reportProgress(task.id, transferred, task.totalBytes)
                                 return this@withContext.isActive
                             }
                             override fun end() {}
@@ -186,7 +208,13 @@ class SftpTransferManager @Inject constructor(
         }
         val currentState = _transfers.value.find { it.id == task.id }?.state
         if (currentState == TransferState.DOWNLOADING) {
-            updateTask(task.id) { it.copy(state = TransferState.DONE) }
+            updateTask(task.id) {
+                it.copy(
+                    state = TransferState.DONE,
+                    transferredBytes = if (it.totalBytes > 0L) it.totalBytes else it.transferredBytes,
+                    speedBytesPerSec = 0L,
+                )
+            }
         }
     }
 
@@ -228,6 +256,43 @@ class SftpTransferManager @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Throttled progress & smoothed speed reporting for active transfers.
+     * The first callback initializes the sampling baseline so resume offsets
+     * never produce artificial throughput spikes.
+     */
+    private fun reportProgress(id: String, transferredBytes: Long, totalBytes: Long) {
+        val now = System.currentTimeMillis()
+        val sample = speedSamples[id]
+        if (sample == null) {
+            speedSamples[id] = SpeedSample(lastTimeMs = now, lastBytes = transferredBytes)
+            lastUiUpdateMs[id] = now
+            updateTask(id) { it.copy(transferredBytes = transferredBytes) }
+            return
+        }
+
+        val lastUi = lastUiUpdateMs[id] ?: 0L
+        val reachedEnd = totalBytes > 0L && transferredBytes >= totalBytes
+        if (!reachedEnd && now - lastUi < UI_PROGRESS_INTERVAL_MS) return
+        lastUiUpdateMs[id] = now
+
+        val dt = now - sample.lastTimeMs
+        val deltaBytes = (transferredBytes - sample.lastBytes).coerceAtLeast(0L)
+        if (dt >= SPEED_SAMPLE_MIN_MS) {
+            val instantSpeed = (deltaBytes * 1000L) / dt
+            sample.smoothedSpeed = if (sample.smoothedSpeed == 0L) {
+                instantSpeed
+            } else {
+                (sample.smoothedSpeed * 7L + instantSpeed * 3L) / 10L
+            }
+            sample.lastTimeMs = now
+            sample.lastBytes = transferredBytes
+        }
+
+        val speed = sample.smoothedSpeed
+        updateTask(id) { it.copy(transferredBytes = transferredBytes, speedBytesPerSec = speed) }
     }
 
     private fun updateTask(id: String, update: (TransferTask) -> TransferTask) {
@@ -274,23 +339,51 @@ class SftpTransferManager @Inject constructor(
 
     fun pauseTransfer(id: String) {
         transferJobs[id]?.cancel()
-        updateTask(id) { it.copy(state = TransferState.PAUSED) }
+        speedSamples.remove(id)
+        lastUiUpdateMs.remove(id)
+        updateTask(id) { it.copy(state = TransferState.PAUSED, speedBytesPerSec = 0L) }
         ensureServiceState()
     }
 
     fun resumeTransfer(id: String) {
         val task = _transfers.value.find { it.id == id } ?: return
         val workingTask = if (task.isUpload) {
-            task.copy(state = TransferState.DOWNLOADING, error = null, transferredBytes = 0L)
+            task.copy(state = TransferState.DOWNLOADING, error = null, transferredBytes = 0L, speedBytesPerSec = 0L)
         } else {
-            task.copy(state = TransferState.DOWNLOADING, error = null)
+            task.copy(state = TransferState.DOWNLOADING, error = null, speedBytesPerSec = 0L)
         }
         updateTask(id) { workingTask }
         startTransferJob(workingTask)
     }
 
+    fun pauseAll() {
+        val activeIds = _transfers.value
+            .filter { it.state == TransferState.DOWNLOADING }
+            .map { it.id }
+        activeIds.forEach { pauseTransfer(it) }
+    }
+
+    fun resumeAll(connectedProfileIds: Set<String>) {
+        val resumableIds = _transfers.value
+            .filter {
+                (it.state == TransferState.PAUSED || it.state == TransferState.ERROR) &&
+                    it.profileId in connectedProfileIds
+            }
+            .map { it.id }
+        resumableIds.forEach { resumeTransfer(it) }
+    }
+
+    fun retryFailed(connectedProfileIds: Set<String>) {
+        val failedIds = _transfers.value
+            .filter { it.state == TransferState.ERROR && it.profileId in connectedProfileIds }
+            .map { it.id }
+        failedIds.forEach { resumeTransfer(it) }
+    }
+
     fun cancelTransfer(id: String) {
         transferJobs[id]?.cancel()
+        speedSamples.remove(id)
+        lastUiUpdateMs.remove(id)
         val task = _transfers.value.find { it.id == id }
         if (task != null) {
             // Keep the record in history as CANCELLED; just drop from the live list.
@@ -311,21 +404,55 @@ class SftpTransferManager @Inject constructor(
     fun removeTransfer(id: String) {
         // Only drops from the live (in-memory) list; the history row is retained.
         lastPersistMs.remove(id)
+        speedSamples.remove(id)
+        lastUiUpdateMs.remove(id)
         _transfers.value = _transfers.value.filter { it.id != id }
     }
 
-    /** Delete a history record and any matching live task. */
-    fun deleteHistoryRecord(id: String) {
+    /** Delete a history record and any matching live task, optionally deleting the local downloaded file. */
+    fun deleteHistoryRecord(id: String, deleteLocalFile: Boolean = false) {
         transferJobs[id]?.cancel()
         lastPersistMs.remove(id)
+        speedSamples.remove(id)
+        lastUiUpdateMs.remove(id)
         _transfers.value = _transfers.value.filter { it.id != id }
-        scope.launch { downloadRecordRepository.deleteById(id) }
+        scope.launch {
+            if (deleteLocalFile) {
+                val record = downloadRecordRepository.getById(id)
+                if (record != null && !record.isUpload) {
+                    deleteLocalFileIfPresent(record.localUri)
+                }
+            }
+            downloadRecordRepository.deleteById(id)
+        }
         ensureServiceState()
     }
 
-    /** Remove all finished/cancelled records from history. */
-    fun clearHistory() {
-        scope.launch { downloadRecordRepository.deleteCompleted() }
+    /** Remove all finished/cancelled records from history, optionally deleting downloaded local files. */
+    fun clearHistory(deleteLocalFiles: Boolean = false) {
+        scope.launch {
+            if (deleteLocalFiles) {
+                val completed = downloadRecordRepository.getCompletedDownloads()
+                completed.forEach { deleteLocalFileIfPresent(it.localUri) }
+            }
+            downloadRecordRepository.deleteCompleted()
+        }
+    }
+
+    private fun deleteLocalFileIfPresent(localUri: String?) {
+        if (localUri.isNullOrBlank()) return
+        runCatching {
+            val uri = Uri.parse(localUri)
+            when (uri.scheme) {
+                "file" -> uri.path?.let { path ->
+                    val file = File(path)
+                    if (file.exists()) file.delete()
+                }
+                "content" -> context.contentResolver.delete(uri, null, null)
+            }
+        }.onFailure { e ->
+            Log.w("SftpTransferManager", "Failed to delete local file: $localUri", e)
+        }
     }
 
     /**
@@ -463,6 +590,10 @@ class SftpTransferManager @Inject constructor(
     companion object {
         /** Minimum interval between progress DB writes per task. */
         private const val PROGRESS_PERSIST_INTERVAL_MS = 1000L
+        /** Minimum interval between UI state updates per task. */
+        private const val UI_PROGRESS_INTERVAL_MS = 250L
+        /** Minimum sampling window for smoothed speed updates. */
+        private const val SPEED_SAMPLE_MIN_MS = 250L
     }
 
     private fun openDedicatedSftpChannel(profileId: String): ChannelSftp? {

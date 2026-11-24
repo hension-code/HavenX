@@ -30,10 +30,25 @@ data class TransferTask(
     val entry: SftpEntry? = null,
     val profileId: String,
     val isSmb: Boolean,
-    val error: String? = null
+    val error: String? = null,
+    val speedBytesPerSec: Long = 0L,
 ) {
     val fraction: Float
         get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+
+    val progressPercent: Int
+        get() = (fraction * 100f).toInt().coerceIn(0, 100)
+
+    val remotePath: String
+        get() = entry?.path ?: destPath ?: ""
+
+    val etaSeconds: Long?
+        get() {
+            if (state != TransferState.DOWNLOADING || totalBytes <= 0L || speedBytesPerSec <= 0L) return null
+            val remaining = totalBytes - transferredBytes
+            if (remaining <= 0L) return 0L
+            return ((remaining + speedBytesPerSec - 1) / speedBytesPerSec).coerceAtLeast(1L)
+        }
 }
 
 data class TransferProgress(

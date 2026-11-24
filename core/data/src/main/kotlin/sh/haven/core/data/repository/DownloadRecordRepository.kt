@@ -28,6 +28,8 @@ class DownloadRecordRepository @Inject constructor(
 
     suspend fun deleteById(id: String) = dao.deleteById(id)
 
+    suspend fun getCompletedDownloads(): List<DownloadRecord> = dao.getCompletedDownloads()
+
     suspend fun deleteCompleted() = dao.deleteCompleted()
 
     suspend fun deleteOlderThan(olderThan: Long) = dao.deleteOlderThan(olderThan)

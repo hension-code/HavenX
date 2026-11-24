@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,6 +106,12 @@ class SftpViewModel @Inject constructor(
     val downloadHistory: StateFlow<List<DownloadRecord>> =
         downloadRecordRepository.observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Map of profileId -> display label for showing server origin on transfer cards. */
+    val profileNames: StateFlow<Map<String, String>> =
+        repository.observeAll()
+            .map { list -> list.associate { it.id to it.label } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val _transferProgress = MutableStateFlow<TransferProgress?>(null)
     val transferProgress: StateFlow<TransferProgress?> = _transferProgress.asStateFlow()
@@ -571,6 +578,20 @@ class SftpViewModel @Inject constructor(
         transferManager.resumeTransfer(id)
     }
 
+    fun pauseAllTransfers() {
+        transferManager.pauseAll()
+    }
+
+    fun resumeAllTransfers() {
+        val connectedIds = _connectedProfiles.value.map { it.id }.toSet()
+        transferManager.resumeAll(connectedIds)
+    }
+
+    fun retryFailedTransfers() {
+        val connectedIds = _connectedProfiles.value.map { it.id }.toSet()
+        transferManager.retryFailed(connectedIds)
+    }
+
     fun cancelTransfer(id: String) {
         transferManager.cancelTransfer(id)
     }
@@ -584,14 +605,14 @@ class SftpViewModel @Inject constructor(
         transferManager.resumeFromHistory(id)
     }
 
-    /** Delete a single history record (and any matching live task). */
-    fun deleteHistoryRecord(id: String) {
-        transferManager.deleteHistoryRecord(id)
+    /** Delete a single history record (and any matching live task), optionally removing local file. */
+    fun deleteHistoryRecord(id: String, deleteLocalFile: Boolean = false) {
+        transferManager.deleteHistoryRecord(id, deleteLocalFile)
     }
 
-    /** Remove all finished/cancelled records from history. */
-    fun clearDownloadHistory() {
-        transferManager.clearHistory()
+    /** Remove all finished/cancelled records from history, optionally removing local downloaded files. */
+    fun clearDownloadHistory(deleteLocalFiles: Boolean = false) {
+        transferManager.clearHistory(deleteLocalFiles)
     }
 
     fun deleteEntry(entry: SftpEntry) {

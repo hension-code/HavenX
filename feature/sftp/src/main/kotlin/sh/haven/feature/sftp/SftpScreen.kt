@@ -5,12 +5,24 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -21,6 +33,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -55,20 +68,24 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -100,6 +117,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -110,6 +129,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -163,6 +183,7 @@ fun SftpScreen(
     val loading by viewModel.loading.collectAsState()
     val transfers by viewModel.transfers.collectAsState()
     val downloadHistory by viewModel.downloadHistory.collectAsState()
+    val profileNames by viewModel.profileNames.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
     val error by viewModel.error.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -407,116 +428,155 @@ fun SftpScreen(
 
     Scaffold(
         topBar = {
-            Surface(shadowElevation = 2.dp) {
+            Surface(
+                tonalElevation = 2.dp,
+                shadowElevation = 1.dp,
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     val canInteract = activeProfileId != null
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        IconButton(onClick = { viewModel.goBack() }, enabled = canInteract && canGoBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                        }
-                        IconButton(onClick = { viewModel.goForward() }, enabled = canInteract && canGoForward) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.forward))
-                        }
-                        IconButton(onClick = { viewModel.navigateUp() }, enabled = canInteract && currentPath != "/") {
-                            Icon(Icons.Filled.ArrowUpward, stringResource(R.string.up))
-                        }
-                        IconButton(onClick = { viewModel.refresh() }, enabled = canInteract) {
-                            Icon(Icons.Filled.Refresh, stringResource(R.string.refresh))
-                        }
-                        
-                        Box {
-                            val activeCount = transfers.count { it.state == TransferState.DOWNLOADING || it.state == TransferState.PAUSED }
-                            IconButton(onClick = { showTransferSheet = true }) {
-                                BadgedBox(
-                                    badge = {
-                                        if (activeCount > 0) {
-                                            Badge { Text(activeCount.toString()) }
-                                        }
-                                    }
-                                ) {
-                                    Icon(Icons.Filled.Download, if (zh) "传输任务" else "Transfers")
-                                }
+                        // Left navigation group
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.goBack() },
+                                enabled = canInteract && canGoBack,
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                            }
+                            IconButton(
+                                onClick = { viewModel.goForward() },
+                                enabled = canInteract && canGoForward,
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.forward))
+                            }
+                            IconButton(
+                                onClick = { viewModel.navigateUp() },
+                                enabled = canInteract && currentPath != "/",
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(Icons.Filled.ArrowUpward, stringResource(R.string.up))
                             }
                         }
 
-                        var showMoreMenu by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { showMoreMenu = true }, enabled = canInteract) {
-                                Icon(Icons.Filled.MoreVert, if (zh) "更多" else "More")
-                            }
-                            
-                            androidx.compose.material3.DropdownMenu(
-                                expanded = showMoreMenu,
-                                onDismissRequest = { showMoreMenu = false }
+                        // Right tools group
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.refresh() },
+                                enabled = canInteract,
+                                modifier = Modifier.size(40.dp),
                             ) {
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(if (showHidden) stringResource(R.string.hide_hidden_files) else stringResource(R.string.show_hidden_files)) },
-                                    onClick = { 
-                                        viewModel.toggleShowHidden() 
-                                        showMoreMenu = false
+                                Icon(Icons.Filled.Refresh, stringResource(R.string.refresh))
+                            }
+
+                            Box {
+                                val activeCount = transfers.count {
+                                    it.state == TransferState.DOWNLOADING ||
+                                        it.state == TransferState.PAUSED ||
+                                        it.state == TransferState.ERROR
+                                }
+                                IconButton(
+                                    onClick = { showTransferSheet = true },
+                                    modifier = Modifier.size(40.dp),
+                                ) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (activeCount > 0) {
+                                                Badge { Text(activeCount.toString()) }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.SwapVert,
+                                            stringResource(R.string.transfer_manager_title),
+                                        )
+                                    }
+                                }
+                            }
+
+                            var showMoreMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(
+                                    onClick = { showMoreMenu = true },
+                                    enabled = canInteract,
+                                    modifier = Modifier.size(40.dp),
+                                ) {
+                                    Icon(Icons.Filled.MoreVert, if (zh) "更多" else "More")
+                                }
+
+                                androidx.compose.material3.DropdownMenu(
+                                    expanded = showMoreMenu,
+                                    onDismissRequest = { showMoreMenu = false }
+                                ) {
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(if (showHidden) stringResource(R.string.hide_hidden_files) else stringResource(R.string.show_hidden_files)) },
+                                        onClick = {
+                                            viewModel.toggleShowHidden()
+                                            showMoreMenu = false
+                                        },
+                                        leadingIcon = {
+                                            Icon(if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null)
+                                        }
+                                    )
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.sort)) },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showSortMenu = true
+                                        },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
+                                    )
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.favorite_folders)) },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showFavoritesMenu = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Filled.StarBorder, null) }
+                                    )
+                                }
+
+                                SortDropdown(
+                                    expanded = showSortMenu,
+                                    currentMode = sortMode,
+                                    zh = zh,
+                                    onDismiss = { showSortMenu = false },
+                                    onSelect = { mode ->
+                                        viewModel.setSortMode(mode)
+                                        showSortMenu = false
                                     },
-                                    leadingIcon = { 
-                                        Icon(if (showHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null) 
+                                )
+                                FavoritesDropdown(
+                                    expanded = showFavoritesMenu,
+                                    favorites = favoriteDirectories.toList().sorted(),
+                                    zh = zh,
+                                    onDismiss = { showFavoritesMenu = false },
+                                    onSelect = { path ->
+                                        viewModel.navigateTo(path)
+                                        showFavoritesMenu = false
+                                    },
+                                    onRemove = { path ->
+                                        viewModel.toggleFavoriteDirectory(path)
                                     }
                                 )
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.sort)) },
-                                    onClick = { 
-                                        showMoreMenu = false
-                                        showSortMenu = true 
-                                    },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
-                                )
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.favorite_folders)) },
-                                    onClick = { 
-                                        showMoreMenu = false
-                                        showFavoritesMenu = true 
-                                    },
-                                    leadingIcon = { Icon(Icons.Filled.StarBorder, null) }
-                                )
                             }
-                            
-                            // Nested dropdowns (their anchor is technically irrelevant as long as it draws)
-                            SortDropdown(
-                                expanded = showSortMenu,
-                                currentMode = sortMode,
-                                zh = zh,
-                                onDismiss = { showSortMenu = false },
-                                onSelect = { mode ->
-                                    viewModel.setSortMode(mode)
-                                    showSortMenu = false
-                                },
-                            )
-                            FavoritesDropdown(
-                                expanded = showFavoritesMenu,
-                                favorites = favoriteDirectories.toList().sorted(),
-                                zh = zh,
-                                onDismiss = { showFavoritesMenu = false },
-                                onSelect = { path ->
-                                    viewModel.navigateTo(path)
-                                    showFavoritesMenu = false
-                                },
-                                onRemove = { path ->
-                                    viewModel.toggleFavoriteDirectory(path)
-                                }
-                            )
                         }
                     }
-                    Spacer(modifier = Modifier.size(2.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (pathEditMode) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (pathEditMode) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             OutlinedTextField(
                                 value = pathInput,
                                 onValueChange = { pathInput = it },
@@ -536,6 +596,7 @@ fun SftpScreen(
                                             pathEditMode = false
                                         }
                                     },
+                                shape = RoundedCornerShape(12.dp),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                                 keyboardActions = KeyboardActions(onGo = {
@@ -562,51 +623,85 @@ fun SftpScreen(
                             ) {
                                 Icon(Icons.Filled.Close, stringResource(R.string.cancel))
                             }
-                        } else {
-                            BreadcrumbPathBar(
-                                path = currentPath,
-                                zh = zh,
-                                onSegmentClick = { segmentPath -> viewModel.navigateTo(segmentPath) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            IconButton(
-                                onClick = {
-                                    val editPath = ensureEditablePath(currentPath)
-                                    pathInput = TextFieldValue(
-                                        text = editPath,
-                                        selection = TextRange(editPath.length),
+                        }
+                    } else {
+                        // Modern pill-style address bar
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                BreadcrumbPathBar(
+                                    path = currentPath,
+                                    zh = zh,
+                                    onSegmentClick = { segmentPath -> viewModel.navigateTo(segmentPath) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val editPath = ensureEditablePath(currentPath)
+                                        pathInput = TextFieldValue(
+                                            text = editPath,
+                                            selection = TextRange(editPath.length),
+                                        )
+                                        pathEditorEverFocused = false
+                                        requestPathFocus = isActive
+                                        pathEditMode = true
+                                    },
+                                    enabled = activeProfileId != null,
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        stringResource(R.string.edit_path),
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    pathEditorEverFocused = false
-                                    requestPathFocus = isActive
-                                    pathEditMode = true
-                                },
-                                enabled = activeProfileId != null,
-                            ) {
-                                Icon(Icons.Filled.Edit, stringResource(R.string.edit_path))
-                            }
-                            IconButton(
-                                onClick = {
-                                    if (searchActive) {
-                                        exitSearch()
-                                    } else {
-                                        pathEditMode = false
-                                        searchActive = true
-                                        requestSearchFocus = isActive
-                                    }
-                                },
-                                enabled = activeProfileId != null,
-                            ) {
-                                Icon(Icons.Filled.Search, stringResource(R.string.search_files_folders))
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (searchActive) {
+                                            exitSearch()
+                                        } else {
+                                            pathEditMode = false
+                                            searchActive = true
+                                            requestSearchFocus = isActive
+                                        }
+                                    },
+                                    enabled = activeProfileId != null,
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Search,
+                                        stringResource(R.string.search_files_folders),
+                                        modifier = Modifier.size(19.dp),
+                                        tint = if (searchActive) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
-                    if (searchActive) {
+                    AnimatedVisibility(
+                        visible = searchActive,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp)
+                                .padding(top = 6.dp)
                                 .focusRequester(searchFocusRequester)
                                 .onGloballyPositioned {
                                     if (isActive && searchActive && requestSearchFocus) {
@@ -615,6 +710,7 @@ fun SftpScreen(
                                         requestSearchFocus = false
                                     }
                                 },
+                            shape = RoundedCornerShape(12.dp),
                             singleLine = true,
                             placeholder = { Text(stringResource(R.string.search_current_directory)) },
                             leadingIcon = {
@@ -699,6 +795,20 @@ fun SftpScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
+            val runningTransfers = remember(transfers) {
+                transfers.filter { it.state == TransferState.DOWNLOADING }
+            }
+            AnimatedVisibility(
+                visible = runningTransfers.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                MiniTransferBar(
+                    runningTransfers = runningTransfers,
+                    onClick = { showTransferSheet = true },
+                )
+            }
+
             if (connectedProfiles.isEmpty()) {
                 EmptyState(zh = zh)
             } else {
@@ -723,20 +833,7 @@ fun SftpScreen(
 
                 // File list
                 if (visibleEntries.isEmpty() && !loading && !searchLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            if (!isSearching) {
-                                stringResource(R.string.empty_directory)
-                            } else {
-                                stringResource(R.string.no_search_results)
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    DirectoryEmptyState(isSearching = isSearching)
                 } else {
                     var entryToDelete by remember { mutableStateOf<SftpEntry?>(null) }
 
@@ -767,7 +864,10 @@ fun SftpScreen(
                         )
                     }
 
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 84.dp),
+                    ) {
                         items(visibleEntries, key = { it.path }) { entry ->
                             val pathCopiedMsg = stringResource(R.string.path_copied)
                             FileListItem(
@@ -809,6 +909,11 @@ fun SftpScreen(
                                 },
                                 zh = zh,
                             )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 68.dp, end = 16.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                            )
                         }
                     }
                 }
@@ -818,46 +923,72 @@ fun SftpScreen(
 
     if (showTransferSheet) {
         val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val pathCopiedMsg = stringResource(R.string.path_copied)
+        val shareChooserTitle = stringResource(R.string.transfer_action_share)
         ModalBottomSheet(
             onDismissRequest = { showTransferSheet = false },
             sheetState = sheetState,
         ) {
-            TransferSheetContent(
+            TransferManagerSheetContent(
                 transfers = transfers,
                 history = downloadHistory,
-                zh = zh,
                 connectedProfileIds = connectedProfiles.map { it.id }.toSet(),
+                profileNames = profileNames,
                 onPause = { viewModel.pauseTransfer(it) },
                 onResume = { viewModel.resumeTransfer(it) },
                 onCancel = { viewModel.cancelTransfer(it) },
-                onRemove = { viewModel.removeTransfer(it) },
+                onPauseAll = { viewModel.pauseAllTransfers() },
+                onResumeAll = { viewModel.resumeAllTransfers() },
+                onRetryFailed = { viewModel.retryFailedTransfers() },
                 onResumeHistory = { viewModel.resumeHistoryRecord(it) },
-                onDeleteHistory = { viewModel.deleteHistoryRecord(it) },
-                onClearHistory = { viewModel.clearDownloadHistory() },
+                onDeleteHistory = { id, deleteLocalFile -> viewModel.deleteHistoryRecord(id, deleteLocalFile) },
+                onClearHistory = { deleteLocalFiles -> viewModel.clearDownloadHistory(deleteLocalFiles) },
                 onOpenFile = { uriString ->
                     try {
-                        val uri = android.net.Uri.parse(uriString)
-                        val contentUri = if (uri.scheme == "file") {
-                            androidx.core.content.FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                java.io.File(uri.path ?: ""),
-                            )
-                        } else {
-                            uri
-                        }
+                        val contentUri = resolveShareableUri(context, uriString)
                         val mimeType = context.contentResolver.getType(contentUri) ?: "*/*"
-                        val openIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        val openIntent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(contentUri, mimeType)
-                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         context.startActivity(openIntent)
                     } catch (_: Exception) {
                         scope.launch { snackbarHostState.showSnackbar(noAppMessage) }
                     }
                 },
+                onShareFile = { uriString ->
+                    try {
+                        val contentUri = resolveShareableUri(context, uriString)
+                        val mimeType = context.contentResolver.getType(contentUri) ?: "*/*"
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = mimeType
+                            putExtra(Intent.EXTRA_STREAM, contentUri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, shareChooserTitle))
+                    } catch (_: Exception) {
+                        scope.launch { snackbarHostState.showSnackbar(noAppMessage) }
+                    }
+                },
+                onCopyRemotePath = { remotePath ->
+                    clipboardManager.setText(AnnotatedString(remotePath))
+                    scope.launch { snackbarHostState.showSnackbar(pathCopiedMsg) }
+                },
             )
         }
+    }
+}
+
+private fun resolveShareableUri(context: android.content.Context, uriString: String): android.net.Uri {
+    val uri = android.net.Uri.parse(uriString)
+    return if (uri.scheme == "file") {
+        androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            java.io.File(uri.path ?: ""),
+        )
+    } else {
+        uri
     }
 }
 
@@ -881,11 +1012,21 @@ private fun FileListItem(
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     Box(modifier = Modifier.fillMaxWidth()) {
         val fileVisual = remember(entry.name, entry.isDirectory) { resolveFileVisual(entry) }
+        val iconTint = fileVisual.tintColor(MaterialTheme.colorScheme)
         ListItem(
-            headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            headlineContent = {
+                Text(
+                    text = entry.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
             supportingContent = {
                 val sizeText = if (entry.isDirectory) {
                     stringResource(R.string.directory)
@@ -895,42 +1036,84 @@ private fun FileListItem(
                 val dateText = dateFormat.format(Date(entry.modifiedTime * 1000))
                 val parentPath = entry.path.substringBeforeLast('/', "/")
                 val details = if (showPath) {
-                    "$sizeText  $dateText\n$parentPath"
+                    "$sizeText · $dateText\n$parentPath"
                 } else {
-                    "$sizeText  $dateText"
+                    "$sizeText · $dateText"
                 }
-                Text(details, maxLines = if (showPath) 2 else 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (showPath) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             },
             leadingContent = {
-                Icon(
-                    imageVector = fileVisual.icon,
-                    contentDescription = if (zh) fileVisual.zhLabel else fileVisual.enLabel,
-                    tint = fileVisual.tintColor(MaterialTheme.colorScheme),
-                )
-            },
-            trailingContent = {
-                if (entry.isDirectory && isFavoriteDirectory) {
-                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.favorite))
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(iconTint.copy(alpha = 0.13f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = fileVisual.icon,
+                        contentDescription = if (zh) fileVisual.zhLabel else fileVisual.enLabel,
+                        tint = iconTint,
+                        modifier = Modifier.size(21.dp),
+                    )
                 }
             },
-            modifier = Modifier.pointerInput(entry.name) {
-                detectTapGestures(
-                    onTap = {
-                        if (entry.isDirectory) {
-                            onTap()
-                        } else if (isMediaPreviewSupported(entry.name)) {
-                            onPreview()
+            trailingContent = {
+                if (entry.isDirectory) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isFavoriteDirectory) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = stringResource(R.string.favorite),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
                         }
-                    },
-                    onLongPress = { offset ->
-                        pressOffset = androidx.compose.ui.unit.DpOffset(
-                            x = with(density) { offset.x.toDp() },
-                            y = with(density) { offset.y.toDp() }
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            modifier = Modifier.size(18.dp),
                         )
-                        showMenu = true
                     }
-                )
+                }
             },
+            modifier = Modifier
+                .indication(interactionSource, ripple())
+                .pointerInput(entry.path) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val press = PressInteraction.Press(offset)
+                            interactionSource.emit(press)
+                            val released = tryAwaitRelease()
+                            interactionSource.emit(
+                                if (released) PressInteraction.Release(press)
+                                else PressInteraction.Cancel(press)
+                            )
+                        },
+                        onTap = {
+                            if (entry.isDirectory) {
+                                onTap()
+                            } else if (isMediaPreviewSupported(entry.name)) {
+                                onPreview()
+                            }
+                        },
+                        onLongPress = { offset ->
+                            pressOffset = androidx.compose.ui.unit.DpOffset(
+                                x = with(density) { offset.x.toDp() },
+                                y = with(density) { offset.y.toDp() }
+                            )
+                            showMenu = true
+                        }
+                    )
+                },
         )
 
         if (showMenu) {
@@ -1039,15 +1222,18 @@ private fun PopupMenuRow(
     }
 }
 
-private data class FileVisual(
+internal data class FileVisual(
     val icon: ImageVector,
     val zhLabel: String,
     val enLabel: String,
     val tintColor: (androidx.compose.material3.ColorScheme) -> androidx.compose.ui.graphics.Color,
 )
 
-private fun resolveFileVisual(entry: SftpEntry): FileVisual {
-    if (entry.isDirectory) {
+internal fun resolveFileVisual(entry: SftpEntry): FileVisual =
+    resolveFileVisualByName(entry.name, entry.isDirectory)
+
+internal fun resolveFileVisualByName(name: String, isDirectory: Boolean = false): FileVisual {
+    if (isDirectory) {
         return FileVisual(
             icon = Icons.Filled.Folder,
             zhLabel = "文件夹",
@@ -1056,7 +1242,7 @@ private fun resolveFileVisual(entry: SftpEntry): FileVisual {
         )
     }
 
-    val ext = entry.name.substringAfterLast('.', "").lowercase()
+    val ext = name.substringAfterLast('.', "").lowercase()
     val imageExt = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "svg")
     val videoExt = setOf("mp4", "m4v", "mkv", "mov", "avi", "webm", "ts")
     val audioExt = setOf("mp3", "wav", "flac", "aac", "m4a", "ogg", "opus")
@@ -1121,264 +1307,6 @@ private fun resolveFileVisual(entry: SftpEntry): FileVisual {
 }
 
 @Composable
-fun TransferSheetContent(
-    transfers: List<TransferTask>,
-    history: List<DownloadRecord>,
-    zh: Boolean,
-    connectedProfileIds: Set<String>,
-    onPause: (String) -> Unit,
-    onResume: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onResumeHistory: (String) -> Unit,
-    onDeleteHistory: (String) -> Unit,
-    onClearHistory: () -> Unit,
-    onOpenFile: (String) -> Unit,
-) {
-    val activeIds = transfers.map { it.id }.toSet()
-    // Active section only shows tasks that are still in progress (or interrupted
-    // but still live). Completed/cancelled records are shown in history even if
-    // the live task hasn't been dismissed yet, so users see finished downloads
-    // immediately without having to remove them first.
-    val activeTransfers = transfers.filter {
-        it.state != TransferState.DONE && it.state != TransferState.CANCELLED
-    }
-    val historyItems = history.filter { record ->
-        record.state == TransferState.DONE.name ||
-            record.state == TransferState.CANCELLED.name ||
-            record.id !in activeIds
-    }
-    val hasActive = activeTransfers.isNotEmpty()
-    val hasHistory = historyItems.isNotEmpty()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
-        contentPadding = PaddingValues(bottom = 16.dp),
-    ) {
-        // Header
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    if (zh) "传输任务" else "Transfers",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (hasHistory) {
-                    TextButton(onClick = onClearHistory) {
-                        Text(if (zh) "清除历史" else "Clear history")
-                    }
-                }
-            }
-        }
-
-        // Active section
-        if (hasActive) {
-            item { SectionHeader(if (zh) "进行中" else "Active", activeTransfers.size) }
-            items(activeTransfers, key = { it.id }) { task ->
-                TransferItem(
-                    task = task,
-                    zh = zh,
-                    canResume = task.profileId in connectedProfileIds,
-                    onPause = { onPause(task.id) },
-                    onResume = { onResume(task.id) },
-                    onCancel = { onCancel(task.id) },
-                    onRemove = { onRemove(task.id) },
-                )
-            }
-            item { HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp)) }
-        }
-
-        // History section
-        item { SectionHeader(if (zh) "历史记录" else "History", historyItems.size) }
-        if (!hasActive && !hasHistory) {
-            item {
-                Text(
-                    if (zh) "暂无传输记录" else "No transfer history",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-        items(historyItems, key = { it.id }) { record ->
-            HistoryItem(
-                record = record,
-                zh = zh,
-                canResume = record.profileId in connectedProfileIds,
-                onResume = { onResumeHistory(record.id) },
-                onDelete = { onDeleteHistory(record.id) },
-                onOpen = { onOpenFile(record.localUri ?: "") },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(8.dp))
-        Text("($count)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun HistoryItem(
-    record: DownloadRecord,
-    zh: Boolean,
-    canResume: Boolean,
-    onResume: () -> Unit,
-    onDelete: () -> Unit,
-    onOpen: () -> Unit,
-) {
-    val context = LocalContext.current
-    val state = runCatching { TransferState.valueOf(record.state) }.getOrDefault(TransferState.DONE)
-    val canOpen = !record.isUpload && !record.localUri.isNullOrEmpty() && state == TransferState.DONE
-    // DOWNLOADING here means a stale in-flight record (e.g. restore hasn't run
-    // or the task was removed from the live list) — treat it as resumable.
-    val isResumable = state == TransferState.PAUSED || state == TransferState.ERROR || state == TransferState.DOWNLOADING
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(
-                enabled = canOpen,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onOpen,
-            ),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                if (record.isUpload) Icons.Filled.Upload else Icons.Filled.Download,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    record.fileName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val sizeText = android.text.format.Formatter.formatFileSize(context, record.totalBytes)
-                val dateText = remember(record.updatedAt) {
-                    val pattern = if (zh) "MM-dd HH:mm" else "MMM dd HH:mm"
-                    java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault())
-                        .format(java.util.Date(record.updatedAt))
-                }
-                val transferredText = if (isResumable && record.totalBytes > 0) {
-                    val pct = (record.transferredBytes * 100 / record.totalBytes).coerceIn(0L, 100L)
-                    " · $pct%"
-                } else ""
-                Text(
-                    "$dateText · $sizeText$transferredText",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            // State badge + actions
-            when (state) {
-                TransferState.DONE -> {
-                    Text(if (zh) "完成" else "Done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-                TransferState.PAUSED, TransferState.ERROR, TransferState.DOWNLOADING -> {
-                    IconButton(onClick = onResume, enabled = canResume, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Filled.PlayArrow, if (zh) "续传" else "Resume")
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    val stateLabel = when (state) {
-                        TransferState.PAUSED -> if (zh) "已暂停" else "Paused"
-                        TransferState.ERROR -> if (zh) "出错" else "Error"
-                        else -> if (zh) "进行中" else "Active"
-                    }
-                    Text(
-                        stateLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (state == TransferState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-                TransferState.CANCELLED -> {
-                    Text(if (zh) "已取消" else "Cancelled", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-            }
-        }
-        if (isResumable && record.totalBytes > 0) {
-            val fraction = (record.transferredBytes.toFloat() / record.totalBytes).coerceIn(0f, 1f)
-            Spacer(Modifier.size(4.dp))
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-fun TransferItem(
-    task: TransferTask,
-    zh: Boolean,
-    canResume: Boolean = true,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onCancel: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    val context = LocalContext.current
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (task.isUpload) Icons.Filled.Upload else Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(task.fileName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(8.dp))
-            when (task.state) {
-                TransferState.DOWNLOADING -> {
-                    IconButton(onClick = onPause, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Pause, null) }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-                TransferState.PAUSED, TransferState.ERROR -> {
-                    IconButton(onClick = onResume, enabled = canResume, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.PlayArrow, null) }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-                TransferState.DONE, TransferState.CANCELLED -> {
-                    IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, null) }
-                }
-            }
-        }
-        Spacer(modifier = Modifier.size(4.dp))
-        androidx.compose.material3.LinearProgressIndicator(progress = { task.fraction }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.size(2.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            val statusText = when (task.state) {
-                TransferState.DOWNLOADING -> "${android.text.format.Formatter.formatFileSize(context, task.transferredBytes)} / ${android.text.format.Formatter.formatFileSize(context, task.totalBytes)}"
-                TransferState.PAUSED -> if (zh) "已暂停" else "Paused"
-                TransferState.ERROR -> if (zh) "出错" else "Error"
-                TransferState.DONE -> if (zh) "完成" else "Done"
-                TransferState.CANCELLED -> if (zh) "已取消" else "Cancelled"
-            }
-            Text(statusText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun FavoritesDropdown(
     expanded: Boolean,
     favorites: List<String>,
@@ -1431,28 +1359,50 @@ private fun BreadcrumbPathBar(
 ) {
     val scroll = rememberScrollState()
     val segments = remember(path) { buildPathSegments(path) }
+    LaunchedEffect(path) {
+        scroll.animateScrollTo(scroll.maxValue)
+    }
     Row(
-        modifier = modifier.horizontalScroll(scroll),
+        modifier = modifier
+            .horizontalScroll(scroll)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         segments.forEachIndexed { index, segment ->
+            val isLast = index == segments.lastIndex
             if (index == 0) {
-                Icon(
-                    imageVector = Icons.Filled.Home,
-                    contentDescription = stringResource(R.string.root),
-                    tint = MaterialTheme.colorScheme.primary,
+                Box(
                     modifier = Modifier
-                        .size(18.dp)
-                        .clickable { onSegmentClick(segment.second) },
-                )
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onSegmentClick(segment.second) }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Home,
+                        contentDescription = stringResource(R.string.root),
+                        tint = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
             } else {
-                Text("  >  ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier.size(16.dp),
+                )
                 Text(
                     text = segment.first,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onSegmentClick(segment.second) },
+                    color = if (isLast) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onSegmentClick(segment.second) }
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
                 )
             }
         }
@@ -1511,29 +1461,183 @@ private fun SortDropdown(
 }
 
 @Composable
-private fun EmptyState(zh: Boolean) {
+private fun MiniTransferBar(
+    runningTransfers: List<TransferTask>,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val single = runningTransfers.singleOrNull()
+    val totalSpeed = runningTransfers.sumOf { it.speedBytesPerSec }
+    val knownTotal = runningTransfers.filter { it.totalBytes > 0L }.sumOf { it.totalBytes }
+    val knownTransferred = runningTransfers.filter { it.totalBytes > 0L }.sumOf {
+        it.transferredBytes.coerceAtMost(it.totalBytes)
+    }
+    val rawFraction = if (knownTotal > 0L) (knownTransferred.toFloat() / knownTotal).coerceIn(0f, 1f) else 0f
+    val animatedFraction by animateFloatAsState(targetValue = rawFraction, label = "miniTransferProgress")
+
+    val icon = when {
+        single == null -> Icons.Filled.SwapVert
+        single.isUpload -> Icons.Filled.ArrowUpward
+        else -> Icons.Filled.ArrowDownward
+    }
+    val title = single?.fileName ?: stringResource(R.string.transfer_summary_active, runningTransfers.size)
+    val meta = buildList {
+        if (totalSpeed > 0L) add("${Formatter.formatShortFileSize(context, totalSpeed)}/s")
+        if (knownTotal > 0L) add("${(rawFraction * 100f).toInt()}%")
+    }.joinToString(" · ")
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(12.dp),
+            )
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (meta.isNotEmpty()) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            if (knownTotal > 0L) {
+                LinearProgressIndicator(
+                    progress = { animatedFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.5.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    strokeCap = StrokeCap.Round,
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.5.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    strokeCap = StrokeCap.Round,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DirectoryEmptyState(isSearching: Boolean) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            Icons.Filled.Folder,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (isSearching) Icons.Filled.SearchOff else Icons.Filled.FolderOpen,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(if (isSearching) R.string.no_search_results else R.string.empty_directory),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun EmptyState(zh: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Folder,
+                contentDescription = null,
+                modifier = Modifier.size(34.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(
             stringResource(R.string.sftp_file_browser),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 16.dp),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 18.dp),
         )
         Text(
             stringResource(R.string.connect_to_a_server_to),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }

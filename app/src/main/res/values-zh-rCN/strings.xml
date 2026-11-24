@@ -19,4 +19,24 @@
     <string name="previous_match">上一个匹配</string>
     <string name="next_match">下一个匹配</string>
     <string name="no_text_matches">无匹配</string>
+
+    <!-- 文本编辑器增强 -->
+    <string name="editor_save">保存</string>
+    <string name="editor_more">更多</string>
+    <string name="editor_font_size">字号</string>
+    <string name="editor_increase_font">增大字号</string>
+    <string name="editor_decrease_font">减小字号</string>
+    <string name="editor_show_line_numbers">显示行号</string>
+    <string name="editor_hide_line_numbers">隐藏行号</string>
+    <string name="editor_go_to_line">跳转到行</string>
+    <string name="editor_go_to_line_hint">输入行号 (1 - %1$d)</string>
+    <string name="editor_jump">跳转</string>
+    <string name="editor_cancel">取消</string>
+    <string name="editor_unsaved_title">有未保存的修改</string>
+    <string name="editor_unsaved_message">文件“%1$s”已修改，退出前是否保存？</string>
+    <string name="editor_discard">放弃修改</string>
+    <string name="editor_save_and_exit">保存并退出</string>
+    <string name="editor_status_position">第 %1$d 行, 第 %2$d 列</string>
+    <string name="editor_status_lines">共 %1$d 行</string>
+    <string name="editor_status_chars">%1$d 字符</string>
 </resources>

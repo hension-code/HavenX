@@ -47,6 +47,10 @@ interface DownloadRecordDao {
     @Query("DELETE FROM download_records WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    /** Completed/cancelled download records, used when clearing history with local files. */
+    @Query("SELECT * FROM download_records WHERE isUpload = 0 AND state IN ('DONE','CANCELLED')")
+    suspend fun getCompletedDownloads(): List<DownloadRecord>
+
     /** Remove finished/cancelled records, keeping only interrupted ones. */
     @Query("DELETE FROM download_records WHERE state IN ('DONE','CANCELLED')")
     suspend fun deleteCompleted()

@@ -19,4 +19,24 @@
     <string name="previous_match">Previous match</string>
     <string name="next_match">Next match</string>
     <string name="no_text_matches">No matches</string>
+
+    <!-- Text editor enhancements -->
+    <string name="editor_save">Save</string>
+    <string name="editor_more">More</string>
+    <string name="editor_font_size">Font size</string>
+    <string name="editor_increase_font">Increase font size</string>
+    <string name="editor_decrease_font">Decrease font size</string>
+    <string name="editor_show_line_numbers">Show line numbers</string>
+    <string name="editor_hide_line_numbers">Hide line numbers</string>
+    <string name="editor_go_to_line">Go to line</string>
+    <string name="editor_go_to_line_hint">Line number (1 - %1$d)</string>
+    <string name="editor_jump">Jump</string>
+    <string name="editor_cancel">Cancel</string>
+    <string name="editor_unsaved_title">Unsaved changes</string>
+    <string name="editor_unsaved_message">You have unsaved changes in \"%1$s\". What would you like to do?</string>
+    <string name="editor_discard">Discard</string>
+    <string name="editor_save_and_exit">Save &amp; exit</string>
+    <string name="editor_status_position">Ln %1$d, Col %2$d</string>
+    <string name="editor_status_lines">%1$d lines</string>
+    <string name="editor_status_chars">%1$d chars</string>
 </resources>
