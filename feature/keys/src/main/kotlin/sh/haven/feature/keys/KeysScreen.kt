@@ -6,17 +6,28 @@ import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -25,21 +36,30 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
@@ -47,21 +67,28 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import sh.haven.core.data.db.entities.SshKey
 import sh.haven.core.security.SshKeyGenerator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun KeysScreen(
     viewModel: KeysViewModel = hiltViewModel(),
@@ -80,6 +107,7 @@ fun KeysScreen(
     var contextMenuKeyId by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -121,6 +149,18 @@ fun KeysScreen(
     }
 
     Scaffold(
+        topBar = {
+            Surface(tonalElevation = 2.dp, shadowElevation = 1.dp) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = if (zh) "SSH 密钥" else "SSH Keys",
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddKeyDialog = true }) {
@@ -140,121 +180,227 @@ fun KeysScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(
-                    Icons.Filled.VpnKey,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.VpnKey,
+                        contentDescription = null,
+                        modifier = Modifier.size(34.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(
                     stringResource(R.string.no_ssh_keys),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 16.dp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 18.dp),
                 )
                 Text(
                     stringResource(R.string.tap_to_generate_or_import),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
+                Spacer(Modifier.height(20.dp))
+                FilledTonalButton(onClick = { showAddKeyDialog = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.add_key))
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 88.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(keys, key = { it.id }) { sshKey ->
-                    Box {
-                        ListItem(
-                            modifier = Modifier.combinedClickable(
-                                onClick = {
-                                    copyPublicKey(context, sshKey)
-                                },
-                                onLongClick = {
-                                    contextMenuKeyId = sshKey.id
-                                },
-                            ),
-                            headlineContent = { Text(sshKey.label) },
-                            supportingContent = {
-                                Column {
-                                    Text(
-                                        sshKey.keyType,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    Text(
-                                        sshKey.fingerprintSha256,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            trailingContent = {
-                                Text(
-                                    formatDate(sshKey.createdAt),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    if (sshKey.keyType.startsWith("sk-"))
-                                        Icons.Filled.Key
-                                    else
-                                        Icons.Filled.VpnKey,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                        )
-
-                        DropdownMenu(
-                            expanded = contextMenuKeyId == sshKey.id,
-                            onDismissRequest = { contextMenuKeyId = null },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.copy_public_key)) },
-                                onClick = {
-                                    copyPublicKey(context, sshKey)
-                                    contextMenuKeyId = null
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
-                                },
+                    val isHardwareKey = sshKey.keyType.startsWith("sk-")
+                    val keyTint = if (isHardwareKey) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                    val copiedMsg = if (zh) "公钥已复制到剪贴板" else "Public key copied"
+                    ElevatedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+                                shape = RoundedCornerShape(16.dp),
                             )
-                            if (!sshKey.keyType.startsWith("sk-")) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.export_private_key)) },
-                                    onClick = {
-                                        contextMenuKeyId = null
-                                        viewModel.requestExport(sshKey.id)
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.FileDownload, contentDescription = null)
-                                    },
+                            .combinedClickable(
+                                onClick = {
+                                    copyPublicKey(context, sshKey)
+                                    scope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        snackbarHostState.showSnackbar(copiedMsg)
+                                    }
+                                },
+                                onLongClick = { contextMenuKeyId = sshKey.id },
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(keyTint.copy(alpha = 0.13f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = if (isHardwareKey) Icons.Filled.Key else Icons.Filled.VpnKey,
+                                    contentDescription = null,
+                                    tint = keyTint,
+                                    modifier = Modifier.size(21.dp),
                                 )
                             }
-                            DropdownMenuItem(
-                                text = {
-                                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
-                                },
-                                onClick = {
-                                    viewModel.deleteKey(sshKey.id)
-                                    contextMenuKeyId = null
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Text(
+                                        text = sshKey.label,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false),
                                     )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                                    ) {
+                                        Text(
+                                            text = sshKey.keyType.removePrefix("ssh-").uppercase(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    text = sshKey.fingerprintSha256,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = formatDate(sshKey.createdAt),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                )
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            FilledTonalIconButton(
+                                onClick = {
+                                    copyPublicKey(context, sshKey)
+                                    scope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        snackbarHostState.showSnackbar(copiedMsg)
+                                    }
                                 },
-                            )
+                                modifier = Modifier.size(38.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = stringResource(R.string.copy_public_key),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Box {
+                                IconButton(
+                                    onClick = { contextMenuKeyId = sshKey.id },
+                                    modifier = Modifier.size(38.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MoreVert,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = contextMenuKeyId == sshKey.id,
+                                    onDismissRequest = { contextMenuKeyId = null },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.copy_public_key)) },
+                                        onClick = {
+                                            copyPublicKey(context, sshKey)
+                                            contextMenuKeyId = null
+                                            scope.launch {
+                                                snackbarHostState.currentSnackbarData?.dismiss()
+                                                snackbarHostState.showSnackbar(copiedMsg)
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                                        },
+                                    )
+                                    if (!isHardwareKey) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.export_private_key)) },
+                                            onClick = {
+                                                contextMenuKeyId = null
+                                                viewModel.requestExport(sshKey.id)
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Filled.FileDownload, contentDescription = null)
+                                            },
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                                        },
+                                        onClick = {
+                                            viewModel.deleteKey(sshKey.id)
+                                            contextMenuKeyId = null
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Delete,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                            )
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -370,7 +516,7 @@ private fun AddKeyChooser(
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GenerateKeyDialog(
     zh: Boolean,
@@ -379,48 +525,43 @@ private fun GenerateKeyDialog(
 ) {
     var label by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(SshKeyGenerator.KeyType.ED25519) }
-    var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.generate_ssh_key)) },
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                text = stringResource(R.string.generate_ssh_key),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
                     label = { Text(stringResource(R.string.label)) },
                     placeholder = { Text(stringResource(R.string.e_g_my_server)) },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                Box(modifier = Modifier.padding(top = 16.dp)) {
-                    OutlinedTextField(
-                        value = selectedType.displayName,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.key_type)) },
-                        modifier = Modifier
-                            .fillMaxWidth(),
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = stringResource(R.string.key_type),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // Invisible clickable overlay to open dropdown
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .combinedClickable(onClick = { expanded = true }),
-                    )
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         SshKeyGenerator.KeyType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.displayName) },
-                                onClick = {
-                                    selectedType = type
-                                    expanded = false
-                                },
+                            FilterChip(
+                                selected = selectedType == type,
+                                onClick = { selectedType = type },
+                                label = { Text(type.displayName) },
                             )
                         }
                     }

@@ -6,10 +6,23 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,17 +43,30 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cable
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Password
+import androidx.compose.material.icons.filled.ScreenShare
 import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material.icons.filled.Laptop
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -495,7 +521,16 @@ fun ConnectionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.connections)) })
+            Surface(tonalElevation = 2.dp, shadowElevation = 1.dp) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.connections),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -510,14 +545,64 @@ fun ConnectionsScreen(
                 .padding(innerPadding),
         ) {
             val quickConnectError = stringResource(R.string.use_format_user_host_or)
-            // Quick connect bar
-            OutlinedTextField(
-                value = quickConnectText,
-                onValueChange = { quickConnectText = it },
-                placeholder = { Text(stringResource(R.string.user_host_or_host_port)) },
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(
+            // Compact pill-style quick connect bar
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .padding(start = 14.dp, end = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Terminal,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (quickConnectText.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.user_host_or_host_port),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = quickConnectText,
+                            onValueChange = { quickConnectText = it },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                            keyboardActions = KeyboardActions(
+                                onGo = {
+                                    quickConnectAction(
+                                        quickConnectText, viewModel, sshKeys, quickConnectError,
+                                        { connectingProfile = it },
+                                        { quickConnectText = "" },
+                                    )
+                                },
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    FilledTonalIconButton(
                         onClick = {
                             quickConnectAction(
                                 quickConnectText, viewModel, sshKeys, quickConnectError,
@@ -526,24 +611,20 @@ fun ConnectionsScreen(
                             )
                         },
                         enabled = quickConnectText.isNotBlank(),
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
                     ) {
-                        Icon(Icons.Filled.Cable, contentDescription = stringResource(R.string.connect))
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(
-                    onGo = {
-                        quickConnectAction(
-                            quickConnectText, viewModel, sshKeys, quickConnectError,
-                            { connectingProfile = it },
-                            { quickConnectText = "" },
+                        Icon(
+                            Icons.Filled.Cable,
+                            contentDescription = stringResource(R.string.connect),
+                            modifier = Modifier.size(18.dp),
                         )
-                    },
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+                    }
+                }
+            }
 
             // Linux VM card — shown when Terminal app is installed
             if (localVmStatus.terminalAppInstalled) {
@@ -556,7 +637,7 @@ fun ConnectionsScreen(
             }
 
             if (connections.isEmpty()) {
-                EmptyState(zh = zh)
+                EmptyState(zh = zh, onAddConnection = { showAddDialog = true })
             } else {
                 // Build tree: top-level profiles first, then dependents nested beneath.
                 // A profile is a child if it has a jumpProfileId (SSH multihop) or
@@ -570,7 +651,16 @@ fun ConnectionsScreen(
                     .groupBy({ it.first }, { it.second })
                 val renderedAsChild = dependentsByParent.values.flatten().map { it.id }.toSet()
 
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 4.dp,
+                        bottom = 88.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     // Top-level: no jump host, or jump host not in saved profiles (orphan)
                     val topLevel = connections.filter { it.id !in renderedAsChild }
                     topLevel.forEach { profile ->
@@ -716,9 +806,33 @@ private fun ConnectionTreeItem(
 ) {
     val profileStatus = profileStatuses[profile.id]
     var showMenu by remember { mutableStateOf(false) }
+    var showDropdownMenu by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var pressOffset by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val interactionSource = remember { MutableInteractionSource() }
+
+    val protocolTag = when {
+        profile.isReticulum -> "RNS"
+        profile.isVnc -> "VNC"
+        profile.isRdp -> "RDP"
+        profile.isSmb -> "SMB"
+        profile.isMosh -> "Mosh"
+        profile.isEternalTerminal -> "ET"
+        else -> "SSH"
+    }
+    val protocolIcon = when {
+        profile.isReticulum -> Icons.Filled.CellTower
+        profile.isVnc -> Icons.Filled.ScreenShare
+        profile.isRdp -> Icons.Filled.DesktopWindows
+        profile.isSmb -> Icons.Filled.FolderShared
+        else -> Icons.Filled.Terminal
+    }
+    val protocolTint = when {
+        profile.isVnc || profile.isRdp -> MaterialTheme.colorScheme.tertiary
+        profile.isSmb -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.primary
+    }
 
     if (showRenameDialog) {
         RenameDialog(
@@ -735,24 +849,21 @@ private fun ConnectionTreeItem(
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (indent > 0) {
-                // Tree connector
                 val lineColor = MaterialTheme.colorScheme.outlineVariant
                 androidx.compose.foundation.Canvas(
                     modifier = Modifier
-                        .width(24.dp)
-                        .height(56.dp)
-                        .padding(start = 12.dp),
+                        .width(22.dp)
+                        .height(64.dp)
+                        .padding(start = 6.dp),
                 ) {
                     val midX = size.width / 2
                     val midY = size.height / 2
-                    // Vertical line (half or full depending on position)
                     drawLine(
                         color = lineColor,
                         start = androidx.compose.ui.geometry.Offset(midX, 0f),
                         end = androidx.compose.ui.geometry.Offset(midX, if (isLastChild) midY else size.height),
                         strokeWidth = 2f,
                     )
-                    // Horizontal branch
                     drawLine(
                         color = lineColor,
                         start = androidx.compose.ui.geometry.Offset(midX, midY),
@@ -762,52 +873,31 @@ private fun ConnectionTreeItem(
                 }
             }
 
-            ListItem(
-                headlineContent = { Text(profile.label) },
-                supportingContent = {
-                    if (profile.isReticulum) {
-                        Text(
-                            if (zh) {
-                                "RNS：${profile.destinationHash?.take(12) ?: ""}...，经由 ${profile.reticulumHost}:${profile.reticulumPort}"
-                            } else {
-                                "RNS: ${profile.destinationHash?.take(12) ?: ""}... via ${profile.reticulumHost}:${profile.reticulumPort}"
-                            }
-                        )
-                    } else {
-                        val suffix = if (jumpHostLabel != null && indent == 0) {
-                            stringResource(R.string.via_jumphostlabel, jumpHostLabel)
-                        } else ""
-                        Text("${profile.username}@${profile.host}:${profile.port}$suffix")
-                    }
-                },
-                leadingContent = {
-                    when {
-                        isConnecting -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        profileStatus == ProfileStatus.RECONNECTING -> CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
-                        profileStatus == ProfileStatus.CONNECTED -> Icon(
-                            Icons.Filled.Circle,
-                            contentDescription = stringResource(R.string.connected),
-                            tint = profileColors[profile.id] ?: Color(0xFF4CAF50),
-                            modifier = Modifier.size(12.dp),
-                        )
-                        profileStatus == ProfileStatus.ERROR -> Icon(
-                            Icons.Filled.Circle,
-                            contentDescription = stringResource(R.string.error),
-                            tint = Color(0xFFF44336),
-                            modifier = Modifier.size(12.dp),
-                        )
-                        else -> Icon(
-                            Icons.Filled.Circle,
-                            contentDescription = stringResource(R.string.disconnected),
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(12.dp),
-                        )
-                    }
-                },
+            ElevatedCard(
                 modifier = Modifier
                     .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = 1.dp,
+                        color = if (profileStatus == ProfileStatus.CONNECTED) {
+                            (profileColors[profile.id] ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    .indication(interactionSource, ripple())
                     .pointerInput(profile.id) {
                         detectTapGestures(
+                            onPress = { offset ->
+                                val press = PressInteraction.Press(offset)
+                                interactionSource.emit(press)
+                                val released = tryAwaitRelease()
+                                interactionSource.emit(
+                                    if (released) PressInteraction.Release(press)
+                                    else PressInteraction.Cancel(press)
+                                )
+                            },
                             onTap = { onTap() },
                             onLongPress = { offset ->
                                 pressOffset = androidx.compose.ui.unit.DpOffset(
@@ -818,7 +908,206 @@ private fun ConnectionTreeItem(
                             }
                         )
                     },
-            )
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 4.dp, top = 11.dp, bottom = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Protocol icon avatar with status indicator dot
+                    Box(modifier = Modifier.size(44.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(protocolTint.copy(alpha = 0.13f))
+                                .align(Alignment.TopStart),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isConnecting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = protocolTint,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = protocolIcon,
+                                    contentDescription = null,
+                                    tint = protocolTint,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .align(Alignment.BottomEnd)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            when (profileStatus) {
+                                ProfileStatus.RECONNECTING -> CircularProgressIndicator(
+                                    modifier = Modifier.size(10.dp),
+                                    strokeWidth = 1.5.dp,
+                                )
+                                ProfileStatus.CONNECTED -> Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(profileColors[profile.id] ?: Color(0xFF4CAF50)),
+                                )
+                                ProfileStatus.ERROR -> Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.error),
+                                )
+                                else -> Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = profile.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                            ) {
+                                Text(
+                                    text = protocolTag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        val subtitle = if (profile.isReticulum) {
+                            if (zh) {
+                                "RNS：${profile.destinationHash?.take(12) ?: ""}... · ${profile.reticulumHost}:${profile.reticulumPort}"
+                            } else {
+                                "RNS: ${profile.destinationHash?.take(12) ?: ""}... · ${profile.reticulumHost}:${profile.reticulumPort}"
+                            }
+                        } else {
+                            val suffix = if (jumpHostLabel != null && indent == 0) {
+                                stringResource(R.string.via_jumphostlabel, jumpHostLabel)
+                            } else ""
+                            "${profile.username}@${profile.host}:${profile.port}$suffix"
+                        }
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    Box {
+                        IconButton(
+                            onClick = { showDropdownMenu = true },
+                            modifier = Modifier.size(38.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = if (zh) "更多操作" else "More options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showDropdownMenu,
+                            onDismissRequest = { showDropdownMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.rename)) },
+                                leadingIcon = { Icon(Icons.Filled.DriveFileRenameOutline, null) },
+                                onClick = { showDropdownMenu = false; showRenameDialog = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.edit)) },
+                                leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                                onClick = { showDropdownMenu = false; onEdit() },
+                            )
+                            if (profile.isSsh) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.port_forwards)) },
+                                    leadingIcon = { Icon(Icons.Filled.SyncAlt, null) },
+                                    onClick = { showDropdownMenu = false; onPortForwards() },
+                                )
+                            }
+                            if (profile.isSsh && profileStatus != ProfileStatus.CONNECTED) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.connect)) },
+                                    leadingIcon = { Icon(Icons.Filled.Password, null) },
+                                    onClick = { showDropdownMenu = false; onConnectWithPassword() },
+                                )
+                            }
+                            if (profile.isSsh && profileStatus == ProfileStatus.CONNECTED) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.new_session)) },
+                                    leadingIcon = { Icon(Icons.Filled.Add, null) },
+                                    onClick = { showDropdownMenu = false; onNewSession() },
+                                )
+                            }
+                            if (profileStatus == ProfileStatus.CONNECTED) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.disconnect)) },
+                                    leadingIcon = { Icon(Icons.Filled.LinkOff, null) },
+                                    onClick = { showDropdownMenu = false; onDisconnect() },
+                                )
+                            }
+                            if (profile.isSsh && hasKeys) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.deploy_ssh_key)) },
+                                    leadingIcon = { Icon(Icons.Filled.VpnKey, null) },
+                                    onClick = { showDropdownMenu = false; onDeployKey() },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(R.string.delete),
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                onClick = { showDropdownMenu = false; onDelete() },
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         if (showMenu) {
@@ -948,30 +1237,51 @@ private fun PopupMenuRow(
 }
 
 @Composable
-private fun EmptyState(zh: Boolean) {
+private fun EmptyState(
+    zh: Boolean,
+    onAddConnection: () -> Unit,
+) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            Icons.Filled.Cable,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Cable,
+                contentDescription = null,
+                modifier = Modifier.size(34.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(
             stringResource(R.string.no_connections_yet),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 16.dp),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 18.dp),
         )
         Text(
             stringResource(R.string.tap_to_add_a_server),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp),
         )
+        Spacer(Modifier.height(20.dp))
+        FilledTonalButton(onClick = onAddConnection) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.add_connection))
+        }
     }
 }
 
@@ -1108,8 +1418,14 @@ private fun LinuxVmCard(
     val hasServices = vmStatus.sshPort != null || vmStatus.vncPort != null
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(16.dp),
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

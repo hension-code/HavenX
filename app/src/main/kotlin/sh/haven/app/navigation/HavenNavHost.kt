@@ -1,6 +1,7 @@
 package com.hension.havenx.navigation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.exclude
@@ -10,12 +11,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,19 +93,39 @@ fun HavenNavHost(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets.exclude(WindowInsets.ime),
         bottomBar = {
             if (!desktopFullscreen) {
-                NavigationBar {
-                    screens.forEachIndexed { index, screen ->
-                        val label = stringResource(screen.labelRes)
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = label) },
-                            label = { Text(label) },
-                            selected = pagerState.currentPage == index,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(index)
-                                }
-                            }
-                        )
+                Column {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                    NavigationBar(tonalElevation = 2.dp) {
+                        screens.forEachIndexed { index, screen ->
+                            val label = stringResource(screen.labelRes)
+                            val selected = pagerState.currentPage == index
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selected) screen.icon else screen.unselectedIcon,
+                                        contentDescription = label,
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    )
+                                },
+                                selected = selected,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }

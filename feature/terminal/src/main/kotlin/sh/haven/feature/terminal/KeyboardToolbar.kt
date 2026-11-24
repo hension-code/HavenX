@@ -848,6 +848,7 @@ private fun RepeatingButton(
 
     FilledTonalButton(
         onClick = {}, // handled by pointerInteropFilter
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
         modifier = modifier.pointerInteropFilter { motionEvent ->
             when (motionEvent.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
@@ -907,6 +908,7 @@ private fun ToolbarTextButton(label: String, onClick: () -> Unit) {
 private fun ToolbarToggleButton(label: String, active: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
         modifier = Modifier
             .padding(horizontal = 1.dp)
             .height(32.dp),

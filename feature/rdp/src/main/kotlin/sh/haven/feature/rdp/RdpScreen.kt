@@ -220,20 +220,43 @@ private fun DesktopPlaceholder(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(protocol, style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    androidx.compose.foundation.shape.CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Fullscreen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(34.dp),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
         Text(
-            stringResource(R.string.add_a_connection_on_the),
-            style = MaterialTheme.typography.bodyLarge,
+            text = protocol,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.add_a_connection_on_the),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         if (error != null) {
             Spacer(Modifier.height(16.dp))
             Card(
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                 ),
@@ -511,49 +534,75 @@ private fun RdpViewer(
 
         // Bottom toolbar (hidden in fullscreen)
         if (!fullscreen) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Button(onClick = onDisconnect) {
-                    Text(stringResource(R.string.disconnect))
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                IconButton(onClick = {
-                    keyboardVisible = !keyboardVisible
-                    if (keyboardVisible) {
-                        focusRequester.requestFocus()
-                        keyboardController?.show()
-                    } else {
-                        keyboardController?.hide()
+            Surface(tonalElevation = 2.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilledTonalButton(
+                        onClick = onDisconnect,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    ) {
+                        Text(
+                            stringResource(R.string.disconnect),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
-                }) {
-                    Icon(
-                        if (keyboardVisible) Icons.Default.KeyboardHide
-                        else Icons.Default.Keyboard,
-                        contentDescription = stringResource(R.string.toggle_keyboard),
-                    )
-                }
 
-                Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(6.dp))
 
-                if (zoom != 1f || panX != 0f || panY != 0f) {
-                    Button(onClick = {
-                        zoom = 1f
-                        panX = 0f
-                        panY = 0f
-                    }) {
-                        Text(stringResource(R.string.reset_zoom))
+                    IconButton(
+                        onClick = {
+                            keyboardVisible = !keyboardVisible
+                            if (keyboardVisible) {
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            } else {
+                                keyboardController?.hide()
+                            }
+                        },
+                        modifier = Modifier.size(38.dp),
+                    ) {
+                        Icon(
+                            if (keyboardVisible) Icons.Default.KeyboardHide
+                            else Icons.Default.Keyboard,
+                            contentDescription = stringResource(R.string.toggle_keyboard),
+                        )
                     }
-                    Spacer(Modifier.width(8.dp))
-                }
 
-                IconButton(onClick = onToggleFullscreen) {
-                    Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.fullscreen))
+                    Spacer(Modifier.weight(1f))
+
+                    if (zoom != 1f || panX != 0f || panY != 0f) {
+                        FilledTonalButton(
+                            onClick = {
+                                zoom = 1f
+                                panX = 0f
+                                panY = 0f
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.reset_zoom),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
+
+                    IconButton(
+                        onClick = onToggleFullscreen,
+                        modifier = Modifier.size(38.dp),
+                    ) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.fullscreen))
+                    }
                 }
             }
         }

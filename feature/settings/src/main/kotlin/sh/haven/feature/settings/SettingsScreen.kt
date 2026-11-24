@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ColorLens
@@ -46,6 +49,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -58,11 +62,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
@@ -174,122 +180,149 @@ fun SettingsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text(stringResource(R.string.settings)) })
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-
-        if (viewModel.biometricAvailable) {
-            SettingsToggleItem(
-                icon = Icons.Filled.Fingerprint,
-                title = stringResource(R.string.biometric_unlock),
-                subtitle = stringResource(R.string.require_biometrics_to_open_havenx),
-                checked = biometricEnabled,
-                onCheckedChange = viewModel::setBiometricEnabled,
+        Surface(tonalElevation = 2.dp, shadowElevation = 1.dp) {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.settings),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
             )
-            if (biometricEnabled) {
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (viewModel.biometricAvailable) {
+                SettingsSectionCard(title = if (zh) "安全与隐私" else "Security") {
+                    SettingsToggleItem(
+                        icon = Icons.Filled.Fingerprint,
+                        title = stringResource(R.string.biometric_unlock),
+                        subtitle = stringResource(R.string.require_biometrics_to_open_havenx),
+                        checked = biometricEnabled,
+                        onCheckedChange = viewModel::setBiometricEnabled,
+                    )
+                    if (biometricEnabled) {
+                        SettingsGroupDivider()
+                        SettingsItem(
+                            icon = Icons.Filled.Timer,
+                            title = stringResource(R.string.lock_timeout),
+                            subtitle = lockTimeoutLabel(lockTimeout, zh),
+                            onClick = { showLockTimeoutDialog = true },
+                        )
+                    }
+                }
+            }
+
+            SettingsSectionCard(title = if (zh) "终端与键盘" else "Terminal & Keyboard") {
                 SettingsItem(
-                    icon = Icons.Filled.Timer,
-                    title = stringResource(R.string.lock_timeout),
-                    subtitle = lockTimeoutLabel(lockTimeout, zh),
-                    onClick = { showLockTimeoutDialog = true },
+                    icon = Icons.Filled.Terminal,
+                    title = stringResource(R.string.session_persistence),
+                    subtitle = if (sessionManager == UserPreferencesRepository.SessionManager.NONE) {
+                        stringResource(R.string.none)
+                    } else {
+                        sessionManager.label
+                    },
+                    onClick = { showSessionManagerDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.TextFields,
+                    title = stringResource(R.string.terminal_font_size),
+                    subtitle = "${fontSize}sp",
+                    onClick = { showFontSizeDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.FontDownload,
+                    title = if (zh) "终端字体" else "Terminal Font",
+                    subtitle = terminalFont.label,
+                    onClick = { showFontDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.Palette,
+                    title = stringResource(R.string.terminal_color_scheme),
+                    subtitle = colorSchemeLabel(colorScheme, zh),
+                    onClick = { showColorSchemeDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.KeyboardAlt,
+                    title = stringResource(R.string.keyboard_toolbar),
+                    subtitle = stringResource(R.string.configure_toolbar_keys_and_layout),
+                    onClick = { showToolbarConfigDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.Bolt,
+                    title = stringResource(R.string.combo_keys_and_snippets),
+                    subtitle = stringResource(R.string.configure_combo_keys_and_snippets),
+                    onClick = { showComboKeysDialog = true },
                 )
             }
-        }
-        SettingsItem(
-            icon = Icons.Filled.Terminal,
-            title = stringResource(R.string.session_persistence),
-            subtitle = if (sessionManager == UserPreferencesRepository.SessionManager.NONE) {
-                stringResource(R.string.none)
-            } else {
-                sessionManager.label
-            },
-            onClick = { showSessionManagerDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.TextFields,
-            title = stringResource(R.string.terminal_font_size),
-            subtitle = "${fontSize}sp",
-            onClick = { showFontSizeDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.FontDownload,
-            title = if (zh) "终端字体" else "Terminal Font",
-            subtitle = terminalFont.label,
-            onClick = { showFontDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.Palette,
-            title = stringResource(R.string.terminal_color_scheme),
-            subtitle = colorSchemeLabel(colorScheme, zh),
-            onClick = { showColorSchemeDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.KeyboardAlt,
-            title = stringResource(R.string.keyboard_toolbar),
-            subtitle = stringResource(R.string.configure_toolbar_keys_and_layout),
-            onClick = { showToolbarConfigDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.KeyboardAlt,
-            title = stringResource(R.string.combo_keys_and_snippets),
-            subtitle = stringResource(R.string.configure_combo_keys_and_snippets),
-            onClick = { showComboKeysDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.ColorLens,
-            title = stringResource(R.string.theme),
-            subtitle = themeModeLabel(theme, zh),
-            onClick = { showThemeDialog = true },
-        )
-        SettingsItem(
-            icon = Icons.Filled.Language,
-            title = stringResource(R.string.language),
-            subtitle = when (languageMode) {
-                UserPreferencesRepository.LanguageMode.SYSTEM -> stringResource(R.string.system_default)
-                UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
-                UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
-            },
-            onClick = { showLanguageDialog = true },
-        )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            SettingsSectionCard(title = if (zh) "外观与语言" else "Appearance & Language") {
+                SettingsItem(
+                    icon = Icons.Filled.ColorLens,
+                    title = stringResource(R.string.theme),
+                    subtitle = themeModeLabel(theme, zh),
+                    onClick = { showThemeDialog = true },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.Language,
+                    title = stringResource(R.string.language),
+                    subtitle = when (languageMode) {
+                        UserPreferencesRepository.LanguageMode.SYSTEM -> stringResource(R.string.system_default)
+                        UserPreferencesRepository.LanguageMode.ENGLISH -> "English"
+                        UserPreferencesRepository.LanguageMode.CHINESE_SIMPLIFIED -> "简体中文"
+                    },
+                    onClick = { showLanguageDialog = true },
+                )
+            }
 
-        SettingsItem(
-            icon = Icons.Filled.CloudUpload,
-            title = stringResource(R.string.export_backup),
-            subtitle = stringResource(R.string.keys_connections_and_settings),
-            onClick = {
-                showBackupPasswordDialog = BackupAction.Export
-            },
-        )
-        SettingsItem(
-            icon = Icons.Filled.CloudDownload,
-            title = stringResource(R.string.restore_backup),
-            subtitle = stringResource(R.string.import_from_a_backup_file),
-            onClick = {
-                importLauncher.launch(arrayOf("*/*"))
-            },
-        )
+            SettingsSectionCard(title = if (zh) "数据与备份" else "Backup & Restore") {
+                SettingsItem(
+                    icon = Icons.Filled.CloudUpload,
+                    title = stringResource(R.string.export_backup),
+                    subtitle = stringResource(R.string.keys_connections_and_settings),
+                    onClick = { showBackupPasswordDialog = BackupAction.Export },
+                )
+                SettingsGroupDivider()
+                SettingsItem(
+                    icon = Icons.Filled.CloudDownload,
+                    title = stringResource(R.string.restore_backup),
+                    subtitle = stringResource(R.string.import_from_a_backup_file),
+                    onClick = { importLauncher.launch(arrayOf("*/*")) },
+                )
+                if (backupStatus is SettingsViewModel.BackupStatus.InProgress) {
+                    SettingsGroupDivider()
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.working)) },
+                        leadingContent = {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+            }
 
-        if (backupStatus is SettingsViewModel.BackupStatus.InProgress) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.working)) },
-                leadingContent = {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                },
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-        }
+            SettingsSectionCard(title = if (zh) "关于" else "About") {
+                SettingsItem(
+                    icon = Icons.Filled.Info,
+                    title = stringResource(R.string.about_havenx),
+                    subtitle = "v${packageInfo.versionName}",
+                    onClick = { showAboutDialog = true },
+                )
+            }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        SettingsItem(
-            icon = Icons.Filled.Info,
-            title = stringResource(R.string.about_havenx),
-            subtitle = "v${packageInfo.versionName}",
-            onClick = { showAboutDialog = true },
-        )
-
-    } // scrollable Column
+            Spacer(Modifier.height(12.dp))
+        } // scrollable Column
     } // outer Column
 
     LaunchedEffect(updateState) {
@@ -1116,6 +1149,43 @@ private fun SelectableDialogRow(
 }
 
 @Composable
+private fun SettingsSectionCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 6.dp, bottom = 6.dp),
+        )
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+                    shape = RoundedCornerShape(16.dp),
+                ),
+            shape = RoundedCornerShape(16.dp),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth(), content = content)
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroupDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 64.dp, end = 16.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+    )
+}
+
+@Composable
 private fun SettingsToggleItem(
     icon: ImageVector,
     title: String,
@@ -1124,17 +1194,37 @@ private fun SettingsToggleItem(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle) },
+        headlineContent = {
+            Text(text = title, fontWeight = FontWeight.Medium)
+        },
+        supportingContent = {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         leadingContent = {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
         },
         trailingContent = {
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         },
-        modifier = Modifier
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 8.dp),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { onCheckedChange(!checked) },
     )
 }
 
@@ -1146,14 +1236,42 @@ private fun SettingsItem(
     onClick: () -> Unit = {},
 ) {
     ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle) },
-        leadingContent = {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        headlineContent = {
+            Text(text = title, fontWeight = FontWeight.Medium)
         },
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+        supportingContent = {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        },
+        trailingContent = {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(18.dp),
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable(onClick = onClick),
     )
 }
 
@@ -1305,6 +1423,13 @@ private fun ComboKeysAndSnippetsDialog(
                                         }
 
                                         Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isDragging) {
+                                                    MaterialTheme.colorScheme.surfaceVariant
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                            ),
                                             elevation = CardDefaults.cardElevation(
                                                 defaultElevation = animatedElevation,
                                             ),
@@ -1355,6 +1480,13 @@ private fun ComboKeysAndSnippetsDialog(
                                                     Text(stringResource(R.string.delete))
                                                 }
                                             }
+                                            if (!isDragging && key.id != orderedKeys.last().id) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                                    thickness = 0.5.dp,
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1396,6 +1528,13 @@ private fun ComboKeysAndSnippetsDialog(
                                         }
 
                                         Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isDragging) {
+                                                    MaterialTheme.colorScheme.surfaceVariant
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                            ),
                                             elevation = CardDefaults.cardElevation(
                                                 defaultElevation = animatedElevation,
                                             ),
@@ -1448,6 +1587,13 @@ private fun ComboKeysAndSnippetsDialog(
                                                 }) {
                                                     Text(stringResource(R.string.delete))
                                                 }
+                                            }
+                                            if (!isDragging && snippet.id != orderedSnippets.last().id) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                                    thickness = 0.5.dp,
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                                )
                                             }
                                         }
                                     }

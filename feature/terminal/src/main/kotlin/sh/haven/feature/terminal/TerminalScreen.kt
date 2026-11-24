@@ -26,8 +26,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -203,6 +208,7 @@ fun TerminalScreen(
                 backgroundColor = Color(colorScheme.background),
                 foregroundColor = Color(colorScheme.foreground),
                 zh = zh,
+                onNavigateToConnections = onNavigateToConnections,
             )
         } else {
             // Tab row — always show when tabs exist so "+" button is accessible
@@ -215,69 +221,72 @@ fun TerminalScreen(
             val clampedIndex = activeTabIndex.coerceIn(0, tabs.size - 1)
             val indicatorColor = profileColors[tabs.getOrNull(clampedIndex)?.profileId]
 
-            PrimaryScrollableTabRow(
-                selectedTabIndex = clampedIndex,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                edgePadding = 8.dp,
-                indicator = {
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(clampedIndex),
-                        color = indicatorColor ?: MaterialTheme.colorScheme.primary,
-                    )
-                },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-
-                tabs.forEachIndexed { index, tab ->
-                    val reconnecting by tab.isReconnecting.collectAsState()
-                    Tab(
-                        selected = activeTabIndex == index,
-                        onClick = { viewModel.selectTab(index) },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                profileColors[tab.profileId]?.let { color ->
-                                    Box(
-                                        modifier = Modifier
-                                            .width(4.dp)
-                                            .height(16.dp)
-                                            .background(color, CircleShape),
-                                    )
+                PrimaryScrollableTabRow(
+                    selectedTabIndex = clampedIndex,
+                    modifier = Modifier.weight(1f),
+                    edgePadding = 8.dp,
+                    indicator = {
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(clampedIndex),
+                            color = indicatorColor ?: MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        val reconnecting by tab.isReconnecting.collectAsState()
+                        Tab(
+                            selected = activeTabIndex == index,
+                            onClick = { viewModel.selectTab(index) },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    profileColors[tab.profileId]?.let { color ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width(4.dp)
+                                                .height(16.dp)
+                                                .background(color, CircleShape),
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+                                    if (reconnecting) {
+                                        Icon(
+                                            Icons.Filled.Autorenew,
+                                            contentDescription = stringResource(R.string.reconnecting),
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                    }
+                                    Text(tab.label, maxLines = 1)
                                     Spacer(Modifier.width(6.dp))
-                                }
-                                if (reconnecting) {
-                                    Icon(
-                                        Icons.Filled.Autorenew,
-                                        contentDescription = stringResource(R.string.reconnecting),
-                                        modifier = Modifier.size(14.dp),
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                }
-                                Text(tab.label, maxLines = 1)
-                                if (activeTabIndex == index) {
-                                    Spacer(Modifier.width(8.dp))
                                     IconButton(
-                                        onClick = { viewModel.addTab() },
-                                        enabled = !newTabLoading,
-                                        modifier = Modifier.size(20.dp),
+                                        onClick = { viewModel.closeTab(tab.sessionId) },
+                                        modifier = Modifier.size(26.dp),
                                     ) {
                                         Icon(
-                                            Icons.Filled.Add,
-                                            contentDescription = stringResource(R.string.clone_tab),
+                                            Icons.Filled.Close,
+                                            contentDescription = stringResource(R.string.close_tab),
                                             modifier = Modifier.size(14.dp),
                                         )
                                     }
                                 }
-                                IconButton(
-                                    onClick = { viewModel.closeTab(tab.sessionId) },
-                                    modifier = Modifier.size(20.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Close,
-                                        contentDescription = stringResource(R.string.close_tab),
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                }
-                            }
-                        },
+                            },
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { viewModel.addTab() },
+                    enabled = !newTabLoading,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.clone_tab),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -462,20 +471,45 @@ private fun EmptyTerminalState(
     backgroundColor: Color,
     foregroundColor: Color,
     zh: Boolean,
+    onNavigateToConnections: () -> Unit,
 ) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .padding(16.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(foregroundColor.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Terminal,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(34.dp),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
         Text(
             text = stringResource(R.string.connect_to_a_server_to),
             fontFamily = FontFamily.Monospace,
-            fontSize = fontSize.sp,
-            color = foregroundColor,
+            fontSize = fontSize.coerceIn(13, 16).sp,
+            color = foregroundColor.copy(alpha = 0.85f),
+            textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(20.dp))
+        FilledTonalButton(onClick = onNavigateToConnections) {
+            Text(
+                text = if (zh) "前往连接" else "Go to Connections",
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 

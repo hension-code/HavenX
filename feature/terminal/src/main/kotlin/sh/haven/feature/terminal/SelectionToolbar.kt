@@ -5,12 +5,15 @@ import android.net.Uri
 import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -421,7 +424,9 @@ fun SelectionToolbarContent(
     var anchorTarget by remember { mutableStateOf(AnchorTarget.END) }
 
     Row(
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -518,6 +523,7 @@ private fun moveAnchor(
 private fun SelectionToggleButton(label: String, active: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
+        shape = RoundedCornerShape(7.dp),
         modifier = Modifier
             .padding(horizontal = 1.dp)
             .height(32.dp),
