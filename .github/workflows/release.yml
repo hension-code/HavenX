@@ -34,9 +34,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install SDK platform 36
-        run: sdkmanager "platforms;android-36"
+        with:
+          packages: platform-tools platforms;android-36
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
